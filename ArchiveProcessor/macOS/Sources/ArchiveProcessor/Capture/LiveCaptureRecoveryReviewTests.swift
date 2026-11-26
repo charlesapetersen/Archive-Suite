@@ -4,10 +4,11 @@ import AppKit
 import PDFKit
 import ArchiveCore
 
-// Tests 21-29 of LiveCaptureRecoveryTestDriver.run(), one function each (W49.proc-build-memory).
+// Tests 21-29 of LiveCaptureRecoveryTestDriver.run(), one function each (W49.proc-build-memory): as one
+// function, type-checking and lowering `run()` took a single swift-frontend to 9.4 GB. Each runs only with a scratch
+// backup root (`ARCHIVEPROC_TEST_BACKUP_ROOT`), as `run()` checks before calling.
 extension LiveCaptureRecoveryTestDriver {
-    /// Test 21 (W3.cap-r3-fu7) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 21 (W3.cap-r3-fu7) of `run()`.
     static func runTest21(tmp: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
@@ -220,8 +221,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRTasks = [:]
     }
 
-    /// Test 22 (W3.cap-r3-fu11) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 22 (W3.cap-r3-fu11) of `run()`.
     static func runTest22(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
@@ -428,8 +428,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRTasks = [:]
     }
 
-    /// Test 23 (W3.cap-r3-fu9) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 23 (W3.cap-r3-fu9) of `run()`.
     static func runTest23(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
@@ -621,8 +620,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRTasks = [:]
     }
 
-    /// Test 24 (W3.cap-r3-fu9-fu1) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 24 (W3.cap-r3-fu9-fu1) of `run()`.
     static func runTest24(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         // Prune the throwaway backup root FIRST, exactly as Test 23 does and for a reason this section
@@ -834,8 +832,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRTasks = [:]
     }
 
-    /// Test 25 (W3.cap-r3-fu12) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 25 (W3.cap-r3-fu12) of `run()`.
     static func runTest25(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         // Prune the throwaway backup root FIRST, for the reason Test 24 records: `CaptureSession()` adopts
@@ -1191,8 +1188,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRTasks = [:]
     }
 
-    /// W3.cap-r3-fu12-fu2 review regression of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// W3.cap-r3-fu12-fu2 review regression of `run()`.
     static func runTest25fu2(check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         let journalFolder = CaptureSession.backupRoot
@@ -1228,8 +1224,7 @@ extension LiveCaptureRecoveryTestDriver {
                   && after?.entries.isEmpty == true)
     }
 
-    /// Test 26 (W3.cap-r3-fu8) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 26 (W3.cap-r3-fu8) of `run()`.
     static func runTest26to29(tmp: URL, staging: URL, stubModel: LLMModel, bitmap: NSBitmapImageRep?, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         let rsOut = tmp.appendingPathComponent("fu8out", isDirectory: true)

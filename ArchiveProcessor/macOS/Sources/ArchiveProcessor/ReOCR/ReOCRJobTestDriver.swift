@@ -195,65 +195,16 @@ enum ReOCRJobTestDriver {
         root = URL(fileURLWithPath: dir, isDirectory: true)
         do {
             // 1. Two pages, end to end.
-            do {
-                let d = try folder("two"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let original = try Data(contentsOf: f)
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                check("1 the reader is asked once, for the image page", reader.calls.map(\.imageIndex) == [0])
-                let source = try Data(contentsOf: d.appendingPathComponent("IMG1.jpg"))
-                check("1 the reader gets the source JPEG byte for byte", reader.calls.first?.image == source,
-                      "\(reader.calls.first?.image.count ?? 0) vs \(source.count) bytes")
-                check("1 the page image is removed after its reading",
-                      ((try? FileManager.default.contentsOfDirectory(atPath: j.scratch.path)) ?? ["?"]).isEmpty)
-                check("1 the review shows the old text", review.results.first?.oldText.contains("Old reading of image 1.") == true)
-                check("1 the review shows the new text",
-                      (try? review.results.first?.outcome.get())?.contains("New reading of image page 1.") == true)
-                check("1 there is a candidate", review.candidate != nil, review.candidateProblem ?? "")
-                check("1 the file is unchanged before accept", (try? Data(contentsOf: f)) == original)
-                _ = try j.accept(review)
-                check("1 accepting publishes the new text", text(f, 1).contains("New reading of image page 1.")
-                      && !text(f, 1).contains("Old reading"))
-                check("1 the old file is kept", (try? Data(contentsOf: j.writer.backupURL(review.operation.journal.operationID))) == original)
-            }
+            try await testSection1()
 
             // 2. One pair of three.
-            do {
-                let d = try folder("one-of-three"), f = try file(d, pairs: 3), j = job(d), reader = FakeReader()
-                let review = try await j.start(file: f, root: archive(d), textPages: [3], model: model, read: reader.read)
-                check("2 only the selected pair's image is read", reader.calls.map(\.imageIndex) == [2])
-                _ = try j.accept(review)
-                check("2 its text page changes", text(f, 3).contains("New reading of image page 3."))
-                check("2 the others keep their text", text(f, 1).contains("Old reading of image 1.")
-                      && text(f, 5).contains("Old reading of image 3."))
-                do { _ = try await j.start(file: f, root: archive(d), textPages: [2], model: model, read: reader.read); check("2 an image page is not selectable", false) }
-                catch { check("2 an image page is not selectable", (error as? ReOCRJob.Failure) == .noSuchPair(page: 2), "\(error)") }
-            }
+            try await testSection2()
 
             // 3. A failed pair.
-            do {
-                let d = try folder("failed-pair"), f = try file(d, pairs: 3), j = job(d), reader = FakeReader(failing: [2])
-                let original = try Data(contentsOf: f)
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                check("3 every pair is still tried", reader.calls.map(\.imageIndex) == [0, 2, 4])
-                check("3 a failed pair means no candidate", review.candidate == nil)
-                check("3 no image page changes are offered without a candidate", review.replacedImagePages == nil)
-                check("3 the failure is shown for its page", { if case .failure = review.results[1].outcome { return true }; return false }())
-                do { _ = try j.accept(review); check("3 accept is refused", false) }
-                catch { check("3 accept is refused", (error as? ReOCRJob.Failure) == .noCandidate, "\(error)") }
-                check("3 the file is untouched", (try? Data(contentsOf: f)) == original)
-                try j.reject(review)
-                check("3 the verdict is recorded", j.writer.recover() == [.rejected(review.operation.journal.operationID)])
-            }
+            try await testSection3()
 
             // 4. A Kind chosen by the person.
-            do {
-                let d = try folder("kind"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let review = try await j.start(file: f, root: archive(d), kinds: [1: .forms], model: model, read: reader.read)
-                check("4 the reader is told the chosen Kind", reader.calls.first?.kind == .forms)
-                _ = try j.accept(review)
-                let header = PDFDocument(url: f)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
-                check("4 the new header has the chosen Kind", header?.kind == .forms, "\(String(describing: header))")
-            }
+            try await testSection4()
 
             try await testEncryptedAndRawScan()
             try await testRawScanWithVisibleText()
@@ -261,640 +212,832 @@ enum ReOCRJobTestDriver {
             await ReOCRImageInputTestDriver.run(in: root) { check($0, $1, $2) }
 
             // 6. Changed between run and accept.
-            do {
-                let d = try folder("changed"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                let h = try FileHandle(forWritingTo: f); try h.seekToEnd(); try h.write(contentsOf: Data("\n%e\n".utf8)); try h.close()
-                let edited = try Data(contentsOf: f)
-                do { _ = try j.accept(review); check("6 a changed file is refused at accept", false) }
-                catch { check("6 a changed file is refused at accept", (error as? ReOCRFileWriter.Failure) == .targetChanged, "\(error)") }
-                check("6 the edit stays", (try? Data(contentsOf: f)) == edited)
-            }
+            try await testSection6()
 
             // 6b. A failure after prepare records the operation rejected rather than leaving it pending.
-            do {
-                let d = try folder("fail-after-prepare"), f = try file(d, pairs: 1), reader = FakeReader()
-                let blocker = d.appendingPathComponent("not-a-folder")
-                try Data("x".utf8).write(to: blocker)
-                let j = ReOCRJob(writer: ReOCRFileWriter(versionsRoot: d.appendingPathComponent("Versions", isDirectory: true)),
-                                 scratch: blocker.appendingPathComponent("scratch", isDirectory: true), support: support(d))
-                do { _ = try await j.start(file: f, root: archive(d), model: model, read: reader.read); check("6b a failure after prepare throws", false) }
-                catch { check("6b a failure after prepare throws", true) }
-                let r = j.writer.recover()
-                check("6b the operation is recorded rejected", r.count == 1 && { if case .rejected = r[0] { return true }; return false }(), "\(r)")
-                check("6b nothing was read", reader.calls.isEmpty)
-            }
+            try await testSection6b()
 
             // 6c. The JPEG fast path only when the page shows exactly the JPEG.
-            do {
-                let d = try folder("fast-path")
-                let img = d.appendingPathComponent("j.jpg")
-                try jpeg(img, seed: 2)
-                let jpg = try Data(contentsOf: img)
-                func page(_ content: String, image: String = "", resources: String = "") -> Data {
-                    handPDF(content: content, jpeg: jpg, imageExtra: image, resources: resources)
-                }
-                check("6c a plain full-page image is extracted",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == jpg)
-                check("6c a letterboxed image inside the page is extracted",
-                      ReOCRJob.embeddedJPEG(page("q 100 0 0 125 50 60 cm /Im0 Do Q"), pageIndex: 0) == jpg)
-                check("6c an image cropped by the page is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 400 0 0 500 -100 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
-                check("6c a flipped image is rendered",
-                      ReOCRJob.embeddedJPEG(page("q -200 0 0 250 200 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
-                check("6c a page that also draws text is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0) == nil)
-                // W42.int-s5: the searchable layer is text in render mode 3, which paints nothing.
-                check("6c a page whose only text is invisible (the searchable layer) is extracted",
-                      ReOCRJob.embeddedJPEG(page("q Q q 0 0 200 250 re W n q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT (x) Tj [(y) -2 (z)] TJ ET Q"),
-                                            pageIndex: 0) == jpg)
-                check("6c invisible text in a Type 3 font is rendered (its glyphs are procedures that may paint)",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT /F1 1 Tf (x) Tj ET",
-                                                 resources: "/Font << /F1 << /Type /Font /Subtype /Type3 >> >>"),
-                                            pageIndex: 0) == nil)
-                check("6c invisible text in a TrueType font is extracted",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT /F1 1 Tf (x) Tj ET",
-                                                 resources: "/Font << /F1 << /Type /Font /Subtype /TrueType >> >>"),
-                                            pageIndex: 0) == jpg)
-                check("6c text in another render mode is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 2 Tr BT (x) Tj ET"), pageIndex: 0) == nil)
-                check("6c a render mode Q restores is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 3 Tr Q q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0) == nil)
-                check("6c an unbalanced Q is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q Q"), pageIndex: 0) == nil)
-                check("6c an image clipped smaller is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 0 0 100 100 re W n 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
-                check("6c a clip to the whole page (as PDFKit writes) is extracted",
-                      ReOCRJob.embeddedJPEG(page("q Q q 0 0 200 250 re W n q 200 0 0 250 0 0 cm /Im0 Do Q Q"), pageIndex: 0) == jpg)
-                check("6c a rectangle that is filled, not clipped, is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 0 0 10 10 re f 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
-                check("6c a masked image is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q", image: "/Decode [1 0 1 0 1 0]"), pageIndex: 0) == nil)
-                check("6c an image drawn twice is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q q 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
-                let rendered = d.appendingPathComponent("r.jpg")
-                check("6c a rendered page still reaches the reader as a JPEG",
-                      ReOCRJob.writeImageInput(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0, to: rendered)
-                      && CGImageSourceCreateWithURL(rendered as CFURL, nil).flatMap { CGImageSourceGetType($0) as String? } == "public.jpeg")
-            }
+            try await testSection6c()
 
             // 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
-            do {
-                let d = try folder("flag-cleared"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                try tag(f, ["Q2", "OCR Poor", "1952"])
-                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
-                // The Reader's flag action, recorded as the protocol says.
-                let flaggedGen = try j.flags.withLock(k, app: "Reader") { l in
-                    try l.commit(l.begin(flagged: true, origin: .flag), observedFlagged: true).generation
-                }
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                check("8 the review saw the Reader's generation", review.reviewedGeneration == flaggedGen && review.flaggedAtReview)
-                let done = try j.accept(review)
-                check("8 the flag is cleared", done.flag == .cleared, "\(done.flag)")
-                check("8 the other tags stay", multisetEqual(tags(f), ["Q2", "1952"]), "\(tags(f))")
-                let st = try j.flags.withLock(k, app: "Reader") { try $0.state() }
-                check("8 the clear is a new generation, recorded unflagged", st.generation != flaggedGen && st.flagged == false)
-                let receipt = try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: done.journal.operationID, in: j.support))
-                check("8 the receipt names the file and both digests", done.receiptProblem == nil && receipt?.relativePath == "Letter.pdf"
-                      && receipt?.beforeSHA256 == done.journal.original.sha256 && receipt?.afterSHA256 == done.journal.candidateSHA256
-                      && receipt?.textPages == [1] && receipt?.outcome == .published, "\(String(describing: receipt))")
-                check("8 a retry of its own finished clear reports it cleared", j.clearFlag(review, done.journal) == .cleared)
-            }
-            do {
-                let d = try folder("flag-again"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                try tag(f, ["OCR Poor"])
-                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                // The person flags it again while the re-read runs.
-                _ = try j.flags.withLock(k, app: "Reader") { l in try l.commit(l.begin(flagged: true, origin: .flag), observedFlagged: true) }
-                let done = try j.accept(review)
-                check("8 a flag set again during the read is left", { if case .changedSinceReview = done.flag { return true }; return false }()
-                      && tags(f) == ["OCR Poor"], "\(done.flag) \(tags(f))")
-                check("8 the text is accepted all the same", text(f, 1).contains("New reading of image page 1."))
-            }
-            do {
-                let d = try folder("finder-flag"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                try tag(f, ["OCR Poor"])   // flagged in Finder while it is read: no suite event
-                let done = try j.accept(review)
-                check("8 a flag set outside the suite during the read is left", { if case .changedSinceReview = done.flag { return true }; return false }()
-                      && tags(f) == ["OCR Poor"], "\(done.flag) \(tags(f))")
-            }
-            do {
-                let d = try folder("resume-clear"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                try tag(f, ["OCR Poor", "Q1"])
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                // Published, then the Processor died just after beginning its clear.
-                let journal = try j.writer.accept(review.operation, candidate: review.candidate ?? Data())
-                _ = try j.flags.withLock(review.key, app: "Processor") {
-                    try $0.begin(flagged: false, origin: .acceptedClear, operationID: journal.operationID)
-                }
-                let outcome = j.clearFlag(review, journal)
-                check("8 an interrupted clear of its own is resumed", outcome == .cleared && tags(f) == ["Q1"], "\(outcome) \(tags(f))")
-                let st = try j.flags.withLock(review.key, app: "Reader") { try $0.state() }
-                check("8 and leaves no barrier", !st.isPending && st.flagged == false)
-            }
-            do {
-                let d = try folder("unflagged"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
-                check("8 an unflagged file has nothing to clear", done.flag == .notFlagged && done.receiptProblem == nil, "\(done.flag)")
-            }
-            do {
-                let d = try folder("pending"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                try tag(f, ["OCR Poor"])
-                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                _ = try j.flags.withLock(k, app: "Reader") { try $0.begin(flagged: false, origin: .unflag) }   // dies mid-action
-                let done = try j.accept(review)
-                check("8 an unfinished action elsewhere leaves the flag", { if case .changedSinceReview = done.flag { return true }; return false }()
-                      && tags(f) == ["OCR Poor"], "\(done.flag)")
-            }
-            do {
-                let d = try folder("outside-root"), f = try file(d, pairs: 1), reader = FakeReader()
-                let other = try folder("other-root")
-                do { _ = try await job(d).start(file: f, root: archive(other), model: model, read: reader.read); check("8 a file outside its root is refused", false) }
-                catch { check("8 a file outside its root is refused", (error as? ImproveOCRFlagStore.StoreError) == .notInRoot && reader.calls.isEmpty, "\(error)") }
-            }
+            try await testSection8()
+            try await testSection8Part2()
+            try await testSection8Part3()
+            try await testSection8Part4()
+            try await testSection8Part5()
+            try await testSection8Part6()
+            try await testSection8Part7()
 
             // 9. Launch recovery finishes a publication a crash cut short: the receipt and the flag.
-            do {
-                let d = try folder("recover"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                try tag(f, ["OCR Poor", "Q3"])
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
-                _ = try? j.writer.accept(review.operation, candidate: review.candidate ?? Data(),
-                                         faults: { if $0 == .afterSwap { throw ReOCRFileWriter.InjectedCrash() } })
-                let id = review.operation.journal.operationID
-                check("9 the crash left no receipt", !FileManager.default.fileExists(atPath: ImproveOCRReceipt.url(for: id, in: j.support).path))
-                let r = j.recover()
-                check("9 recovery publishes, writes the receipt and clears the flag",
-                      r.count == 1 && r[0].writer == .published(id) && r[0].receiptProblem == nil && r[0].flag == .cleared, "\(r)")
-                check("9 the tags are right after recovery", tags(f) == ["Q3"], "\(tags(f))")
-                check("9 the receipt is there", (try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: id, in: j.support)))?.afterSHA256
-                      == (try? j.writer.read(id))?.candidateSHA256)
-                let again = j.recover()
-                check("9 a second recovery changes nothing", again.count == 1 && again[0].writer == .alreadyPublished(id)
-                      && again[0].flag == .cleared && tags(f) == ["Q3"], "\(again)")
-                let record = try? j.writer.readRecord(ReOCRJob.Record.self, named: ReOCRJob.Record.file, for: id)
-                check("9 the job's record is settled", record?.receiptWritten == true && record?.flag == .cleared)
-                // Put back in Finder after the clear; a record that lost its outcome must not clear it again.
-                try tag(f, ["Q3", "OCR Poor"])
-                if var unsettled = record {
-                    unsettled.flag = nil
-                    try j.writer.writeRecord(unsettled, named: ReOCRJob.Record.file, for: id)
-                }
-                let third = j.recover()
-                check("9 a flag put back after the clear is not cleared again",
-                      { if case .changedSinceReview = third.first?.flag { return true }; return false }() && tags(f).contains("OCR Poor"),
-                      "\(third) \(tags(f))")
-                check("9 the journal cannot be overwritten as a record",
-                      (try? j.writer.writeRecord(["x": 1], named: "journal.json", for: id)) == nil)
-            }
+            try await testSection9()
 
             // 10. Restore.
-            do {
-                let d = try folder("restore"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                try tag(f, ["OCR Poor", "Q2"])
-                let original = try Data(contentsOf: f)
-                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
-                let accepted = try Data(contentsOf: f)
-                try tag(f, ["Q2", "Added after"])   // an unrelated edit after acceptance
-                let r = try j.restore(done.journal.operationID)
-                check("10 restore puts the original bytes back", (try? Data(contentsOf: f)) == original)
-                check("10 it keeps later tag edits and puts the flag back",
-                      multisetEqual(tags(f), ["Q2", "Added after", "OCR Poor"]) && r.flag == .reflagged, "\(r.flag) \(tags(f))")
-                check("10 the accepted revision is kept", (try? Data(contentsOf: j.writer.backupURL(r.journal.operationID))) == accepted)
-                let receipt = try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: r.journal.operationID, in: j.support))
-                check("10 a restore receipt is written", r.receiptProblem == nil && receipt?.outcome == .restored
-                      && receipt?.afterSHA256 == done.journal.original.sha256)
-                let rec = j.recover()
-                check("10 recovery after a restore changes nothing", multisetEqual(tags(f), ["Q2", "Added after", "OCR Poor"])
-                      && rec.allSatisfy { $0.receiptProblem == nil }, "\(rec) \(tags(f))")
-                do { _ = try j.restore(r.journal.operationID); check("10 a restore cannot itself be restored", false) }
-                catch { check("10 a restore cannot itself be restored", (try? Data(contentsOf: f)) == original) }
-                do { _ = try j.restore(done.journal.operationID); check("10 a second restore is refused", false) }
-                catch { check("10 a second restore is refused", { if case ReOCRJob.Failure.notRestorable = error { return true }; return false }()) }
-            }
-            do {
-                let d = try folder("restore-changed"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
-                let h = try FileHandle(forWritingTo: f); try h.seekToEnd(); try h.write(contentsOf: Data("\n%e\n".utf8)); try h.close()
-                let edited = try Data(contentsOf: f)
-                do { _ = try j.restore(done.journal.operationID); check("10 restore of a changed file is refused", false) }
-                catch { check("10 restore of a changed file is refused", (try? Data(contentsOf: f)) == edited) }
-                let pendingOps = j.recover().filter { if case .notPublished = $0.writer { return true }; return false }
-                check("10 a refused restore leaves no operation waiting for review", pendingOps.isEmpty, "\(pendingOps)")
-            }
-            do {
-                let d = try folder("restore-unflagged-later"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                try tag(f, ["OCR Poor"])
-                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
-                // The person unflags it explicitly in the Reader after acceptance (it was already clear).
-                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
-                _ = try j.flags.withLock(k, app: "Reader") { l in
-                    try l.commit(l.begin(flagged: false, origin: .unflag), observedFlagged: false)
-                }
-                let r = try j.restore(done.journal.operationID)
-                check("10 a flag action after the clear means no re-flag",
-                      { if case .changedSinceClear = r.flag { return true }; return false }() && !tags(f).contains("OCR Poor"), "\(r.flag)")
-            }
-            do {
-                let d = try folder("restore-never-flagged"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
-                let r = try j.restore(done.journal.operationID)
-                check("10 an original that was not flagged is not flagged", r.flag == .notNeeded && tags(f).isEmpty)
-            }
+            try await testSection10()
+            try await testSection10Part2()
+            try await testSection10Part3()
+            try await testSection10Part4()
 
             // 11. The saved connection to the shared support folder.
-            do {
-                let suite = "ImproveOCR.test.\(UUID().uuidString)"
-                guard let defaults = UserDefaults(suiteName: suite) else { check("11 a scratch defaults suite", false); return }
-                defer { defaults.removePersistentDomain(forName: suite) }
-                let c = ReOCRSupportConnection(defaults: defaults)
-                check("11 nothing connected yet", (try? c.resolve()) == nil && { do { _ = try c.resolve(); return false }
-                    catch { return (error as? ReOCRSupportConnection.Problem) == .notConnected } }())
-                let d = try folder("support-conn")
-                let made = try c.connect(d)
-                check("11 connecting makes the store's identity", (try? ImproveOCRSupportIdentity.identity(of: d, create: false)) == made.storeID)
-                check("11 it resolves to the same store", (try? c.resolve())?.storeID == made.storeID)
-                let moved = root.appendingPathComponent("support-conn-moved", isDirectory: true)
-                try FileManager.default.moveItem(at: d, to: moved)
-                let afterMove = try? c.resolve()
-                check("11 a moved folder is followed", afterMove?.storeID == made.storeID
-                      && afterMove?.url.standardizedFileURL.lastPathComponent == "support-conn-moved", "\(String(describing: afterMove))")
-                try FileManager.default.removeItem(at: moved.appendingPathComponent(ImproveOCRSupportIdentity.file))
-                _ = try ImproveOCRSupportIdentity.identity(of: moved, create: true)   // replaced by another store
-                do { _ = try c.resolve(); check("11 a different store is refused", false) }
-                catch { check("11 a different store is refused", (error as? ReOCRSupportConnection.Problem) == .differentStore, "\(error)") }
-                c.disconnect()
-                check("11 disconnecting forgets it", { do { _ = try c.resolve(); return false }
-                    catch { return (error as? ReOCRSupportConnection.Problem) == .notConnected } }())
-            }
+            try await testSection11()
 
             // 12. A real reader on this Mac ($0, no network): Apple Vision through the row factory, end to end.
-            do {
-                let d = try folder("vision"), j = job(d)
-                let img = d.appendingPathComponent("typed.jpg"), pdf = d.appendingPathComponent("Letter.pdf")
-                try typedPage(img, "IMPROVED READING OF THE LETTER 1952")
-                try PDFGenerator().generate(imageURL: img, result: OCRResult(text: "garbled old text", classification: nil,
-                                            errorMessage: nil, errorCode: nil), model: model, outputURL: pdf,
-                                            originalFileName: "typed.jpg", pageKind: .typewritten)
-                let vision = LLMModel.appleVisionModels[0]
-                let row = ReOCRRanking.Row(id: "vision", name: vision.displayName, appRoute: nil, provider: .appleVision,
-                                           modelID: vision.id, figure: nil, sample: nil, caveats: [], usdPer1000: 0,
-                                           estimateUSD: 0, readiness: .ready, tie: .notMeasured, isCurrent: false)
-                guard let read = ReOCRJob.reader(for: row, apiKey: "") else { check("12 the Vision row has a reader", false); return }
-                let review = try await j.start(file: pdf, root: archive(d), model: vision, read: read)
-                let newText = (try? review.results.first?.outcome.get()) ?? ""
-                check("12 Vision reads the image page", newText.uppercased().contains("IMPROVED READING"), newText)
-                check("12 a candidate is made", review.candidate != nil, review.candidateProblem ?? "")
-                check("12 the review reports the image page's layer change", review.replacedImagePages == [0])
-                _ = try j.accept(review)
-                check("12 the image page's searchable text matches the review", text(pdf, 0).uppercased().contains("IMPROVED READING"))
-                let header = PDFDocument(url: pdf)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
-                check("12 the header names Vision as the reader", header?.provenance?.model == vision.displayName,
-                      "\(String(describing: header?.provenance))")
-                var notReady = row
-                notReady = ReOCRRanking.Row(id: row.id, name: row.name, appRoute: "gemini|x", provider: .gemini, modelID: "x",
-                                            figure: nil, sample: nil, caveats: [], usdPer1000: nil, estimateUSD: nil,
-                                            readiness: .needsSetup("needs a Gemini key"), tie: .notMeasured, isCurrent: false)
-                check("12 a row that needs setup has no reader", ReOCRJob.reader(for: notReady, apiKey: "k") == nil)
-            }
+            try await testSection12()
 
             // 13. The dialog's model: groups by Kind, a Kind change re-ranks, the estimate, Run's blocker, the run.
-            do {
-                guard let table = SettingsRouteTable.bundled else { check("13 the bundled route table loads", false); return }
-                let d = try folder("dialog"), reader = FakeReader()
-                let typed = try file(d, pairs: 1)
-                let unknown = d.appendingPathComponent("Unknown.pdf")
-                let img = d.appendingPathComponent("u.jpg"); try jpeg(img, seed: 9)
-                try PDFGenerator().generate(imageURL: img, result: OCRResult(text: "old", classification: nil, errorMessage: nil,
-                                            errorCode: nil), model: model, outputURL: unknown, originalFileName: "u.jpg")
-                var res = SettingsResources(macMemoryGB: 16)
-                res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
-                let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled,
-                                         resources: res, staysOnMac: false)
-                let three = try file(try folder("dialog-three"), pairs: 3)
-                let picked = ReOCRDialogModel(selectedPairs: [three: [1, 7]], table: table, pairs: OCRPairMatrix.bundled,
-                                              resources: res, staysOnMac: false)
-                await picked.loadFiles([three])
-                check("13 the Reader's chosen pairs are the only pages offered (one past the end ignored)",
-                      picked.pages.map(\.pairIndex) == [3], "\(picked.pages.map(\.pairIndex))")
-                var progress: [Int] = []
-                await m.loadFiles([typed, unknown]) { progress.append($0) }
-                check("13 the load reports each checked file", progress == [1, 2])
-                check("13 every file is listed", m.files.count == 2)
-                let call = m.pages.first { $0.fileID == unknown.path }
-                check("13 the classifier gives the unknown page a provisional Kind", call?.origin == .classifier && call?.kind != nil
-                      && m.pages.first { $0.fileID == typed.path }?.origin == .header, "\(String(describing: call))")
-                lines.append("INFO 13 classifier: \(String(describing: call?.kind)) at \(String(describing: call?.confidence))")
-                // Whatever it said, the test's next steps decide the Kind; start from "no Kind" again.
-                m.setKind(nil, file: unknown.path, pairIndex: 1)
-                check("13 Run waits for a Kind", m.runBlocker?.contains("Kind") == true, m.runBlocker ?? "")
-                m.setKind(.handwritten, file: unknown.path, pairIndex: 1)
-                check("13 choosing a Kind re-groups", m.groups.map(\.kind) == [.handwritten, .typewritten] || m.groups.map(\.kind) == [.typewritten, .handwritten],
-                      "\(m.groups.map(\.kind))")
-                let hand = m.groups.first { $0.kind == .handwritten }
-                let direct = ReOCRRanking.rank(kind: .handwritten, pages: 1, table: table, pairs: OCRPairMatrix.bundled,
-                                               resources: res, staysOnMac: false)
-                check("13 and re-ranks for the new Kind", hand?.ranking?.kind == .handwritten
-                      && hand?.ranking?.rows.map(\.id) == direct.rows.map(\.id) && !(direct.rows.isEmpty))
-                m.setKind(.forms, file: unknown.path, pairIndex: 1)
-                let forms = ReOCRRanking.rank(kind: .forms, pages: 1, table: table, pairs: OCRPairMatrix.bundled,
-                                              resources: res, staysOnMac: false)
-                check("13 a second change re-ranks again", m.groups.first { $0.kind == .forms }?.ranking?.rows.map(\.id) == forms.rows.map(\.id))
-                let est = m.estimate
-                check("13 the estimate is a sum or says what is unpriced", est.usd >= 0 && est.unpricedPages >= 0)
-                lines.append("INFO 13 estimate: $\(est.usd), \(est.unpricedPages) unpriced; blocker: \(m.runBlocker ?? "none")")
-                if m.runBlocker == nil {
-                    let j = job(d)
-                    let runs = await m.run(job: j, root: archive(d), model: model, readerFor: { _ in reader.read })
-                    check("13 Run reads the two eligible files", runs.count == 2 && runs.allSatisfy { (try? $0.outcome.get())?.candidate != nil },
-                          "\(runs.map { $0.error ?? "\($0.outcome)" })")
-                    check("13 each page reaches its reader with its Kind", Set(reader.calls.compactMap(\.kind)) == [.typewritten, .forms])
-                    if let r = runs.first(where: { $0.fileID == unknown.path }), let review = try? r.outcome.get(),
-                       let row = m.groups.first(where: { $0.kind == .forms }).flatMap({ m.chosenRow($0) }) {
-                        _ = try j.accept(review)
-                        let h = PDFDocument(url: unknown)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
-                        check("13 the new header names the chosen row's model and the Kind",
-                              h?.kind == .forms && h?.provenance?.model == row.provider.models.first { $0.id == row.modelID }?.displayName,
-                              "\(String(describing: h)) \(row.id)")
-                        await m.refresh(fileID: unknown.path)
-                        let refreshed = m.pages.first { $0.fileID == unknown.path }
-                        check("13 refresh reads the accepted Kind and reader back from disk",
-                              refreshed?.origin == .header && refreshed?.kind == .forms
-                              && m.files[1].pair(at: 1)?.header?.provenance == h?.provenance)
-                    }
-                } else {
-                    check("13 with every key, a ready reader exists for each Kind", false, m.runBlocker ?? "")
-                }
-            }
+            try await testSection13()
 
             // 13b. W47.wh-yolo-scans-reocr: each file is read with its own collection's detector for scanned newspapers.
-            do {
-                guard let table = SettingsRouteTable.bundled else { check("13b the bundled route table loads", false); return }
-                let a = try folder("yolo")
-                func collection(_ name: String, yolo: Bool) throws -> URL {
-                    let d = a.appendingPathComponent(name, isDirectory: true)
-                    try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
-                    var doc = CollectionSettingsDocument(name: name, createdAt: Date())
-                    doc.collection.set(.scanNewspapersDocLayoutYOLO, .bool(yolo), source: .setByUser(Date()))
-                    doc.collection.set(.noTraining, .bool(yolo), source: .setByUser(Date()))
-                    try CollectionSettingsFile.write(doc, in: d)
-                    return try file(d, pairs: 1)
-                }
-                let on = try collection("on", yolo: true), off = try collection("off", yolo: false)
-                let switches = await ImproveOCRController.collectionSwitches(for: [on, off], settings: SettingsLayerStore.shared.file)
-                check("13b each file gets its collection's choice", switches.scanDetectors[on] == .docLayoutYOLO
-                      && switches.scanDetectors[off] == .ppDocLayoutV3, "\(switches.scanDetectors)")
-                var res = SettingsResources(macMemoryGB: 16)
-                res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
-                let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled, resources: res,
-                                         staysOnMac: false, trainingProtectedFiles: switches.trainingProtectedFiles,
-                                         scanDetectors: switches.scanDetectors)
-                await m.loadFiles([on, off])
-                final class Seen: @unchecked Sendable {
-                    let lock = NSLock()
-                    var detectors: [NewspaperDetector] = []
-                    var trainingPolicies: [Bool] = []
-                }
-                let seen = Seen()
-                let runs = await m.run(job: job(a), root: archive(a), model: model, readerFor: { _ in { _, _, _ in
-                    seen.lock.withLock {
-                        seen.detectors.append(NewspaperPageReader.scanDetector)
-                        seen.trainingPolicies.append(OpenRouterDataPolicy.denyDataCollection)
-                    }
-                    return OCRResult(text: "New reading.", classification: nil, errorMessage: nil, errorCode: nil)
-                } })
-                let order = seen.lock.withLock { seen.detectors }
-                check("13b the reader sees each file's detector, in file order",
-                      runs.count == 2 && order == [.docLayoutYOLO, .ppDocLayoutV3],
-                      "\(order) \(m.runBlocker ?? "") \(runs.map { $0.error ?? "\($0.outcome)" })")
-                check("13b only the protected file's reader gets the deny",
-                      seen.lock.withLock { seen.trainingPolicies } == [true, false])
-                check("13b outside the run the default stands", NewspaperPageReader.scanDetector == .ppDocLayoutV3)
-            }
+            try await testSection13b()
 
             // 14. A hand-off from the Reader: it only resolves files inside the named archive, once.
-            do {
-                let suite = "ImproveOCR.handoff.\(UUID().uuidString)"
-                guard let defaults = UserDefaults(suiteName: suite) else { check("14 a scratch defaults suite", false); return }
-                defer { defaults.removePersistentDomain(forName: suite) }
-                let archiveDir = try folder("handoff-archive")
-                let guid = UUID()
-                try JSONEncoder().encode(RootMarker(guid: guid, name: "scratch", kind: .reader, createdAt: Date()))
-                    .write(to: archiveDir.appendingPathComponent(RootMarker.filename))
-                _ = try file(archiveDir, pairs: 1)
-                let letter = archiveDir.appendingPathComponent("Letter.pdf")
-                let conn = ReOCRSupportConnection(defaults: defaults)
-                _ = try conn.connect(try folder("handoff-support"))
-                func isMessage(_ o: ImproveOCRHandoff.Outcome, _ needle: String = "") -> Bool {
-                    if case .message(let m) = o { return needle.isEmpty || m.contains(needle) }
-                    return false
-                }
-                let link = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
-                var asked = 0
-                // The person cancels the folder panel: nothing comes up, and the request is not used up.
-                let cancelled = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in nil })
-                check("14 a cancelled panel brings nothing up", isMessage(cancelled, "not available"), "\(cancelled)")
-                let first = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return archiveDir })
-                check("14 the same link, sent again after the cancel, brings up the dialog for its file", first == .open([letter]), "\(first)")
-                check("14 the person was asked for the archive once", asked == 1)
-                let again = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
-                check("14 the same link does not come up twice", isMessage(again, "already"), "\(again)")
-                let second = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
-                let viaGrant = await ImproveOCRHandoff.handle(second, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
-                // The grant resolves through /private/var, the same folder as /var: compare resolved paths.
-                func same(_ o: ImproveOCRHandoff.Outcome) -> Bool {
-                    if case .open(let urls, _) = o { return urls.map { $0.resolvingSymlinksInPath().path } == [letter.resolvingSymlinksInPath().path] }
-                    return false
-                }
-                check("14 the saved grant is used next time, without asking", same(viaGrant) && asked == 1, "\(viaGrant)")
-                let other = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: UUID(), relativePaths: ["Letter.pdf"]).url()
-                let wrong = await ImproveOCRHandoff.handle(other, connection: conn, defaults: defaults, chooseRoot: { _ in archiveDir })
-                check("14 a folder with another root marker is refused", isMessage(wrong), "\(wrong)")
-                let outside = try folder("handoff-outside")
-                try FileManager.default.createSymbolicLink(at: archiveDir.appendingPathComponent("Escape.pdf"),
-                                                           withDestinationURL: outside.appendingPathComponent("x.pdf"))
-                let escape = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Escape.pdf"]).url()
-                check("14 a link out of the archive is refused",
-                      isMessage(await ImproveOCRHandoff.handle(escape, connection: conn, defaults: defaults, chooseRoot: { _ in nil })))
-                let noneSuite = suite + ".none"
-                guard let noneDefaults = UserDefaults(suiteName: noneSuite) else { return }
-                defer { noneDefaults.removePersistentDomain(forName: noneSuite) }
-                let third = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
-                check("14 without the shared folder nothing comes up",
-                      isMessage(await ImproveOCRHandoff.handle(third, connection: ReOCRSupportConnection(defaults: noneDefaults),
-                                                         defaults: defaults, chooseRoot: { _ in nil }), "shared folder"))
-            }
+            try await testSection14()
 
             // 15. The history: what was kept, what it is, Restore and Remove.
-            do {
-                let d = try folder("history"), j = job(d), reader = FakeReader()
-                let h = ReOCRHistory(writer: j.writer)
-                check("15 an empty history", h.entries().isEmpty && h.totalBytes == 0)
-                let a = try file(d, pairs: 1)
-                let accepted = try j.accept(try await j.start(file: a, root: archive(d), model: model, read: reader.read))
-                let restored = try j.restore(accepted.journal.operationID)
-                let rejectedReview = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
-                try j.reject(rejectedReview)
-                let undecided = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
-                let states = Dictionary(uniqueKeysWithValues: h.entries().map { ($0.id, $0.state) })
-                check("15 each change is listed with what it is",
-                      states[accepted.journal.operationID] == .undone(by: restored.journal.operationID)
-                      && states[restored.journal.operationID] == .restoredEarlier(accepted.journal.operationID)
-                      && states[rejectedReview.operation.journal.operationID] == .rejected
-                      && states[undecided.operation.journal.operationID] == .undecided, "\(states)")
-                check("15 the kept size is counted", h.totalBytes > 0 && h.entries().allSatisfy { $0.bytes > 0 })
-                check("15 only an accepted change offers Restore", h.entries().filter(\.canRestore).isEmpty)
-                try h.remove(rejectedReview.operation.journal.operationID)
-                check("15 removing one change removes only its copy",
-                      !FileManager.default.fileExists(atPath: j.writer.backupURL(rejectedReview.operation.journal.operationID).path)
-                      && FileManager.default.fileExists(atPath: j.writer.backupURL(accepted.journal.operationID).path))
-                try h.remove(undecided.operation.journal.operationID)
-                check("15 an undecided change can be removed", !h.entries().contains { $0.id == undecided.operation.journal.operationID })
-                // A change stopped during publication waits for launch recovery.
-                let b = try file(try folder("history-b"), pairs: 1)
-                let jb = job(b.deletingLastPathComponent())
-                let stopped = try await jb.start(file: b, root: archive(b.deletingLastPathComponent()), model: model, read: reader.read)
-                _ = try? jb.writer.accept(stopped.operation, candidate: stopped.candidate ?? Data(),
-                                          faults: { if $0 == .afterAcceptReady { throw ReOCRFileWriter.InjectedCrash() } })
-                let hb = ReOCRHistory(writer: jb.writer)
-                check("15 a change stopped during publication cannot be removed",
-                      (try? hb.remove(stopped.operation.journal.operationID)) == nil
-                      && hb.entries().first?.state == .interrupted, "\(hb.entries().map(\.state))")
-                let fresh = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
-                _ = try j.accept(fresh)
-                check("15 a new acceptance offers Restore", h.entries().first { $0.id == fresh.operation.journal.operationID }?.canRestore == true)
-            }
+            try await testSection15()
 
             // 16. The flagged files under a folder, in any spelling, and nothing else.
-            do {
-                let d = try folder("flagged")
-                let sub = d.appendingPathComponent("Box 2", isDirectory: true)
-                try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
-                let a = try file(try folder("flagged-a"), pairs: 1), b = try file(try folder("flagged-b"), pairs: 1), c = try file(try folder("flagged-c"), pairs: 1)
-                let fa = d.appendingPathComponent("A.pdf"), fb = sub.appendingPathComponent("B.pdf"), fc = d.appendingPathComponent("C.pdf")
-                try FileManager.default.copyItem(at: a, to: fa); try FileManager.default.copyItem(at: b, to: fb); try FileManager.default.copyItem(at: c, to: fc)
-                try tag(fa, ["OCR Poor", "Q1"]); try tag(fb, ["ocr poor"]); try tag(fc, ["Q2"])
-                let found = ReOCRFlaggedFinder.find(in: d)
-                check("16 the flagged PDFs are found, in any spelling and in subfolders",
-                      found.files.map(\.lastPathComponent) == ["A.pdf", "B.pdf"] && found.scanned == 3 && !found.truncated, "\(found)")
-                let one = ReOCRFlaggedFinder.find(in: d, limit: 1)
-                check("16 a limit is kept and reported", one.files.count == 1 && one.truncated)
-                check("16 finding changes nothing", tags(fc) == ["Q2"] && tags(fa).contains("OCR Poor"))
-            }
+            try await testSection16()
 
             // 7. A selected pair whose scan has a crop, rotation, annotation and existing invisible OCR.
-            do {
-                let d = try folder("rotated"), f = try file(d, pairs: 2), reader = FakeReader()
-                let jpeg = try Data(contentsOf: d.appendingPathComponent("IMG2.jpg"))
-                let scan = handPDF(
-                    content: "q 200 0 0 250 0 0 cm /Im0 Do Q BT /F1 12 Tf 3 Tr 30 120 Td (STALESCAN) Tj ET",
-                    jpeg: jpeg, imageExtra: "", resources: "/Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >>")
-                if let doc = PDFDocument(url: f), let p = PDFDocument(data: scan)?.page(at: 0) {
-                    p.rotation = 90
-                    p.setBounds(CGRect(x: 12, y: 17, width: 170, height: 210), for: .cropBox)
-                    let annotation = PDFAnnotation(bounds: CGRect(x: 24, y: 26, width: 30, height: 28), forType: .square, withProperties: nil)
-                    annotation.contents = "Keep this annotation"
-                    p.addAnnotation(annotation)
-                    doc.removePage(at: 2)
-                    doc.insert(p, at: 2)
-                    // Normalize Quartz's output as the Processor's PDF/A writer does, including its XMP stream.
-                    if let edited = doc.dataRepresentation(), let compatible = ArchivalFinish.finished(edited) {
-                        try compatible.write(to: f)
-                    }
-                }
-                let data = try Data(contentsOf: f)
-                check("7 fixture has an old searchable layer", text(f, 2).contains("STALESCAN"))
-                check("7 a rotated page is not extracted", ReOCRJob.embeddedJPEG(data, pageIndex: 2) == nil)
-                let j = job(d)
-                let review = try await j.start(file: f, root: archive(d), textPages: [3], model: model, read: reader.read)
-                let src = reader.calls.first.flatMap { CGImageSourceCreateWithData($0.image as CFData, nil) }
-                let props = src.flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
-                let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0, h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
-                check("7 it is rendered upright as a JPEG", src.map { CGImageSourceGetType($0) as String? } == "public.jpeg" && w > h,
-                      "\(w)x\(h)")
-                check("7 its candidate is made", review.candidate != nil,
-                      review.candidateProblem ?? "\(review.results.map(\.outcome))")
-                check("7 review reports the selected scan's layer change", review.replacedImagePages == [2])
-                if review.candidate != nil {
-                    _ = try j.accept(review)
-                    let doc = PDFDocument(url: f)
-                    let page = doc?.page(at: 2)
-                    check("7 rotation, crop and annotation survive publication", page?.rotation == 90
-                          && page?.bounds(for: .cropBox) == CGRect(x: 12, y: 17, width: 170, height: 210)
-                          && page?.annotations.first?.contents == "Keep this annotation")
-                    let removed = doc?.findString("STALESCAN", withOptions: []).isEmpty == true
-                    let hits = doc?.findString("New reading", withOptions: []) ?? []
-                    let hitPages = hits.compactMap { $0.pages.first }.compactMap { doc?.index(for: $0) }
-                    let selected = page?.selection(for: NSRange(location: 0, length: 3))?.string
-                    check("7 search and selection use the new reading on the selected scan",
-                          removed && hitPages.sorted() == [2, 3] && selected == "New")
-                    if let page, let hit = hits.first(where: { $0.pages.contains(page) }) {
-                        let bounds = hit.bounds(for: page)
-                        check("7 the selected text is inside the visible crop",
-                              !bounds.isEmpty && page.bounds(for: .cropBox).contains(bounds))
-                    } else { check("7 the selected text is inside the visible crop", false) }
-                    check("7 only the corresponding separate text page changes", text(f, 1).contains("Old reading of image 1.")
-                          && text(f, 3).contains("New reading of image page 3."))
-                    _ = try j.restore(review.operation.journal.operationID)
-                    check("7 Restore returns the exact original including the old layer", (try? Data(contentsOf: f)) == data)
-                }
-            }
+            try await testSection7()
 
             // 17. A standalone searchable file produced by the normal output path, including its XMP header.
-            do {
-                let d = try folder("searchable"), j = job(d)
-                let img = d.appendingPathComponent("typed.jpg"), pdf = d.appendingPathComponent("Searchable.pdf")
-                try typedPage(img, "FORMER TRANSCRIPTION")
-                let fixtureModel = model
-                let output = try await PDFGenerator.runWorker {
-                    try PDFGenerator().generateOutput(
-                        imageURL: img, result: OCRResult(text: "FORMER TRANSCRIPTION", classification: nil,
-                                                        errorMessage: nil, errorCode: nil),
-                        model: fixtureModel, outputURL: pdf, originalFileName: "typed.jpg", pageKind: .typewritten,
-                        textLayer: .init(searchableFor: ["*/*"]))
-                }
-                let original = try Data(contentsOf: pdf)
-                check("17 normal output made a searchable fixture", output.form == .searchable && text(pdf, 0).contains("FORMER"),
-                      output.compression ?? output.compressedNote ?? "")
-                let compressed = original.range(of: Data("/JBIG2Decode".utf8)) != nil
-                lines.append("INFO 17 fixture: \(compressed ? "JBIG2" : output.compression ?? "other scan encoding")")
-                let reader = FakeReader()
-                let review = try await j.start(file: pdf, root: archive(d), textPages: [0], model: model, read: reader.read)
-                check("17 review shows the old text and does not write before acceptance", reader.calls.map(\.imageIndex) == [0]
-                      && review.results.first?.oldText.contains("FORMER") == true && (try? Data(contentsOf: pdf)) == original)
-                check("17 one searchable page can be improved", review.candidate != nil && review.replacedImagePages == [0],
-                      review.candidateProblem ?? "\(review.results.map(\.outcome))")
-                if review.candidate != nil {
-                    _ = try j.accept(review)
-                    let doc = PDFDocument(url: pdf)
-                    let roles = doc.map { PDFPageRole.roles(of: $0) }
-                    check("17 page count and role survive", doc?.pageCount == 1 && roles == [.searchable])
-                    let oldHits = doc?.findString("FORMER", withOptions: []).count
-                    let newHits = doc?.findString("New reading", withOptions: []).count
-                    let selected = doc?.page(at: 0)?.selection(for: NSRange(location: 0, length: 3))?.string
-                    check("17 search and selection use only the new reading", oldHits == 0 && newHits == 1 && selected == "New")
-                    _ = try j.restore(review.operation.journal.operationID)
-                    check("17 Restore puts back the original searchable PDF byte for byte", (try? Data(contentsOf: pdf)) == original)
-                    let first = try await j.start(file: pdf, root: archive(d), model: model, read: reader.read)
-                    _ = try j.accept(first)
-                    let accepted = try Data(contentsOf: pdf)
-                    let again = try await j.start(file: pdf, root: archive(d), model: model) { _, _, _ in
-                        OCRResult(text: "SECOND REVISION", classification: nil, errorMessage: nil, errorCode: nil)
-                    }
-                    check("17 a subsequent Improve OCR replaces the previous form", again.candidate != nil, again.candidateProblem ?? "")
-                    if again.candidate != nil {
-                        _ = try j.accept(again)
-                        check("17 only the second reading remains searchable", text(pdf, 0).contains("SECOND REVISION")
-                              && !text(pdf, 0).contains("New reading"))
-                        _ = try j.restore(again.operation.journal.operationID)
-                        check("17 Restore puts back the previous revision byte for byte", (try? Data(contentsOf: pdf)) == accepted)
-                    }
-                }
-            }
+            try await testSection17()
         } catch {
             check("no error is thrown", false, "\(error)")
+        }
+    }
+
+    // One function per section of `run()` (W49.proc-build-memory): as one function, `run()` took a single
+    // swift-frontend to 3 GB while compiling this file.
+
+    /// 1. Two pages, end to end.
+    private static func testSection1() async throws {
+        do {
+            let d = try folder("two"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            let original = try Data(contentsOf: f)
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            check("1 the reader is asked once, for the image page", reader.calls.map(\.imageIndex) == [0])
+            let source = try Data(contentsOf: d.appendingPathComponent("IMG1.jpg"))
+            check("1 the reader gets the source JPEG byte for byte", reader.calls.first?.image == source,
+                  "\(reader.calls.first?.image.count ?? 0) vs \(source.count) bytes")
+            check("1 the page image is removed after its reading",
+                  ((try? FileManager.default.contentsOfDirectory(atPath: j.scratch.path)) ?? ["?"]).isEmpty)
+            check("1 the review shows the old text", review.results.first?.oldText.contains("Old reading of image 1.") == true)
+            check("1 the review shows the new text",
+                  (try? review.results.first?.outcome.get())?.contains("New reading of image page 1.") == true)
+            check("1 there is a candidate", review.candidate != nil, review.candidateProblem ?? "")
+            check("1 the file is unchanged before accept", (try? Data(contentsOf: f)) == original)
+            _ = try j.accept(review)
+            check("1 accepting publishes the new text", text(f, 1).contains("New reading of image page 1.")
+                  && !text(f, 1).contains("Old reading"))
+            check("1 the old file is kept", (try? Data(contentsOf: j.writer.backupURL(review.operation.journal.operationID))) == original)
+        }
+    }
+
+    /// 2. One pair of three.
+    private static func testSection2() async throws {
+        do {
+            let d = try folder("one-of-three"), f = try file(d, pairs: 3), j = job(d), reader = FakeReader()
+            let review = try await j.start(file: f, root: archive(d), textPages: [3], model: model, read: reader.read)
+            check("2 only the selected pair's image is read", reader.calls.map(\.imageIndex) == [2])
+            _ = try j.accept(review)
+            check("2 its text page changes", text(f, 3).contains("New reading of image page 3."))
+            check("2 the others keep their text", text(f, 1).contains("Old reading of image 1.")
+                  && text(f, 5).contains("Old reading of image 3."))
+            do { _ = try await j.start(file: f, root: archive(d), textPages: [2], model: model, read: reader.read); check("2 an image page is not selectable", false) }
+            catch { check("2 an image page is not selectable", (error as? ReOCRJob.Failure) == .noSuchPair(page: 2), "\(error)") }
+        }
+    }
+
+    /// 3. A failed pair.
+    private static func testSection3() async throws {
+        do {
+            let d = try folder("failed-pair"), f = try file(d, pairs: 3), j = job(d), reader = FakeReader(failing: [2])
+            let original = try Data(contentsOf: f)
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            check("3 every pair is still tried", reader.calls.map(\.imageIndex) == [0, 2, 4])
+            check("3 a failed pair means no candidate", review.candidate == nil)
+            check("3 no image page changes are offered without a candidate", review.replacedImagePages == nil)
+            check("3 the failure is shown for its page", { if case .failure = review.results[1].outcome { return true }; return false }())
+            do { _ = try j.accept(review); check("3 accept is refused", false) }
+            catch { check("3 accept is refused", (error as? ReOCRJob.Failure) == .noCandidate, "\(error)") }
+            check("3 the file is untouched", (try? Data(contentsOf: f)) == original)
+            try j.reject(review)
+            check("3 the verdict is recorded", j.writer.recover() == [.rejected(review.operation.journal.operationID)])
+        }
+    }
+
+    /// 4. A Kind chosen by the person.
+    private static func testSection4() async throws {
+        do {
+            let d = try folder("kind"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            let review = try await j.start(file: f, root: archive(d), kinds: [1: .forms], model: model, read: reader.read)
+            check("4 the reader is told the chosen Kind", reader.calls.first?.kind == .forms)
+            _ = try j.accept(review)
+            let header = PDFDocument(url: f)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
+            check("4 the new header has the chosen Kind", header?.kind == .forms, "\(String(describing: header))")
+        }
+    }
+
+    /// 6. Changed between run and accept.
+    private static func testSection6() async throws {
+        do {
+            let d = try folder("changed"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            let h = try FileHandle(forWritingTo: f); try h.seekToEnd(); try h.write(contentsOf: Data("\n%e\n".utf8)); try h.close()
+            let edited = try Data(contentsOf: f)
+            do { _ = try j.accept(review); check("6 a changed file is refused at accept", false) }
+            catch { check("6 a changed file is refused at accept", (error as? ReOCRFileWriter.Failure) == .targetChanged, "\(error)") }
+            check("6 the edit stays", (try? Data(contentsOf: f)) == edited)
+        }
+    }
+
+    /// 6b. A failure after prepare records the operation rejected rather than leaving it pending.
+    private static func testSection6b() async throws {
+        do {
+            let d = try folder("fail-after-prepare"), f = try file(d, pairs: 1), reader = FakeReader()
+            let blocker = d.appendingPathComponent("not-a-folder")
+            try Data("x".utf8).write(to: blocker)
+            let j = ReOCRJob(writer: ReOCRFileWriter(versionsRoot: d.appendingPathComponent("Versions", isDirectory: true)),
+                             scratch: blocker.appendingPathComponent("scratch", isDirectory: true), support: support(d))
+            do { _ = try await j.start(file: f, root: archive(d), model: model, read: reader.read); check("6b a failure after prepare throws", false) }
+            catch { check("6b a failure after prepare throws", true) }
+            let r = j.writer.recover()
+            check("6b the operation is recorded rejected", r.count == 1 && { if case .rejected = r[0] { return true }; return false }(), "\(r)")
+            check("6b nothing was read", reader.calls.isEmpty)
+        }
+    }
+
+    /// 6c. The JPEG fast path only when the page shows exactly the JPEG.
+    private static func testSection6c() async throws {
+        do {
+            let d = try folder("fast-path")
+            let img = d.appendingPathComponent("j.jpg")
+            try jpeg(img, seed: 2)
+            let jpg = try Data(contentsOf: img)
+            func page(_ content: String, image: String = "", resources: String = "") -> Data {
+                handPDF(content: content, jpeg: jpg, imageExtra: image, resources: resources)
+            }
+            check("6c a plain full-page image is extracted",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == jpg)
+            check("6c a letterboxed image inside the page is extracted",
+                  ReOCRJob.embeddedJPEG(page("q 100 0 0 125 50 60 cm /Im0 Do Q"), pageIndex: 0) == jpg)
+            check("6c an image cropped by the page is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 400 0 0 500 -100 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
+            check("6c a flipped image is rendered",
+                  ReOCRJob.embeddedJPEG(page("q -200 0 0 250 200 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
+            check("6c a page that also draws text is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0) == nil)
+            // W42.int-s5: the searchable layer is text in render mode 3, which paints nothing.
+            check("6c a page whose only text is invisible (the searchable layer) is extracted",
+                  ReOCRJob.embeddedJPEG(page("q Q q 0 0 200 250 re W n q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT (x) Tj [(y) -2 (z)] TJ ET Q"),
+                                        pageIndex: 0) == jpg)
+            check("6c invisible text in a Type 3 font is rendered (its glyphs are procedures that may paint)",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT /F1 1 Tf (x) Tj ET",
+                                             resources: "/Font << /F1 << /Type /Font /Subtype /Type3 >> >>"),
+                                        pageIndex: 0) == nil)
+            check("6c invisible text in a TrueType font is extracted",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT /F1 1 Tf (x) Tj ET",
+                                             resources: "/Font << /F1 << /Type /Font /Subtype /TrueType >> >>"),
+                                        pageIndex: 0) == jpg)
+            check("6c text in another render mode is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 2 Tr BT (x) Tj ET"), pageIndex: 0) == nil)
+            check("6c a render mode Q restores is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 3 Tr Q q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0) == nil)
+            check("6c an unbalanced Q is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q Q"), pageIndex: 0) == nil)
+            check("6c an image clipped smaller is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 0 0 100 100 re W n 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
+            check("6c a clip to the whole page (as PDFKit writes) is extracted",
+                  ReOCRJob.embeddedJPEG(page("q Q q 0 0 200 250 re W n q 200 0 0 250 0 0 cm /Im0 Do Q Q"), pageIndex: 0) == jpg)
+            check("6c a rectangle that is filled, not clipped, is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 0 0 10 10 re f 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
+            check("6c a masked image is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q", image: "/Decode [1 0 1 0 1 0]"), pageIndex: 0) == nil)
+            check("6c an image drawn twice is rendered",
+                  ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q q 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
+            let rendered = d.appendingPathComponent("r.jpg")
+            check("6c a rendered page still reaches the reader as a JPEG",
+                  ReOCRJob.writeImageInput(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0, to: rendered)
+                  && CGImageSourceCreateWithURL(rendered as CFURL, nil).flatMap { CGImageSourceGetType($0) as String? } == "public.jpeg")
+        }
+    }
+
+    /// 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+    private static func testSection8() async throws {
+        do {
+            let d = try folder("flag-cleared"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            try tag(f, ["Q2", "OCR Poor", "1952"])
+            let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+            // The Reader's flag action, recorded as the protocol says.
+            let flaggedGen = try j.flags.withLock(k, app: "Reader") { l in
+                try l.commit(l.begin(flagged: true, origin: .flag), observedFlagged: true).generation
+            }
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            check("8 the review saw the Reader's generation", review.reviewedGeneration == flaggedGen && review.flaggedAtReview)
+            let done = try j.accept(review)
+            check("8 the flag is cleared", done.flag == .cleared, "\(done.flag)")
+            check("8 the other tags stay", multisetEqual(tags(f), ["Q2", "1952"]), "\(tags(f))")
+            let st = try j.flags.withLock(k, app: "Reader") { try $0.state() }
+            check("8 the clear is a new generation, recorded unflagged", st.generation != flaggedGen && st.flagged == false)
+            let receipt = try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: done.journal.operationID, in: j.support))
+            check("8 the receipt names the file and both digests", done.receiptProblem == nil && receipt?.relativePath == "Letter.pdf"
+                  && receipt?.beforeSHA256 == done.journal.original.sha256 && receipt?.afterSHA256 == done.journal.candidateSHA256
+                  && receipt?.textPages == [1] && receipt?.outcome == .published, "\(String(describing: receipt))")
+            check("8 a retry of its own finished clear reports it cleared", j.clearFlag(review, done.journal) == .cleared)
+        }
+    }
+
+    /// 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+    private static func testSection8Part2() async throws {
+        do {
+            let d = try folder("flag-again"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            try tag(f, ["OCR Poor"])
+            let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            // The person flags it again while the re-read runs.
+            _ = try j.flags.withLock(k, app: "Reader") { l in try l.commit(l.begin(flagged: true, origin: .flag), observedFlagged: true) }
+            let done = try j.accept(review)
+            check("8 a flag set again during the read is left", { if case .changedSinceReview = done.flag { return true }; return false }()
+                  && tags(f) == ["OCR Poor"], "\(done.flag) \(tags(f))")
+            check("8 the text is accepted all the same", text(f, 1).contains("New reading of image page 1."))
+        }
+    }
+
+    /// 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+    private static func testSection8Part3() async throws {
+        do {
+            let d = try folder("finder-flag"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            try tag(f, ["OCR Poor"])   // flagged in Finder while it is read: no suite event
+            let done = try j.accept(review)
+            check("8 a flag set outside the suite during the read is left", { if case .changedSinceReview = done.flag { return true }; return false }()
+                  && tags(f) == ["OCR Poor"], "\(done.flag) \(tags(f))")
+        }
+    }
+
+    /// 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+    private static func testSection8Part4() async throws {
+        do {
+            let d = try folder("resume-clear"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            try tag(f, ["OCR Poor", "Q1"])
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            // Published, then the Processor died just after beginning its clear.
+            let journal = try j.writer.accept(review.operation, candidate: review.candidate ?? Data())
+            _ = try j.flags.withLock(review.key, app: "Processor") {
+                try $0.begin(flagged: false, origin: .acceptedClear, operationID: journal.operationID)
+            }
+            let outcome = j.clearFlag(review, journal)
+            check("8 an interrupted clear of its own is resumed", outcome == .cleared && tags(f) == ["Q1"], "\(outcome) \(tags(f))")
+            let st = try j.flags.withLock(review.key, app: "Reader") { try $0.state() }
+            check("8 and leaves no barrier", !st.isPending && st.flagged == false)
+        }
+    }
+
+    /// 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+    private static func testSection8Part5() async throws {
+        do {
+            let d = try folder("unflagged"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+            check("8 an unflagged file has nothing to clear", done.flag == .notFlagged && done.receiptProblem == nil, "\(done.flag)")
+        }
+    }
+
+    /// 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+    private static func testSection8Part6() async throws {
+        do {
+            let d = try folder("pending"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            try tag(f, ["OCR Poor"])
+            let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            _ = try j.flags.withLock(k, app: "Reader") { try $0.begin(flagged: false, origin: .unflag) }   // dies mid-action
+            let done = try j.accept(review)
+            check("8 an unfinished action elsewhere leaves the flag", { if case .changedSinceReview = done.flag { return true }; return false }()
+                  && tags(f) == ["OCR Poor"], "\(done.flag)")
+        }
+    }
+
+    /// 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+    private static func testSection8Part7() async throws {
+        do {
+            let d = try folder("outside-root"), f = try file(d, pairs: 1), reader = FakeReader()
+            let other = try folder("other-root")
+            do { _ = try await job(d).start(file: f, root: archive(other), model: model, read: reader.read); check("8 a file outside its root is refused", false) }
+            catch { check("8 a file outside its root is refused", (error as? ImproveOCRFlagStore.StoreError) == .notInRoot && reader.calls.isEmpty, "\(error)") }
+        }
+    }
+
+    /// 9. Launch recovery finishes a publication a crash cut short: the receipt and the flag.
+    private static func testSection9() async throws {
+        do {
+            let d = try folder("recover"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            try tag(f, ["OCR Poor", "Q3"])
+            let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+            _ = try? j.writer.accept(review.operation, candidate: review.candidate ?? Data(),
+                                     faults: { if $0 == .afterSwap { throw ReOCRFileWriter.InjectedCrash() } })
+            let id = review.operation.journal.operationID
+            check("9 the crash left no receipt", !FileManager.default.fileExists(atPath: ImproveOCRReceipt.url(for: id, in: j.support).path))
+            let r = j.recover()
+            check("9 recovery publishes, writes the receipt and clears the flag",
+                  r.count == 1 && r[0].writer == .published(id) && r[0].receiptProblem == nil && r[0].flag == .cleared, "\(r)")
+            check("9 the tags are right after recovery", tags(f) == ["Q3"], "\(tags(f))")
+            check("9 the receipt is there", (try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: id, in: j.support)))?.afterSHA256
+                  == (try? j.writer.read(id))?.candidateSHA256)
+            let again = j.recover()
+            check("9 a second recovery changes nothing", again.count == 1 && again[0].writer == .alreadyPublished(id)
+                  && again[0].flag == .cleared && tags(f) == ["Q3"], "\(again)")
+            let record = try? j.writer.readRecord(ReOCRJob.Record.self, named: ReOCRJob.Record.file, for: id)
+            check("9 the job's record is settled", record?.receiptWritten == true && record?.flag == .cleared)
+            // Put back in Finder after the clear; a record that lost its outcome must not clear it again.
+            try tag(f, ["Q3", "OCR Poor"])
+            if var unsettled = record {
+                unsettled.flag = nil
+                try j.writer.writeRecord(unsettled, named: ReOCRJob.Record.file, for: id)
+            }
+            let third = j.recover()
+            check("9 a flag put back after the clear is not cleared again",
+                  { if case .changedSinceReview = third.first?.flag { return true }; return false }() && tags(f).contains("OCR Poor"),
+                  "\(third) \(tags(f))")
+            check("9 the journal cannot be overwritten as a record",
+                  (try? j.writer.writeRecord(["x": 1], named: "journal.json", for: id)) == nil)
+        }
+    }
+
+    /// 10. Restore.
+    private static func testSection10() async throws {
+        do {
+            let d = try folder("restore"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            try tag(f, ["OCR Poor", "Q2"])
+            let original = try Data(contentsOf: f)
+            let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+            let accepted = try Data(contentsOf: f)
+            try tag(f, ["Q2", "Added after"])   // an unrelated edit after acceptance
+            let r = try j.restore(done.journal.operationID)
+            check("10 restore puts the original bytes back", (try? Data(contentsOf: f)) == original)
+            check("10 it keeps later tag edits and puts the flag back",
+                  multisetEqual(tags(f), ["Q2", "Added after", "OCR Poor"]) && r.flag == .reflagged, "\(r.flag) \(tags(f))")
+            check("10 the accepted revision is kept", (try? Data(contentsOf: j.writer.backupURL(r.journal.operationID))) == accepted)
+            let receipt = try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: r.journal.operationID, in: j.support))
+            check("10 a restore receipt is written", r.receiptProblem == nil && receipt?.outcome == .restored
+                  && receipt?.afterSHA256 == done.journal.original.sha256)
+            let rec = j.recover()
+            check("10 recovery after a restore changes nothing", multisetEqual(tags(f), ["Q2", "Added after", "OCR Poor"])
+                  && rec.allSatisfy { $0.receiptProblem == nil }, "\(rec) \(tags(f))")
+            do { _ = try j.restore(r.journal.operationID); check("10 a restore cannot itself be restored", false) }
+            catch { check("10 a restore cannot itself be restored", (try? Data(contentsOf: f)) == original) }
+            do { _ = try j.restore(done.journal.operationID); check("10 a second restore is refused", false) }
+            catch { check("10 a second restore is refused", { if case ReOCRJob.Failure.notRestorable = error { return true }; return false }()) }
+        }
+    }
+
+    /// 10. Restore.
+    private static func testSection10Part2() async throws {
+        do {
+            let d = try folder("restore-changed"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+            let h = try FileHandle(forWritingTo: f); try h.seekToEnd(); try h.write(contentsOf: Data("\n%e\n".utf8)); try h.close()
+            let edited = try Data(contentsOf: f)
+            do { _ = try j.restore(done.journal.operationID); check("10 restore of a changed file is refused", false) }
+            catch { check("10 restore of a changed file is refused", (try? Data(contentsOf: f)) == edited) }
+            let pendingOps = j.recover().filter { if case .notPublished = $0.writer { return true }; return false }
+            check("10 a refused restore leaves no operation waiting for review", pendingOps.isEmpty, "\(pendingOps)")
+        }
+    }
+
+    /// 10. Restore.
+    private static func testSection10Part3() async throws {
+        do {
+            let d = try folder("restore-unflagged-later"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            try tag(f, ["OCR Poor"])
+            let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+            // The person unflags it explicitly in the Reader after acceptance (it was already clear).
+            let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+            _ = try j.flags.withLock(k, app: "Reader") { l in
+                try l.commit(l.begin(flagged: false, origin: .unflag), observedFlagged: false)
+            }
+            let r = try j.restore(done.journal.operationID)
+            check("10 a flag action after the clear means no re-flag",
+                  { if case .changedSinceClear = r.flag { return true }; return false }() && !tags(f).contains("OCR Poor"), "\(r.flag)")
+        }
+    }
+
+    /// 10. Restore.
+    private static func testSection10Part4() async throws {
+        do {
+            let d = try folder("restore-never-flagged"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+            let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+            let r = try j.restore(done.journal.operationID)
+            check("10 an original that was not flagged is not flagged", r.flag == .notNeeded && tags(f).isEmpty)
+        }
+    }
+
+    /// 11. The saved connection to the shared support folder.
+    private static func testSection11() async throws {
+        do {
+            let suite = "ImproveOCR.test.\(UUID().uuidString)"
+            guard let defaults = UserDefaults(suiteName: suite) else { check("11 a scratch defaults suite", false); return }
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let c = ReOCRSupportConnection(defaults: defaults)
+            check("11 nothing connected yet", (try? c.resolve()) == nil && { do { _ = try c.resolve(); return false }
+                catch { return (error as? ReOCRSupportConnection.Problem) == .notConnected } }())
+            let d = try folder("support-conn")
+            let made = try c.connect(d)
+            check("11 connecting makes the store's identity", (try? ImproveOCRSupportIdentity.identity(of: d, create: false)) == made.storeID)
+            check("11 it resolves to the same store", (try? c.resolve())?.storeID == made.storeID)
+            let moved = root.appendingPathComponent("support-conn-moved", isDirectory: true)
+            try FileManager.default.moveItem(at: d, to: moved)
+            let afterMove = try? c.resolve()
+            check("11 a moved folder is followed", afterMove?.storeID == made.storeID
+                  && afterMove?.url.standardizedFileURL.lastPathComponent == "support-conn-moved", "\(String(describing: afterMove))")
+            try FileManager.default.removeItem(at: moved.appendingPathComponent(ImproveOCRSupportIdentity.file))
+            _ = try ImproveOCRSupportIdentity.identity(of: moved, create: true)   // replaced by another store
+            do { _ = try c.resolve(); check("11 a different store is refused", false) }
+            catch { check("11 a different store is refused", (error as? ReOCRSupportConnection.Problem) == .differentStore, "\(error)") }
+            c.disconnect()
+            check("11 disconnecting forgets it", { do { _ = try c.resolve(); return false }
+                catch { return (error as? ReOCRSupportConnection.Problem) == .notConnected } }())
+        }
+    }
+
+    /// 12. A real reader on this Mac ($0, no network): Apple Vision through the row factory, end to end.
+    private static func testSection12() async throws {
+        do {
+            let d = try folder("vision"), j = job(d)
+            let img = d.appendingPathComponent("typed.jpg"), pdf = d.appendingPathComponent("Letter.pdf")
+            try typedPage(img, "IMPROVED READING OF THE LETTER 1952")
+            try PDFGenerator().generate(imageURL: img, result: OCRResult(text: "garbled old text", classification: nil,
+                                        errorMessage: nil, errorCode: nil), model: model, outputURL: pdf,
+                                        originalFileName: "typed.jpg", pageKind: .typewritten)
+            let vision = LLMModel.appleVisionModels[0]
+            let row = ReOCRRanking.Row(id: "vision", name: vision.displayName, appRoute: nil, provider: .appleVision,
+                                       modelID: vision.id, figure: nil, sample: nil, caveats: [], usdPer1000: 0,
+                                       estimateUSD: 0, readiness: .ready, tie: .notMeasured, isCurrent: false)
+            guard let read = ReOCRJob.reader(for: row, apiKey: "") else { check("12 the Vision row has a reader", false); return }
+            let review = try await j.start(file: pdf, root: archive(d), model: vision, read: read)
+            let newText = (try? review.results.first?.outcome.get()) ?? ""
+            check("12 Vision reads the image page", newText.uppercased().contains("IMPROVED READING"), newText)
+            check("12 a candidate is made", review.candidate != nil, review.candidateProblem ?? "")
+            check("12 the review reports the image page's layer change", review.replacedImagePages == [0])
+            _ = try j.accept(review)
+            check("12 the image page's searchable text matches the review", text(pdf, 0).uppercased().contains("IMPROVED READING"))
+            let header = PDFDocument(url: pdf)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
+            check("12 the header names Vision as the reader", header?.provenance?.model == vision.displayName,
+                  "\(String(describing: header?.provenance))")
+            var notReady = row
+            notReady = ReOCRRanking.Row(id: row.id, name: row.name, appRoute: "gemini|x", provider: .gemini, modelID: "x",
+                                        figure: nil, sample: nil, caveats: [], usdPer1000: nil, estimateUSD: nil,
+                                        readiness: .needsSetup("needs a Gemini key"), tie: .notMeasured, isCurrent: false)
+            check("12 a row that needs setup has no reader", ReOCRJob.reader(for: notReady, apiKey: "k") == nil)
+        }
+    }
+
+    /// 13. The dialog's model: groups by Kind, a Kind change re-ranks, the estimate, Run's blocker, the run.
+    private static func testSection13() async throws {
+        do {
+            guard let table = SettingsRouteTable.bundled else { check("13 the bundled route table loads", false); return }
+            let d = try folder("dialog"), reader = FakeReader()
+            let typed = try file(d, pairs: 1)
+            let unknown = d.appendingPathComponent("Unknown.pdf")
+            let img = d.appendingPathComponent("u.jpg"); try jpeg(img, seed: 9)
+            try PDFGenerator().generate(imageURL: img, result: OCRResult(text: "old", classification: nil, errorMessage: nil,
+                                        errorCode: nil), model: model, outputURL: unknown, originalFileName: "u.jpg")
+            var res = SettingsResources(macMemoryGB: 16)
+            res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
+            let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled,
+                                     resources: res, staysOnMac: false)
+            let three = try file(try folder("dialog-three"), pairs: 3)
+            let picked = ReOCRDialogModel(selectedPairs: [three: [1, 7]], table: table, pairs: OCRPairMatrix.bundled,
+                                          resources: res, staysOnMac: false)
+            await picked.loadFiles([three])
+            check("13 the Reader's chosen pairs are the only pages offered (one past the end ignored)",
+                  picked.pages.map(\.pairIndex) == [3], "\(picked.pages.map(\.pairIndex))")
+            var progress: [Int] = []
+            await m.loadFiles([typed, unknown]) { progress.append($0) }
+            check("13 the load reports each checked file", progress == [1, 2])
+            check("13 every file is listed", m.files.count == 2)
+            let call = m.pages.first { $0.fileID == unknown.path }
+            check("13 the classifier gives the unknown page a provisional Kind", call?.origin == .classifier && call?.kind != nil
+                  && m.pages.first { $0.fileID == typed.path }?.origin == .header, "\(String(describing: call))")
+            lines.append("INFO 13 classifier: \(String(describing: call?.kind)) at \(String(describing: call?.confidence))")
+            // Whatever it said, the test's next steps decide the Kind; start from "no Kind" again.
+            m.setKind(nil, file: unknown.path, pairIndex: 1)
+            check("13 Run waits for a Kind", m.runBlocker?.contains("Kind") == true, m.runBlocker ?? "")
+            m.setKind(.handwritten, file: unknown.path, pairIndex: 1)
+            check("13 choosing a Kind re-groups", m.groups.map(\.kind) == [.handwritten, .typewritten] || m.groups.map(\.kind) == [.typewritten, .handwritten],
+                  "\(m.groups.map(\.kind))")
+            let hand = m.groups.first { $0.kind == .handwritten }
+            let direct = ReOCRRanking.rank(kind: .handwritten, pages: 1, table: table, pairs: OCRPairMatrix.bundled,
+                                           resources: res, staysOnMac: false)
+            check("13 and re-ranks for the new Kind", hand?.ranking?.kind == .handwritten
+                  && hand?.ranking?.rows.map(\.id) == direct.rows.map(\.id) && !(direct.rows.isEmpty))
+            m.setKind(.forms, file: unknown.path, pairIndex: 1)
+            let forms = ReOCRRanking.rank(kind: .forms, pages: 1, table: table, pairs: OCRPairMatrix.bundled,
+                                          resources: res, staysOnMac: false)
+            check("13 a second change re-ranks again", m.groups.first { $0.kind == .forms }?.ranking?.rows.map(\.id) == forms.rows.map(\.id))
+            let est = m.estimate
+            check("13 the estimate is a sum or says what is unpriced", est.usd >= 0 && est.unpricedPages >= 0)
+            lines.append("INFO 13 estimate: $\(est.usd), \(est.unpricedPages) unpriced; blocker: \(m.runBlocker ?? "none")")
+            if m.runBlocker == nil {
+                let j = job(d)
+                let runs = await m.run(job: j, root: archive(d), model: model, readerFor: { _ in reader.read })
+                check("13 Run reads the two eligible files", runs.count == 2 && runs.allSatisfy { (try? $0.outcome.get())?.candidate != nil },
+                      "\(runs.map { $0.error ?? "\($0.outcome)" })")
+                check("13 each page reaches its reader with its Kind", Set(reader.calls.compactMap(\.kind)) == [.typewritten, .forms])
+                if let r = runs.first(where: { $0.fileID == unknown.path }), let review = try? r.outcome.get(),
+                   let row = m.groups.first(where: { $0.kind == .forms }).flatMap({ m.chosenRow($0) }) {
+                    _ = try j.accept(review)
+                    let h = PDFDocument(url: unknown)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
+                    check("13 the new header names the chosen row's model and the Kind",
+                          h?.kind == .forms && h?.provenance?.model == row.provider.models.first { $0.id == row.modelID }?.displayName,
+                          "\(String(describing: h)) \(row.id)")
+                    await m.refresh(fileID: unknown.path)
+                    let refreshed = m.pages.first { $0.fileID == unknown.path }
+                    check("13 refresh reads the accepted Kind and reader back from disk",
+                          refreshed?.origin == .header && refreshed?.kind == .forms
+                          && m.files[1].pair(at: 1)?.header?.provenance == h?.provenance)
+                }
+            } else {
+                check("13 with every key, a ready reader exists for each Kind", false, m.runBlocker ?? "")
+            }
+        }
+    }
+
+    /// 13b. W47.wh-yolo-scans-reocr: each file is read with its own collection's detector for scanned newspapers.
+    private static func testSection13b() async throws {
+        do {
+            guard let table = SettingsRouteTable.bundled else { check("13b the bundled route table loads", false); return }
+            let a = try folder("yolo")
+            func collection(_ name: String, yolo: Bool) throws -> URL {
+                let d = a.appendingPathComponent(name, isDirectory: true)
+                try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+                var doc = CollectionSettingsDocument(name: name, createdAt: Date())
+                doc.collection.set(.scanNewspapersDocLayoutYOLO, .bool(yolo), source: .setByUser(Date()))
+                doc.collection.set(.noTraining, .bool(yolo), source: .setByUser(Date()))
+                try CollectionSettingsFile.write(doc, in: d)
+                return try file(d, pairs: 1)
+            }
+            let on = try collection("on", yolo: true), off = try collection("off", yolo: false)
+            let switches = await ImproveOCRController.collectionSwitches(for: [on, off], settings: SettingsLayerStore.shared.file)
+            check("13b each file gets its collection's choice", switches.scanDetectors[on] == .docLayoutYOLO
+                  && switches.scanDetectors[off] == .ppDocLayoutV3, "\(switches.scanDetectors)")
+            var res = SettingsResources(macMemoryGB: 16)
+            res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
+            let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled, resources: res,
+                                     staysOnMac: false, trainingProtectedFiles: switches.trainingProtectedFiles,
+                                     scanDetectors: switches.scanDetectors)
+            await m.loadFiles([on, off])
+            final class Seen: @unchecked Sendable {
+                let lock = NSLock()
+                var detectors: [NewspaperDetector] = []
+                var trainingPolicies: [Bool] = []
+            }
+            let seen = Seen()
+            let runs = await m.run(job: job(a), root: archive(a), model: model, readerFor: { _ in { _, _, _ in
+                seen.lock.withLock {
+                    seen.detectors.append(NewspaperPageReader.scanDetector)
+                    seen.trainingPolicies.append(OpenRouterDataPolicy.denyDataCollection)
+                }
+                return OCRResult(text: "New reading.", classification: nil, errorMessage: nil, errorCode: nil)
+            } })
+            let order = seen.lock.withLock { seen.detectors }
+            check("13b the reader sees each file's detector, in file order",
+                  runs.count == 2 && order == [.docLayoutYOLO, .ppDocLayoutV3],
+                  "\(order) \(m.runBlocker ?? "") \(runs.map { $0.error ?? "\($0.outcome)" })")
+            check("13b only the protected file's reader gets the deny",
+                  seen.lock.withLock { seen.trainingPolicies } == [true, false])
+            check("13b outside the run the default stands", NewspaperPageReader.scanDetector == .ppDocLayoutV3)
+        }
+    }
+
+    /// 14. A hand-off from the Reader: it only resolves files inside the named archive, once.
+    private static func testSection14() async throws {
+        do {
+            let suite = "ImproveOCR.handoff.\(UUID().uuidString)"
+            guard let defaults = UserDefaults(suiteName: suite) else { check("14 a scratch defaults suite", false); return }
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let archiveDir = try folder("handoff-archive")
+            let guid = UUID()
+            try JSONEncoder().encode(RootMarker(guid: guid, name: "scratch", kind: .reader, createdAt: Date()))
+                .write(to: archiveDir.appendingPathComponent(RootMarker.filename))
+            _ = try file(archiveDir, pairs: 1)
+            let letter = archiveDir.appendingPathComponent("Letter.pdf")
+            let conn = ReOCRSupportConnection(defaults: defaults)
+            _ = try conn.connect(try folder("handoff-support"))
+            func isMessage(_ o: ImproveOCRHandoff.Outcome, _ needle: String = "") -> Bool {
+                if case .message(let m) = o { return needle.isEmpty || m.contains(needle) }
+                return false
+            }
+            let link = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
+            var asked = 0
+            // The person cancels the folder panel: nothing comes up, and the request is not used up.
+            let cancelled = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in nil })
+            check("14 a cancelled panel brings nothing up", isMessage(cancelled, "not available"), "\(cancelled)")
+            let first = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return archiveDir })
+            check("14 the same link, sent again after the cancel, brings up the dialog for its file", first == .open([letter]), "\(first)")
+            check("14 the person was asked for the archive once", asked == 1)
+            let again = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
+            check("14 the same link does not come up twice", isMessage(again, "already"), "\(again)")
+            let second = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
+            let viaGrant = await ImproveOCRHandoff.handle(second, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
+            // The grant resolves through /private/var, the same folder as /var: compare resolved paths.
+            func same(_ o: ImproveOCRHandoff.Outcome) -> Bool {
+                if case .open(let urls, _) = o { return urls.map { $0.resolvingSymlinksInPath().path } == [letter.resolvingSymlinksInPath().path] }
+                return false
+            }
+            check("14 the saved grant is used next time, without asking", same(viaGrant) && asked == 1, "\(viaGrant)")
+            let other = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: UUID(), relativePaths: ["Letter.pdf"]).url()
+            let wrong = await ImproveOCRHandoff.handle(other, connection: conn, defaults: defaults, chooseRoot: { _ in archiveDir })
+            check("14 a folder with another root marker is refused", isMessage(wrong), "\(wrong)")
+            let outside = try folder("handoff-outside")
+            try FileManager.default.createSymbolicLink(at: archiveDir.appendingPathComponent("Escape.pdf"),
+                                                       withDestinationURL: outside.appendingPathComponent("x.pdf"))
+            let escape = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Escape.pdf"]).url()
+            check("14 a link out of the archive is refused",
+                  isMessage(await ImproveOCRHandoff.handle(escape, connection: conn, defaults: defaults, chooseRoot: { _ in nil })))
+            let noneSuite = suite + ".none"
+            guard let noneDefaults = UserDefaults(suiteName: noneSuite) else { return }
+            defer { noneDefaults.removePersistentDomain(forName: noneSuite) }
+            let third = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
+            check("14 without the shared folder nothing comes up",
+                  isMessage(await ImproveOCRHandoff.handle(third, connection: ReOCRSupportConnection(defaults: noneDefaults),
+                                                     defaults: defaults, chooseRoot: { _ in nil }), "shared folder"))
+        }
+    }
+
+    /// 15. The history: what was kept, what it is, Restore and Remove.
+    private static func testSection15() async throws {
+        do {
+            let d = try folder("history"), j = job(d), reader = FakeReader()
+            let h = ReOCRHistory(writer: j.writer)
+            check("15 an empty history", h.entries().isEmpty && h.totalBytes == 0)
+            let a = try file(d, pairs: 1)
+            let accepted = try j.accept(try await j.start(file: a, root: archive(d), model: model, read: reader.read))
+            let restored = try j.restore(accepted.journal.operationID)
+            let rejectedReview = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
+            try j.reject(rejectedReview)
+            let undecided = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
+            let states = Dictionary(uniqueKeysWithValues: h.entries().map { ($0.id, $0.state) })
+            check("15 each change is listed with what it is",
+                  states[accepted.journal.operationID] == .undone(by: restored.journal.operationID)
+                  && states[restored.journal.operationID] == .restoredEarlier(accepted.journal.operationID)
+                  && states[rejectedReview.operation.journal.operationID] == .rejected
+                  && states[undecided.operation.journal.operationID] == .undecided, "\(states)")
+            check("15 the kept size is counted", h.totalBytes > 0 && h.entries().allSatisfy { $0.bytes > 0 })
+            check("15 only an accepted change offers Restore", h.entries().filter(\.canRestore).isEmpty)
+            try h.remove(rejectedReview.operation.journal.operationID)
+            check("15 removing one change removes only its copy",
+                  !FileManager.default.fileExists(atPath: j.writer.backupURL(rejectedReview.operation.journal.operationID).path)
+                  && FileManager.default.fileExists(atPath: j.writer.backupURL(accepted.journal.operationID).path))
+            try h.remove(undecided.operation.journal.operationID)
+            check("15 an undecided change can be removed", !h.entries().contains { $0.id == undecided.operation.journal.operationID })
+            // A change stopped during publication waits for launch recovery.
+            let b = try file(try folder("history-b"), pairs: 1)
+            let jb = job(b.deletingLastPathComponent())
+            let stopped = try await jb.start(file: b, root: archive(b.deletingLastPathComponent()), model: model, read: reader.read)
+            _ = try? jb.writer.accept(stopped.operation, candidate: stopped.candidate ?? Data(),
+                                      faults: { if $0 == .afterAcceptReady { throw ReOCRFileWriter.InjectedCrash() } })
+            let hb = ReOCRHistory(writer: jb.writer)
+            check("15 a change stopped during publication cannot be removed",
+                  (try? hb.remove(stopped.operation.journal.operationID)) == nil
+                  && hb.entries().first?.state == .interrupted, "\(hb.entries().map(\.state))")
+            let fresh = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
+            _ = try j.accept(fresh)
+            check("15 a new acceptance offers Restore", h.entries().first { $0.id == fresh.operation.journal.operationID }?.canRestore == true)
+        }
+    }
+
+    /// 16. The flagged files under a folder, in any spelling, and nothing else.
+    private static func testSection16() async throws {
+        do {
+            let d = try folder("flagged")
+            let sub = d.appendingPathComponent("Box 2", isDirectory: true)
+            try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+            let a = try file(try folder("flagged-a"), pairs: 1), b = try file(try folder("flagged-b"), pairs: 1), c = try file(try folder("flagged-c"), pairs: 1)
+            let fa = d.appendingPathComponent("A.pdf"), fb = sub.appendingPathComponent("B.pdf"), fc = d.appendingPathComponent("C.pdf")
+            try FileManager.default.copyItem(at: a, to: fa); try FileManager.default.copyItem(at: b, to: fb); try FileManager.default.copyItem(at: c, to: fc)
+            try tag(fa, ["OCR Poor", "Q1"]); try tag(fb, ["ocr poor"]); try tag(fc, ["Q2"])
+            let found = ReOCRFlaggedFinder.find(in: d)
+            check("16 the flagged PDFs are found, in any spelling and in subfolders",
+                  found.files.map(\.lastPathComponent) == ["A.pdf", "B.pdf"] && found.scanned == 3 && !found.truncated, "\(found)")
+            let one = ReOCRFlaggedFinder.find(in: d, limit: 1)
+            check("16 a limit is kept and reported", one.files.count == 1 && one.truncated)
+            check("16 finding changes nothing", tags(fc) == ["Q2"] && tags(fa).contains("OCR Poor"))
+        }
+    }
+
+    /// 7. A selected pair whose scan has a crop, rotation, annotation and existing invisible OCR.
+    private static func testSection7() async throws {
+        do {
+            let d = try folder("rotated"), f = try file(d, pairs: 2), reader = FakeReader()
+            let jpeg = try Data(contentsOf: d.appendingPathComponent("IMG2.jpg"))
+            let scan = handPDF(
+                content: "q 200 0 0 250 0 0 cm /Im0 Do Q BT /F1 12 Tf 3 Tr 30 120 Td (STALESCAN) Tj ET",
+                jpeg: jpeg, imageExtra: "", resources: "/Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >>")
+            if let doc = PDFDocument(url: f), let p = PDFDocument(data: scan)?.page(at: 0) {
+                p.rotation = 90
+                p.setBounds(CGRect(x: 12, y: 17, width: 170, height: 210), for: .cropBox)
+                let annotation = PDFAnnotation(bounds: CGRect(x: 24, y: 26, width: 30, height: 28), forType: .square, withProperties: nil)
+                annotation.contents = "Keep this annotation"
+                p.addAnnotation(annotation)
+                doc.removePage(at: 2)
+                doc.insert(p, at: 2)
+                // Normalize Quartz's output as the Processor's PDF/A writer does, including its XMP stream.
+                if let edited = doc.dataRepresentation(), let compatible = ArchivalFinish.finished(edited) {
+                    try compatible.write(to: f)
+                }
+            }
+            let data = try Data(contentsOf: f)
+            check("7 fixture has an old searchable layer", text(f, 2).contains("STALESCAN"))
+            check("7 a rotated page is not extracted", ReOCRJob.embeddedJPEG(data, pageIndex: 2) == nil)
+            let j = job(d)
+            let review = try await j.start(file: f, root: archive(d), textPages: [3], model: model, read: reader.read)
+            let src = reader.calls.first.flatMap { CGImageSourceCreateWithData($0.image as CFData, nil) }
+            let props = src.flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
+            let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0, h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
+            check("7 it is rendered upright as a JPEG", src.map { CGImageSourceGetType($0) as String? } == "public.jpeg" && w > h,
+                  "\(w)x\(h)")
+            check("7 its candidate is made", review.candidate != nil,
+                  review.candidateProblem ?? "\(review.results.map(\.outcome))")
+            check("7 review reports the selected scan's layer change", review.replacedImagePages == [2])
+            if review.candidate != nil {
+                _ = try j.accept(review)
+                let doc = PDFDocument(url: f)
+                let page = doc?.page(at: 2)
+                check("7 rotation, crop and annotation survive publication", page?.rotation == 90
+                      && page?.bounds(for: .cropBox) == CGRect(x: 12, y: 17, width: 170, height: 210)
+                      && page?.annotations.first?.contents == "Keep this annotation")
+                let removed = doc?.findString("STALESCAN", withOptions: []).isEmpty == true
+                let hits = doc?.findString("New reading", withOptions: []) ?? []
+                let hitPages = hits.compactMap { $0.pages.first }.compactMap { doc?.index(for: $0) }
+                let selected = page?.selection(for: NSRange(location: 0, length: 3))?.string
+                check("7 search and selection use the new reading on the selected scan",
+                      removed && hitPages.sorted() == [2, 3] && selected == "New")
+                if let page, let hit = hits.first(where: { $0.pages.contains(page) }) {
+                    let bounds = hit.bounds(for: page)
+                    check("7 the selected text is inside the visible crop",
+                          !bounds.isEmpty && page.bounds(for: .cropBox).contains(bounds))
+                } else { check("7 the selected text is inside the visible crop", false) }
+                check("7 only the corresponding separate text page changes", text(f, 1).contains("Old reading of image 1.")
+                      && text(f, 3).contains("New reading of image page 3."))
+                _ = try j.restore(review.operation.journal.operationID)
+                check("7 Restore returns the exact original including the old layer", (try? Data(contentsOf: f)) == data)
+            }
+        }
+    }
+
+    /// 17. A standalone searchable file produced by the normal output path, including its XMP header.
+    private static func testSection17() async throws {
+        do {
+            let d = try folder("searchable"), j = job(d)
+            let img = d.appendingPathComponent("typed.jpg"), pdf = d.appendingPathComponent("Searchable.pdf")
+            try typedPage(img, "FORMER TRANSCRIPTION")
+            let fixtureModel = model
+            let output = try await PDFGenerator.runWorker {
+                try PDFGenerator().generateOutput(
+                    imageURL: img, result: OCRResult(text: "FORMER TRANSCRIPTION", classification: nil,
+                                                    errorMessage: nil, errorCode: nil),
+                    model: fixtureModel, outputURL: pdf, originalFileName: "typed.jpg", pageKind: .typewritten,
+                    textLayer: .init(searchableFor: ["*/*"]))
+            }
+            let original = try Data(contentsOf: pdf)
+            check("17 normal output made a searchable fixture", output.form == .searchable && text(pdf, 0).contains("FORMER"),
+                  output.compression ?? output.compressedNote ?? "")
+            let compressed = original.range(of: Data("/JBIG2Decode".utf8)) != nil
+            lines.append("INFO 17 fixture: \(compressed ? "JBIG2" : output.compression ?? "other scan encoding")")
+            let reader = FakeReader()
+            let review = try await j.start(file: pdf, root: archive(d), textPages: [0], model: model, read: reader.read)
+            check("17 review shows the old text and does not write before acceptance", reader.calls.map(\.imageIndex) == [0]
+                  && review.results.first?.oldText.contains("FORMER") == true && (try? Data(contentsOf: pdf)) == original)
+            check("17 one searchable page can be improved", review.candidate != nil && review.replacedImagePages == [0],
+                  review.candidateProblem ?? "\(review.results.map(\.outcome))")
+            if review.candidate != nil {
+                _ = try j.accept(review)
+                let doc = PDFDocument(url: pdf)
+                let roles = doc.map { PDFPageRole.roles(of: $0) }
+                check("17 page count and role survive", doc?.pageCount == 1 && roles == [.searchable])
+                let oldHits = doc?.findString("FORMER", withOptions: []).count
+                let newHits = doc?.findString("New reading", withOptions: []).count
+                let selected = doc?.page(at: 0)?.selection(for: NSRange(location: 0, length: 3))?.string
+                check("17 search and selection use only the new reading", oldHits == 0 && newHits == 1 && selected == "New")
+                _ = try j.restore(review.operation.journal.operationID)
+                check("17 Restore puts back the original searchable PDF byte for byte", (try? Data(contentsOf: pdf)) == original)
+                let first = try await j.start(file: pdf, root: archive(d), model: model, read: reader.read)
+                _ = try j.accept(first)
+                let accepted = try Data(contentsOf: pdf)
+                let again = try await j.start(file: pdf, root: archive(d), model: model) { _, _, _ in
+                    OCRResult(text: "SECOND REVISION", classification: nil, errorMessage: nil, errorCode: nil)
+                }
+                check("17 a subsequent Improve OCR replaces the previous form", again.candidate != nil, again.candidateProblem ?? "")
+                if again.candidate != nil {
+                    _ = try j.accept(again)
+                    check("17 only the second reading remains searchable", text(pdf, 0).contains("SECOND REVISION")
+                          && !text(pdf, 0).contains("New reading"))
+                    _ = try j.restore(again.operation.journal.operationID)
+                    check("17 Restore puts back the previous revision byte for byte", (try? Data(contentsOf: pdf)) == accepted)
+                }
+            }
         }
     }
 

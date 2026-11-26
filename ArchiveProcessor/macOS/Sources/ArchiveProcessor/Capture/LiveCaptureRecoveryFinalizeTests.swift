@@ -4,10 +4,11 @@ import AppKit
 import PDFKit
 import ArchiveCore
 
-// Tests 13-20 of LiveCaptureRecoveryTestDriver.run(), one function each (W49.proc-build-memory).
+// Tests 13-20 of LiveCaptureRecoveryTestDriver.run(), one function each (W49.proc-build-memory): as one
+// function, type-checking and lowering `run()` took a single swift-frontend to 9.4 GB. Each runs only with a scratch
+// backup root (`ARCHIVEPROC_TEST_BACKUP_ROOT`), as `run()` checks before calling.
 extension LiveCaptureRecoveryTestDriver {
-    /// Test 13 (W3.cap-r6) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 13 (W3.cap-r6) of `run()`.
     static func runTest13(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         func makeConfig(_ out: URL) -> SessionProcessingConfig {
@@ -152,8 +153,7 @@ extension LiveCaptureRecoveryTestDriver {
             .appendingPathComponent(".Trash/\(goneDir.lastPathComponent)"))
     }
 
-    /// Test 14 (W3.cap-r2) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 14 (W3.cap-r2) of `run()`.
     static func runTest14(tmp: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         let r2Out = tmp.appendingPathComponent("r2out", isDirectory: true)
@@ -208,8 +208,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRStarts = []
     }
 
-    /// Test 15 (W3.cap-r5) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 15 (W3.cap-r5) of `run()`.
     static func runTest15(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         let r5Out = tmp.appendingPathComponent("r5out", isDirectory: true)
@@ -292,8 +291,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRGate = nil
     }
 
-    /// Test 16 (W3.cap-r4) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 16 (W3.cap-r4) of `run()`.
     static func runTest16(tmp: URL, stubModel: LLMModel, isolatedBackup: Bool, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         let r4Out = tmp.appendingPathComponent("r4out", isDirectory: true)
@@ -386,8 +384,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRStub = nil
     }
 
-    /// Test 17 (W3.cap-r3) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 17 (W3.cap-r3) of `run()`.
     static func runTest17(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         // Same isolation as Test 16, and load-bearing for the same reason: `CaptureSession.init` adopts
@@ -617,8 +614,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRGate = nil
     }
 
-    /// Test 17 (W3.cap-r3-fu1) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 17 (W3.cap-r3-fu1) of `run()`.
     static func runTest17fu1(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         // Same isolation as Tests 16/17, load-bearing for the same reason: `CaptureSession.init` adopts
@@ -767,8 +763,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRGate = nil
     }
 
-    /// Test 18 (W3.cap-r3-fu2) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 18 (W3.cap-r3-fu2) of `run()`.
     static func runTest18(tmp: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         // Same isolation as Tests 16/17, load-bearing for the same reason: `CaptureSession.init` adopts
@@ -907,8 +902,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRGate = nil
     }
 
-    /// Test 19 (W3.cap-r3-fu5) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 19 (W3.cap-r3-fu5) of `run()`.
     static func runTest19(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         // Same isolation as Tests 16–18, and load-bearing for the same reason: `CaptureSession.init`
@@ -1082,8 +1076,7 @@ extension LiveCaptureRecoveryTestDriver {
         LiveCaptureProcessor._recoveryTestOCRTasks = [:]
     }
 
-    /// Test 20 (W3.cap-r3-fu6) of `run()`, moved out whole (W49.proc-build-memory): inside `run()`, type-checking and
-    /// lowering that one function took a single swift-frontend to 9.4 GB. Runs only with a scratch backup root.
+    /// Test 20 (W3.cap-r3-fu6) of `run()`.
     static func runTest20(tmp: URL, staging: URL, stubModel: LLMModel, check: (String, Bool) -> Void) async {
         let fm = FileManager.default
         if let testRoot = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"],
