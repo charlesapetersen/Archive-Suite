@@ -350,7 +350,8 @@ extension FocusedValues {
     }
 }
 
-/// Edit ▸ Delete Note… (⌘⌫, as in Finder; W40.fix-notes-delete-redo, notes-2 row 16): the selected row, through
+/// Edit ▸ Delete Note… (⌘⌫, as in Finder; W40.fix-notes-delete-redo, notes-2 row 16): the selected rows (Delete N
+/// Notes… for several, one prompt for them all; W49.notes-multiselect-actions), through
 /// the same confirmation as the row menu's Delete…. The menu sees ⌘⌫ before a text view does, so in the editor or a
 /// text field the key keeps its own meaning, deleting to the start of the line; outside the note list it does nothing.
 struct DeleteCommands: Commands {
@@ -358,7 +359,9 @@ struct DeleteCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .pasteboard) {
-            Button("Delete Note\u{2026}") { perform() }
+            Button((deleteItem?.count ?? 1) > 1 ? "Delete \(deleteItem?.count ?? 0) Notes\u{2026}" : "Delete Note\u{2026}") {
+                perform()
+            }
                 .keyboardShortcut(.delete, modifiers: .command)
                 .disabled(deleteItem == nil)
         }
@@ -378,6 +381,8 @@ struct DeleteCommands: Commands {
 }
 
 struct DeleteItemAction {
+    /// How many notes it deletes, for the menu's title.
+    var count = 1
     let perform: @MainActor () -> Void
 }
 

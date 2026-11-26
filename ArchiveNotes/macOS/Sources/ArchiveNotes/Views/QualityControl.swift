@@ -9,16 +9,19 @@ import SwiftUI
 /// "group / inspector" control from 06-viewers §8.
 struct QualityFacetRow: View {
     let quality: Int?
+    /// Several notes with different ratings (W49.notes-multiselect-actions): no button is highlighted.
+    var isMixed = false
+    var identifier = "an.detail.quality"
     let onSet: (Int?) -> Void
 
     var body: some View {
         HStack(spacing: 6) {
-            facetButton("None", current: quality == nil) { onSet(nil) }
+            facetButton("None", current: !isMixed && quality == nil) { onSet(nil) }
             ForEach(1...3, id: \.self) { q in
-                facetButton("\(q)", current: quality == q) { onSet(q) }
+                facetButton("\(q)", current: !isMixed && quality == q) { onSet(q) }
             }
         }
-        .accessibilityIdentifier("an.detail.quality")
+        .accessibilityIdentifier(identifier)
     }
 
     private func facetButton(_ label: String, current: Bool, action: @escaping () -> Void) -> some View {

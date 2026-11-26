@@ -146,22 +146,39 @@ final class NotesNavigationModel: ObservableObject {
     private var isConfirmingDeletion = false
 
     /// Whether an Undo's Put Back brought the note home, read by the Redo that follows it.
-    final class DeleteHistoryStep { var happened = false }
+    final class DeleteHistoryStep { var putBack: [UUID] = [] }
 
-    /// The item + folder whose removal would delete the item's sole remaining instance (§3.6).
+    /// The item + folder whose removal would delete the item's sole remaining instance (§3.6), or a whole-item
+    /// delete of one note or of several selected together (W49.notes-multiselect-actions: one prompt for them all).
     struct PendingDeletion: Identifiable, Equatable {
         let id = UUID()
         let itemId: UUID
         let folderId: UUID?
         let title: String
         let allInstances: Bool
+        /// Every note this prompt deletes: `itemId` alone, or the selected notes of a bulk delete (always
+        /// `allInstances`), in list order.
+        let itemIds: [UUID]
 
         init(itemId: UUID, folderId: UUID?, title: String, allInstances: Bool = false) {
             self.itemId = itemId
             self.folderId = folderId
             self.title = title
             self.allInstances = allInstances
+            self.itemIds = [itemId]
         }
+
+        /// A whole-item delete of `itemIds` (at least one), every placement of each.
+        init(batch itemIds: [UUID], title: String) {
+            precondition(!itemIds.isEmpty)
+            self.itemId = itemIds[0]
+            self.folderId = nil
+            self.title = title
+            self.allInstances = true
+            self.itemIds = itemIds
+        }
+
+        var isBatch: Bool { itemIds.count > 1 }
     }
 
     // MARK: FTS state (keyword search)
@@ -341,6 +358,43 @@ final class NotesNavigationModel: ObservableObject {
     /// date's existing Year/Month/Day/Decade facets onto this note's own `.md`.
     func setQuality(_ quality: Int?, for id: UUID) async {
         await model.setQuality(quality, for: id)
+    }
+
+    // MARK: Bulk edits of a multi-selection (W49.notes-multiselect-actions)
+
+    /// Set Quality on every note in `ids`, one note's atomic save and Finder mirror at a time, as a single
+    /// note's is: each note's write stands on its own, so a failed one leaves the others set.
+    func setQuality(_ quality: Int?, for ids: [UUID]) async {
+        for id in ids { await model.setQuality(quality, for: id) }
+    }
+
+    /// Add `tag` to every note in `ids` (a delta on each note's latest front matter, as the tag bar's add is).
+    /// Returns the notes it could not be saved on.
+    @discardableResult
+    func addTag(_ tag: String, to ids: [UUID]) async -> [UUID] {
+        var failed: [UUID] = []
+        for id in ids where !(await model.addTag(tag, to: id)) { failed.append(id) }
+        reportBulkTagFailure(failed.count, of: ids.count, verb: "add the tag to")
+        return failed
+    }
+
+    /// Remove `tag` from every note in `ids` that has it. Returns the notes it could not be saved on.
+    @discardableResult
+    func removeTag(_ tag: String, from ids: [UUID]) async -> [UUID] {
+        let key = NotesTagVocabulary.titleCased(tag).lowercased()
+        let holders = ids.filter { id in
+            model.allItems.first { $0.id == id }?.managedTags
+                .contains { NotesTagVocabulary.titleCased($0).lowercased() == key } ?? true
+        }
+        var failed: [UUID] = []
+        for id in holders where !(await model.removeTag(tag, from: id)) { failed.append(id) }
+        reportBulkTagFailure(failed.count, of: holders.count, verb: "remove the tag from")
+        return failed
+    }
+
+    private func reportBulkTagFailure(_ failed: Int, of total: Int, verb: String) {
+        guard failed > 0, total > 1 else { return }
+        model.statusMessage = "Couldn't \(verb) \(failed) of \(total) notes. The others were saved."
     }
 
     // MARK: Sort control (from the table header)
@@ -596,6 +650,16 @@ final class NotesNavigationModel: ObservableObject {
                                           title: title.isEmpty ? "Untitled" : title, allInstances: true)])
     }
 
+    /// Stage a whole-item delete of the selected notes: one note asks as before, several ask once for them all
+    /// (W49.notes-multiselect-actions). Nothing is changed until the user confirms.
+    func requestDeleteItems(_ itemIds: [UUID]) {
+        var seen = Set<UUID>()
+        let ids = itemIds.filter { seen.insert($0).inserted }
+        guard let first = ids.first else { return }
+        guard ids.count > 1 else { requestDeleteItem(first); return }
+        enqueueDeletions([PendingDeletion(batch: ids, title: "\(ids.count) notes")])
+    }
+
     private func enqueueDeletions(_ requests: [PendingDeletion]) {
         queuedDeletions.append(contentsOf: requests)
         if pendingDeletion == nil { advanceDeletionQueue() }
@@ -616,13 +680,19 @@ final class NotesNavigationModel: ObservableObject {
     /// and any Trash move finish, so the next prompt gets its own decision.
     @discardableResult
     func confirmPendingDeletion(_ pending: PendingDeletion) async -> Bool {
-        guard pendingDeletion?.id == pending.id, !isConfirmingDeletion else { return false }
+        !(await confirmPendingDeletionTrashing(pending)).isEmpty
+    }
+
+    /// As `confirmPendingDeletion`, returning the notes that reached the Trash, so the view offers Undo for
+    /// exactly those.
+    func confirmPendingDeletionTrashing(_ pending: PendingDeletion) async -> [UUID] {
+        guard pendingDeletion?.id == pending.id, !isConfirmingDeletion else { return [] }
         isConfirmingDeletion = true
         defer {
             isConfirmingDeletion = false
             advanceDeletionQueue()
         }
-        return await confirmDeletion(pending)
+        return await confirmDeletionTrashing(pending)
     }
 
     /// Perform a confirmed delete-last-instance for a specific pending item. The alert may be **stale**
@@ -642,43 +712,62 @@ final class NotesNavigationModel: ObservableObject {
     /// for exactly the deletes that happened (W40.fix-notes-delete-undo).
     @discardableResult
     func confirmDeletion(_ pending: PendingDeletion) async -> Bool {
-        let ids = [pending.itemId]
+        !(await confirmDeletionTrashing(pending)).isEmpty
+    }
+
+    /// As `confirmDeletion`, returning the notes that reached the Trash. A bulk delete holds the hard-delete
+    /// window for every selected note for the whole call, and takes each note's placements away on its own
+    /// (W49.notes-multiselect-actions): a note whose placements could not be removed stays filed and on disk,
+    /// and only the notes left with none go to the Trash.
+    @discardableResult
+    func confirmDeletionTrashing(_ pending: PendingDeletion) async -> [UUID] {
+        let ids = pending.itemIds
         model.organization.beginHardDelete(ids)
         defer { model.organization.endHardDelete(ids) }
         if pending.allInstances {
             // After the drain, so a placement still being written is in the record Put Back reads.
-            let former: [UUID]
-            do {
-                try await model.organization.drainMembershipWritesForConfirmedDelete(item: pending.itemId)
-                former = model.organization.foldersContaining(item: pending.itemId)
-                try await model.organization.removeAllMembershipsForConfirmedDelete(item: pending.itemId)
+            var former: [UUID: [UUID]] = [:]
+            var unfiled: [UUID] = []
+            for id in ids {
+                do {
+                    try await model.organization.drainMembershipWritesForConfirmedDelete(item: id)
+                    let folders = model.organization.foldersContaining(item: id)
+                    try await model.organization.removeAllMembershipsForConfirmedDelete(item: id)
+                    former[id] = folders
+                    unfiled.append(id)
+                } catch {
+                    continue
+                }
             }
-            catch {
-                model.statusMessage = "Couldn't remove the note from its folders. The note is still on disk."
+            if unfiled.count < ids.count {
+                let kept = ids.count - unfiled.count
+                model.statusMessage = ids.count == 1
+                    ? "Couldn't remove the note from its folders. The note is still on disk."
+                    : "Couldn't remove \(kept) of \(ids.count) notes from their folders. Those notes are still on disk."
                 model.rebuild(); recompute(); model.adoptMirrorFailure()
-                return false
+                guard !unfiled.isEmpty else { return [] }
             }
-            let survived = await model.trashItems(ids, formerFolders: [pending.itemId: former])
+            let survived = Set(await model.trashItems(unfiled, formerFolders: former))
             recompute()
             model.adoptMirrorFailure()
-            return survived.isEmpty
+            return unfiled.filter { !survived.contains($0) }
         }
-        guard let folderId = pending.folderId else { return false }
+        guard let folderId = pending.folderId else { return [] }
         do {
             try await model.organization.drainMembershipWritesForConfirmedDelete(item: pending.itemId)
             switch try await model.organization.removeConfirmedLastMembership(
                 item: pending.itemId, folder: folderId) {
             case .unlinkedNotLast:
                 // A replica appeared between the modal and this confirm — just unlink; do NOT delete.
-                model.rebuild(); recompute(); model.adoptMirrorFailure(); return false
+                model.rebuild(); recompute(); model.adoptMirrorFailure(); return []
             case .notPresent:
                 // A STALE alert: the other window already moved or removed this membership, so nothing
                 // was removed here and the note may still be filed elsewhere. Keep it (W23.h3).
-                model.rebuild(); recompute(); return false
+                model.rebuild(); recompute(); return []
             case .deletedLastInstance:
                 break                                   // genuinely the last — fall through to the trash
             }
-        } catch { model.statusMessage = "Couldn't remove the note from the folder."; return false }
+        } catch { model.statusMessage = "Couldn't remove the note from the folder."; return [] }
         model.organization.beginHardDelete([pending.itemId])
         defer { model.organization.endHardDelete([pending.itemId]) }
         let survived = await model.trashItems([pending.itemId], formerFolders: [pending.itemId: [folderId]])
@@ -687,7 +776,7 @@ final class NotesNavigationModel: ObservableObject {
         // The trash decision itself is unchanged — the note is in the store's Trash (Put Back) and
         // the graph is consistent in SQLite; making the *durable mirror* transactional is W23.m13.
         model.adoptMirrorFailure()
-        return survived.isEmpty
+        return survived.isEmpty ? [pending.itemId] : []
     }
 
     /// Skip just this note and offer the next queued confirmation.
@@ -697,12 +786,10 @@ final class NotesNavigationModel: ObservableObject {
         advanceDeletionQueue()
     }
 
-    /// The note Edit ▸ Delete… (⌘⌫) asks to delete: the one selected row of the note list, or nil when the
-    /// list is not showing or holds no single selection (W40.fix-notes-delete-redo, notes-2 row 16).
-    var deletableSelection: UUID? {
-        guard paneMode == .notes, selection.count == 1 else { return nil }
-        return selection.first
-    }
+    /// The notes Edit ▸ Delete… (⌘⌫) asks to delete: the selected rows of the note list in list order, or empty
+    /// when the list is not showing (W40.fix-notes-delete-redo, notes-2 row 16; several since
+    /// W49.notes-multiselect-actions).
+    var deletableSelection: [UUID] { exportableSelection }
 
     /// What File ▸ Export… and Print… act on (W49.notes-export-print): the selected rows, in list order. Empty
     /// while the list is not showing (templates, the Trash).
@@ -723,34 +810,49 @@ final class NotesNavigationModel: ObservableObject {
     /// the manager is undoing or redoing, so it lands on the other stack, and the steps run one after
     /// another, so a quick Undo-Redo-Undo cannot put a note back before it reached the Trash.
     func registerUndoOfDelete(_ itemId: UUID, title: String, with undo: UndoManager) {
+        registerUndoOfDelete([itemId], title: title, with: undo)
+    }
+
+    /// One Undo for every note a confirmed delete sent to the Trash, a bulk delete's included
+    /// (W49.notes-multiselect-actions): Edit ▸ Undo puts them all back in one step.
+    func registerUndoOfDelete(_ itemIds: [UUID], title: String, with undo: UndoManager) {
+        guard !itemIds.isEmpty else { return }
         // The manager is held weakly: it keeps these handlers, so a strong capture would never be freed.
         undo.registerUndo(withTarget: model) { [weak self, weak undo] model in
             guard let self, let undo else { return }
             let putBack = DeleteHistoryStep()
-            self.registerRedoOfDelete(itemId, title: title, with: undo, ifPutBack: putBack)
+            self.registerRedoOfDelete(itemIds, title: title, with: undo, ifPutBack: putBack)
             self.enqueueDeleteHistory {
-                putBack.happened = await model.putBack([itemId]).contains(itemId)
+                let restored = Set(await model.putBack(itemIds))
+                putBack.putBack = itemIds.filter { restored.contains($0) }
             }
         }
-        undo.setActionName("Delete Note")
+        undo.setActionName(Self.deleteActionName(itemIds.count))
     }
 
     /// Edit ▸ Redo after that Undo: the note goes to the Trash again (notes-2 row 17), through the same
     /// guarded delete as a confirmed one — every placement Put Back made is removed first, so the note
     /// never reaches the Trash still filed, including a folder it was added to after the Undo, as Finder's
     /// Redo of a Move to Trash does. Only a note this Undo actually brought back is deleted.
-    private func registerRedoOfDelete(_ itemId: UUID, title: String, with undo: UndoManager,
+    private func registerRedoOfDelete(_ itemIds: [UUID], title: String, with undo: UndoManager,
                                       ifPutBack putBack: DeleteHistoryStep) {
         undo.registerUndo(withTarget: model) { [weak self, weak undo] _ in
             guard let self, let undo else { return }
-            self.registerUndoOfDelete(itemId, title: title, with: undo)
+            self.registerUndoOfDelete(itemIds, title: title, with: undo)
             self.enqueueDeleteHistory {
-                guard putBack.happened else { return }
-                await self.confirmDeletion(PendingDeletion(itemId: itemId, folderId: nil, title: title,
-                                                           allInstances: true))
+                let again = putBack.putBack
+                guard !again.isEmpty else { return }
+                let pending = again.count == 1
+                    ? PendingDeletion(itemId: again[0], folderId: nil, title: title, allInstances: true)
+                    : PendingDeletion(batch: again, title: title)
+                await self.confirmDeletionTrashing(pending)
             }
         }
-        undo.setActionName("Delete Note")
+        undo.setActionName(Self.deleteActionName(itemIds.count))
+    }
+
+    private static func deleteActionName(_ count: Int) -> String {
+        count == 1 ? "Delete Note" : "Delete \(count) Notes"
     }
 
     private var deleteHistoryTail: Task<Void, Never>?

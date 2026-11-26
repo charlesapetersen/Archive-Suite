@@ -138,9 +138,8 @@ struct NotesBrowserView: View {
             selectedCount: nav.paneMode == .notes ? nav.selection.count : 0,
             listedCount: nav.paneMode == .notes ? nav.displayed.count : 0,
             selected: { nav.exportableSelection }, listed: { nav.exportableListed }))
-        .focusedSceneValue(\.deleteItemAction, nav.deletableSelection.map { id in
-            DeleteItemAction(perform: { nav.requestDeleteItem(id) })
-        })
+        .focusedSceneValue(\.deleteItemAction, nav.deletableSelection.isEmpty ? nil : DeleteItemAction(
+            count: nav.deletableSelection.count, perform: { nav.requestDeleteItems(nav.deletableSelection) }))
         .sheet(item: $nav.advancedSearchRequest) { request in
             NotesAdvancedSearchSheet(nav: nav, request: request)
         }
@@ -175,11 +174,17 @@ struct NotesBrowserView: View {
     /// AppKit's sheet completion lets each prompt finish before the queue advances.
     private func presentDeletion(_ pending: NotesNavigationModel.PendingDeletion, in window: NSWindow) async {
         let alert = NSAlert()
-        alert.messageText = "Delete “\(pending.title)”?"
-        alert.informativeText = pending.allInstances
-            ? "This removes every folder placement for “\(pending.title)” and moves the note to the Trash."
-            : "This is the only remaining instance of “\(pending.title)” — deleting it moves the note to the Trash."
-        let delete = alert.addButton(withTitle: "Delete Note")
+        if pending.isBatch {
+            alert.messageText = "Delete \(pending.itemIds.count) notes?"
+            alert.informativeText = "This removes every folder placement for the \(pending.itemIds.count) selected "
+                + "notes and moves them to the Trash. Edit ▸ Undo puts them all back."
+        } else {
+            alert.messageText = "Delete “\(pending.title)”?"
+            alert.informativeText = pending.allInstances
+                ? "This removes every folder placement for “\(pending.title)” and moves the note to the Trash."
+                : "This is the only remaining instance of “\(pending.title)” — deleting it moves the note to the Trash."
+        }
+        let delete = alert.addButton(withTitle: pending.isBatch ? "Delete \(pending.itemIds.count) Notes" : "Delete Note")
         delete.hasDestructiveAction = true
         delete.keyEquivalent = ""
         delete.setAccessibilityIdentifier("an.dialog.deleteLastInstance.confirm")
@@ -194,8 +199,9 @@ struct NotesBrowserView: View {
             return
         }
         // Offer Undo only once the confirmed note actually reached the Trash.
-        if await nav.confirmPendingDeletion(pending), let undo = window.undoManager ?? undoManager {
-            nav.registerUndoOfDelete(pending.itemId, title: pending.title, with: undo)
+        let trashed = await nav.confirmPendingDeletionTrashing(pending)
+        if !trashed.isEmpty, let undo = window.undoManager ?? undoManager {
+            nav.registerUndoOfDelete(trashed, title: pending.title, with: undo)
         }
     }
 
@@ -706,7 +712,8 @@ private struct DetailPane: View {
 
 /// The inspector panel at the window's right (W40.notes-detail-layout): the selected item's fields and locations,
 /// `NoteMetadataInspector`, in a scroll view. It reads `nav.detailItemID` as the note pane does, so it follows the
-/// selection in the same pass as the editor; with nothing or several items selected it says so, as the header does.
+/// selection in the same pass as the editor; with nothing selected it says so, as the header does, and with several it
+/// edits their Quality and Tags together (`NoteBulkInspector`).
 private struct NoteInspectorPanel: View {
     @ObservedObject var nav: NotesNavigationModel
     /// The template the templates manager has selected, whose inspector shows in templates mode.
@@ -734,6 +741,12 @@ private struct NoteInspectorPanel: View {
                         NoteMetadataInspector(nav: nav, item: summary)
                     }
                     .padding(.trailing, scrollerTrailing)
+                }
+            } else if nav.paneMode == .notes, !nav.showingTemplates, nav.selection.count > 1 {
+                // Several notes: Quality and Tags for them all (W49.notes-multiselect-actions).
+                ScrollView {
+                    NoteBulkInspector(nav: nav)
+                        .padding(.trailing, scrollerTrailing)
                 }
             } else if nav.showingTemplates,
                       let template = nav.model.templates.first(where: { $0.id == selectedTemplateID }) {

@@ -73,37 +73,61 @@ enum NotesItemContextMenu {
                 let fromTemplate = NSMenuItem(title: "New from Template", action: nil, keyEquivalent: "")
                 fromTemplate.submenu = templateMenu
                 menu.addItem(fromTemplate)
+            }
+        }
 
-                let qualityMenu = NSMenu()
-                for (title, value) in [("None", Optional<Int>.none), ("Quality 1", 1),
-                                       ("Quality 2", 2), ("Quality 3", 3)] {
+        // Set Quality and Delete… act on every selected row (W49.notes-multiselect-actions): a value is ticked
+        // when every selected note has it, and several selected notes are deleted after one prompt.
+        let summaries = model.allItems.filter { selection.contains($0.id) }
+        let ordered = nav.displayed.lazy.filter { selection.contains($0.id) }.map(\.id)
+        let orderedIDs = ordered.isEmpty ? ids : Array(ordered)
+        if !summaries.isEmpty {
+            let qualities = Set(summaries.map(\.quality))
+            let qualityMenu = NSMenu()
+            for (title, value) in [("None", Optional<Int>.none), ("Quality 1", 1),
+                                   ("Quality 2", 2), ("Quality 3", 3)] {
+                let item = NSMenuItem(title: title, action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+                item.state = qualities == [value] ? .on : (qualities.contains(value) ? .mixed : .off)
+                let trampoline = NotesMenuAction { Task { await nav.setQuality(value, for: orderedIDs) } }
+                item.target = trampoline
+                item.representedObject = trampoline
+                qualityMenu.addItem(item)
+            }
+            let setQuality = NSMenuItem(title: "Set Quality", action: nil, keyEquivalent: "")
+            setQuality.submenu = qualityMenu
+            menu.addItem(setQuality)
+
+            // Several notes: their tags, to take one off them all (the inspector adds one to them all).
+            let tags = NoteBulkTags.tags(in: summaries)
+            if selection.count > 1, !tags.isEmpty {
+                let removeMenu = NSMenu()
+                for entry in tags {
+                    let title = entry.count == summaries.count ? entry.tag : "\(entry.tag) (\(entry.count))"
                     let item = NSMenuItem(title: title, action: #selector(NotesMenuAction.fire), keyEquivalent: "")
-                    item.state = summary.quality == value ? .on : .off
-                    let trampoline = NotesMenuAction { Task { await nav.setQuality(value, for: id) } }
+                    let trampoline = NotesMenuAction { Task { await nav.removeTag(entry.tag, from: orderedIDs) } }
                     item.target = trampoline
                     item.representedObject = trampoline
-                    qualityMenu.addItem(item)
+                    removeMenu.addItem(item)
                 }
-                let setQuality = NSMenuItem(title: "Set Quality", action: nil, keyEquivalent: "")
-                setQuality.submenu = qualityMenu
-                menu.addItem(setQuality)
+                let removeTag = NSMenuItem(title: "Remove Tag", action: nil, keyEquivalent: "")
+                removeTag.submenu = removeMenu
+                menu.addItem(removeTag)
             }
-
-            menu.addItem(.separator())
-
-            // Shows ⌘⌫, Edit ▸ Delete Note…'s key (W40.fix-notes-delete-redo).
-            let delete = NSMenuItem(title: "Delete…", action: #selector(NotesMenuAction.fire), keyEquivalent: "\u{8}")
-            delete.keyEquivalentModifierMask = .command
-            let deleteAction = NotesMenuAction { nav.requestDeleteItem(id) }
-            delete.target = deleteAction
-            delete.representedObject = deleteAction
-            menu.addItem(delete)
             menu.addItem(.separator())
         }
 
+        // Shows ⌘⌫, Edit ▸ Delete Note…'s key (W40.fix-notes-delete-redo).
+        let delete = NSMenuItem(title: selection.count > 1 ? "Delete \(selection.count) Notes…" : "Delete…",
+                                action: #selector(NotesMenuAction.fire), keyEquivalent: "\u{8}")
+        delete.keyEquivalentModifierMask = .command
+        let deleteAction = NotesMenuAction { nav.requestDeleteItems(orderedIDs) }
+        delete.target = deleteAction
+        delete.representedObject = deleteAction
+        menu.addItem(delete)
+        menu.addItem(.separator())
+
         // Export… and Print… of the clicked rows, in list order (W49.notes-export-print; File ▸ Export… and ⌘P).
-        let ordered = nav.displayed.lazy.filter { selection.contains($0.id) }.map(\.id)
-        let exportIDs = ordered.isEmpty ? ids : Array(ordered)
+        let exportIDs = orderedIDs
         let exportItem = NSMenuItem(title: selection.count > 1 ? "Export \(selection.count) Items…" : "Export…",
                                 action: #selector(NotesMenuAction.fire), keyEquivalent: "")
         let exportAction = NotesMenuAction {
