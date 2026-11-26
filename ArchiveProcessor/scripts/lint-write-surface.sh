@@ -32,6 +32,9 @@ ALLOW=(
   # W49.storage-processor: the DEBUG recovery driver stages a synthetic PDF carrying the companion's
   # catalogue identity. All calls write under its UUID-named test directory with isolated backup enabled.
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/Capture/LiveCaptureRecoveryTestDriver.swift${SEP}try? PDFGenerator.writeArchival(document, to: pdf, catalogueIdentity: identity)"
+  # W49.proc-reocr-preservation: the Improve OCR input test (DEBUG only) writes a two-page PDF standing in for a
+  # scanner's intake original, under its scratch folder. It is a fixture input, never app output.
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRImageInputTestDriver.swift${SEP}guard original.write(to: scan) else { throw CocoaError(.fileWriteUnknown) }"
   # W44.reocr-processor: the Improve OCR publication test (DEBUG only) puts a custom attribute and a resource fork on
   # its scratch fixtures, so it can prove publication keeps them. Tags and label go through CoordinatedTagWriter.
   "tagwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriterTestDriver.swift${SEP}let rc = value.withUnsafeBytes { setxattr(url.path, name, \$0.baseAddress, \$0.count, 0, XATTR_NOFOLLOW) }"
