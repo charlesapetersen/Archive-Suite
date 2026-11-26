@@ -242,7 +242,7 @@ Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, 
 How the figures in Settings and the Advisor ("Compare routes & trade-offs…") were measured, and what each processing
 stage does to a page. The Settings window says each of these in a sentence and links here from its `?` popovers
 (`Handbook` in `Views/SettingsView.swift`); this is the long form the redesign moved out of the window
-(W49.proc-settings-docs-tests-cleanup, `execution-plans/processor-settings-redesign.md` §6.4). Every route the bench
+(W49.proc-settings-docs-tests-cleanup; the redesign plan's §6.4, deleted on shipping, readable at d1a9e011). Every route the bench
 measured, including those the app does not run, is in [ArchiveOCRBench](../ArchiveOCRBench/README.md) (its "How to
 read the page" and "Limits" sections).
 
