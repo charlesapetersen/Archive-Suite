@@ -42,6 +42,8 @@
 #                  VM_KEEP=1 takes a kept guest over and stops it at the end; `vm-gui-runner.sh stop` stops it now.
 #                VM_SPLIT=N (xcuitest only): run the selection as at most N chunks balanced by measured test time
 #                  (whole classes, unless one class alone is over a chunk's share), each in a freshly booted guest (the macOS 27.2 guest slows down over a long lane; see README §"Long lanes").
+#                VM_COVERAGE=1 (W40.e4): build and test with -enableCodeCoverage YES; feed each collected
+#                  xcresult to ops/verify/coverage_gaps.py.
 #                VM_SAMPLE=S: sample host and guest load every S s into $ART/<app>/sampler*.tsv (default 60; 0 = off).
 #
 # The guest's `xcodebuild test` is ended if it outlives its own summary or goes silent (tart_run_test).
@@ -64,6 +66,7 @@ AGENT_WAIT="${AGENT_WAIT:-240}"
 VM_KEEP="${VM_KEEP:-0}"
 VM_SPLIT="${VM_SPLIT:-0}"
 VM_SAMPLE="${VM_SAMPLE:-60}"
+COVERAGE_FLAG=""; [ "${VM_COVERAGE:-0}" = 1 ] && COVERAGE_FLAG="-enableCodeCoverage YES"
 KEEP_STATE="$TART_KEEP_STATE"
 [[ "$VM_SPLIT" =~ ^[0-9]+$ ]] || { echo "VM_SPLIT must be a whole number" >&2; exit 2; }
 [[ "$VM_SAMPLE" =~ ^[0-9]+$ ]] || { echo "VM_SAMPLE must be a whole number of seconds" >&2; exit 2; }
@@ -644,7 +647,7 @@ run_tests() {
     rm -rf '$GUEST_DD/$bundle.xcresult'
     $TEST_ENV xcodebuild $action \
       -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
-      $args -destination 'platform=macOS' \
+      $args -destination 'platform=macOS' $COVERAGE_FLAG \
       -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/$bundle.xcresult' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
   " || true
