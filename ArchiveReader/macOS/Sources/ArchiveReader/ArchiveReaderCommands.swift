@@ -60,79 +60,11 @@ struct ArchiveReaderCommands: Commands {
     /// The navigation window is in front with nothing over it, so Find… searches the library.
     private var findSearchesLibrary: Bool { nav.map { !$0.showingPreview } ?? false }
 
-    /// The tag ledger's undo is open to the window in front (the list's, or the document window's file).
-    private var tagCanUndo: Bool { nav != nil ? (nav?.undoDepth ?? 0) > 0 : (docTags?.canUndo ?? false) }
-    private var tagCanRedo: Bool { nav != nil ? (nav?.redoDepth ?? 0) > 0 : (docTags?.canRedo ?? false) }
-    private var tagModel: NavigationModel? { nav ?? docTags?.navigation }
-    /// The container and item-field edits made in the window in front (`ContainerHistory`).
-    private var containerUndoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo) }
-    private var containerRedoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo, redo: true) }
-    /// A catalogue save, or a bulk tag change running off the main actor (W49.reader-batch-writes-async): Undo
-    /// and Redo wait for it rather than reversing an older step of another kind under it.
-    private var catalogueChangeInProgress: Bool {
-        guard let model = tagModel else { return false }
-        return model.tagBatch != nil || (model.library.usesCatalogue && model.catalogueEditSaving)
-    }
-    private var catalogueUndoStep: CatalogueEditJournal.Step? { catalogueHistory?.undo }
-    private var catalogueRedoStep: CatalogueEditJournal.Step? { catalogueHistory?.redo }
-    private var catalogueHistory: CatalogueEditJournal.Heads? {
-        guard let model = tagModel, model.library.usesCatalogue, !model.catalogueEditSaving,
-              doc?.findFieldFocused != true else { return nil }
-        return model.catalogueHistory
-    }
-
-    /// W49.reader-undo-menu-names: Edit ▸ Undo and Redo take the newest change of the tag ledger, the viewer's turns
-    /// and the window's container edits, and are named for it. The title reads the history last read; the action
-    /// reads the ledger fresh. A tag change whose time is not read yet still counts, as the oldest.
-    private func nextUndo(tag: Date?) -> ReaderUndoSource? {
-        ReaderUndoSource.newest(tag: tagCanUndo ? tag ?? .distantPast : nil, rotation: doc?.nextRotationUndoDate,
-                                container: containerUndoStep?.date, catalogue: catalogueUndoStep?.date)
-    }
-    private func nextRedo(tag: Date?) -> ReaderUndoSource? {
-        ReaderUndoSource.newest(tag: tagCanRedo ? tag ?? .distantPast : nil, rotation: doc?.nextRotationRedoDate,
-                                container: containerRedoStep?.date, catalogue: catalogueRedoStep?.date)
-    }
-
-    private var undoTitle: String {
-        switch nextUndo(tag: tagModel?.knownUndoDate) {
-        case .tag: return ReaderCommand.undoTagChange.title
-        case .rotation: return "Undo Rotation"
-        case .catalogue: return "Undo \(catalogueUndoStep?.title ?? "Catalogue Change")"
-        case .container: return "Undo \(containerUndoStep?.action ?? "")"
-        case nil: return "Undo"
-        }
-    }
-
-    private var redoTitle: String {
-        switch nextRedo(tag: tagModel?.knownRedoDate) {
-        case .tag: return ReaderCommand.redoTagChange.title
-        case .rotation: return "Redo Rotation"
-        case .catalogue: return "Redo \(catalogueRedoStep?.title ?? "Catalogue Change")"
-        case .container: return "Redo \(containerRedoStep?.action ?? "")"
-        case nil: return "Redo"
-        }
-    }
-
-    private func undo() {
-        guard !catalogueChangeInProgress else { return }
-        switch nextUndo(tag: tagCanUndo ? tagModel?.nextUndoDate() : nil) {
-        case .rotation: doc?.undoRotation()
-        case .catalogue: tagModel?.reverseCatalogueEdit(redo: false)
-        case .container: windowUndo?.undo()
-        case .tag: if let nav { nav.undoLast() } else { docTags?.undo() }
-        case nil: break
-        }
-    }
-
-    private func redo() {
-        guard !catalogueChangeInProgress else { return }
-        switch nextRedo(tag: tagCanRedo ? tagModel?.nextRedoDate() : nil) {
-        case .rotation: doc?.redoRotation()
-        case .catalogue: tagModel?.reverseCatalogueEdit(redo: true)
-        case .container: windowUndo?.redo()
-        case .tag: if let nav { nav.redoLast() } else { docTags?.redo() }
-        case nil: break
-        }
+    /// W49.reader-undo-menu-names: Edit ▸ Undo and Redo take the newest change of the tag ledger, the viewer's turns,
+    /// the window's container edits and the catalogue's saves, and are named for it. The toolbar Undo uses the same
+    /// route (W49.reader-toolbar-undo).
+    private var undoRoute: ReaderUndoRoute {
+        ReaderUndoRoute(nav: nav, doc: doc, docTags: docTags, windowUndo: windowUndo)
     }
 
     var body: some Commands {
@@ -203,14 +135,13 @@ struct ArchiveReaderCommands: Commands {
         // were Tags ▸ Undo/Redo Tag Change beside the system's unnamed Edit ▸ Undo, which alone reached container
         // edits. With the caret in a text field, ⌘Z and ⇧⌘Z undo the typing instead (`TextUndoGuard`).
         CommandGroup(replacing: .undoRedo) {
-            Button(undoTitle) { undo() }
+            let route = undoRoute
+            Button(route.undoTitle) { undoRoute.undo() }
                 .keyboardShortcut(.undoTagChange)
-                .disabled(catalogueChangeInProgress || (!tagCanUndo && !(doc?.canUndoRotation ?? false)
-                           && containerUndoStep == nil && catalogueUndoStep == nil))
-            Button(redoTitle) { redo() }
+                .disabled(!route.canUndo)
+            Button(route.redoTitle) { undoRoute.redo() }
                 .keyboardShortcut(.redoTagChange)
-                .disabled(catalogueChangeInProgress || (!tagCanRedo && !(doc?.canRedoRotation ?? false)
-                           && containerRedoStep == nil && catalogueRedoStep == nil))
+                .disabled(!route.canRedo)
         }
 
         CommandGroup(after: .pasteboard) {

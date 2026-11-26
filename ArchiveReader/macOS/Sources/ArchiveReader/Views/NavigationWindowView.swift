@@ -839,11 +839,18 @@ struct NavigationWindowView: View {
                 .help(ReaderCommand.toggleFlag.help)
                 .accessibilityIdentifier("ar.toolbar.flag")
 
-            Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                .disabled(model.undoDepth == 0)
-                .help(ReaderCommand.undoTagChange.help)
+            // W49.reader-toolbar-undo: Edit ▸ Undo's route, so a container or catalogue edit is reached too, newest first.
+            let route = undoRoute
+            Button { undoRoute.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+                .disabled(!route.canUndo)
+                .help(route.canUndo ? route.undoTitle : ReaderCommand.undoTagChange.help)
                 .accessibilityIdentifier("ar.toolbar.undo")
         }
+    }
+
+    /// The window's Undo, as Edit ▸ Undo routes it. The preview sheet covers the toolbar, so no viewer's turns.
+    private var undoRoute: ReaderUndoRoute {
+        ReaderUndoRoute(nav: model, doc: nil, docTags: nil, windowUndo: undoManager)
     }
 
     private var rootLabel: String {

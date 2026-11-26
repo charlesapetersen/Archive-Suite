@@ -547,6 +547,48 @@ final class FolderDatingTests: XCTestCase {
         XCTAssertNil(try XCTUnwrap(model.folderDatingOffer, "Redo offers to take them away").date)
     }
 
+    /// W49.reader-toolbar-undo: the window's Undo (Edit ▸ Undo and the toolbar's) takes a container edit made after a
+    /// tag change first, named for it, and leaves the tag change for the next Undo. The toolbar called the tag ledger
+    /// alone, so it took back the older tag change instead.
+    func testTheWindowUndoTakesTheNewerContainerEditBeforeTheTagChange() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let route = ReaderUndoRoute(nav: model, doc: nil, docTags: nil, windowUndo: undo)
+        try datedFromTheFolder(model)
+        let dated = try tagsOnDisk("0002.pdf")
+        XCTAssertTrue(route.canUndo)
+        XCTAssertEqual(route.nextUndo(tag: model.nextUndoDate()), .tag)
+        XCTAssertEqual(route.undoTitle, ReaderCommand.undoTagChange.title)
+
+        let tree = try XCTUnwrap(model.containerTree)
+        let edited = ([tree.path] + ["Box 3", "0002.pdf"]).joined(separator: "/")
+        wait { !model.containerEditSaving }
+        model.editContainerField(.date, .noneHere, forPath: edited, undo: undo)
+        wait { !model.containerEditSaving && route.containerUndoStep != nil }
+        let step = try XCTUnwrap(route.containerUndoStep, "the container edit is the window's next Undo")
+        XCTAssertEqual(route.nextUndo(tag: model.nextUndoDate()), .container)
+        XCTAssertEqual(route.undoTitle, "Undo \(step.action)")
+        model.folderDatingOffer = nil
+
+        route.undo()
+        wait { !model.containerEditSaving && route.containerUndoStep == nil }
+        XCTAssertNil(route.containerUndoStep)
+        XCTAssertTrue(undo.canRedo, "the container edit was undone")
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), dated, "the older tag change is left alone")
+        XCTAssertTrue(route.canUndo)
+        XCTAssertEqual(route.nextUndo(tag: model.nextUndoDate()), .tag)
+        XCTAssertEqual(route.redoTitle, "Redo \(step.action)")
+
+        wait { !model.containerEditSaving }
+        model.folderDatingOffer = nil
+        route.undo()
+        wait { (try? self.tagsOnDisk("0002.pdf")) == ["Unread", "Harbours"] }
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"], "then the tag change")
+    }
+
     /// Widening the folder's date replaces the dates it gave with the wider one, and nothing the user checked.
     func testWideningTheFolderDateUpdatesTheDatesItGave() throws {
         try makeFolder(date: "Feb. 1966")
