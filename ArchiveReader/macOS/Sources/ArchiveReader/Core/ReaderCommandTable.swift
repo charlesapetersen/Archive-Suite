@@ -67,9 +67,9 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     // Edit
     case copyExact, copyCleaned, copyPageLink, options
     // File
-    case chooseFolder, rescan, saveSearch, connectImproveOCR, containerLevels
+    case chooseFolder, rescan, saveSearch, connectImproveOCR, containerLevels, print
     // Selection
-    case open, preview, revealInFinder, copyLinks, copyArchiveLinks, exportToZotero, addToZotero, selectRun, nextUnread,
+    case open, preview, revealInFinder, openInDefaultApp, copyLinks, copyArchiveLinks, exportToZotero, addToZotero, selectRun, nextUnread,
          previousUnread
     // Tags
     case markRead, markUnread, markReadAndNext, renameTag, findSimilarTags, toggleFlag, undoTagChange, redoTagChange,
@@ -129,9 +129,11 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .saveSearch: return "Save Current Search…"
         case .connectImproveOCR: return "Connect Improve OCR Folder…"
         case .containerLevels: return "Container Levels…"
+        case .print: return "Print…"
         case .open: return "Open in Document Window"
         case .preview: return "Preview"
         case .revealInFinder: return "Reveal in Finder"
+        case .openInDefaultApp: return "Open in Default App"
         case .copyLinks: return "Copy Link(s)"
         case .copyArchiveLinks: return "Copy Archive Link(s)"
         case .exportToZotero: return "Export to Zotero…"
@@ -218,12 +220,14 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         // ⌘R is Mark Read.
         case .rescan: return CommandKey("r", [.command, .option])
         case .saveSearch, .connectImproveOCR, .containerLevels, .improveOCR, .showPoorOCROnly: return nil
+        // The Mac's Print (W49.reader-print-open-app).
+        case .print: return CommandKey("p")
         case .open: return CommandKey("o")
         case .preview: return CommandKey("y")
         case .revealInFinder: return CommandKey("r", [.command, .shift])
         case .copyLinks: return CommandKey("c", [.command, .option])
         case .copyArchiveLinks: return CommandKey("l", [.command, .shift])
-        case .exportToZotero, .addToZotero, .selectRun: return nil
+        case .openInDefaultApp, .exportToZotero, .addToZotero, .selectRun: return nil
         // ⌘] / ⌘[ are Back and Forward, as in Finder and Preview (W40.reader-back-forward); the bare ] / [ in
         // the list stay Next / Previous Unread.
         case .nextUnread: return CommandKey("]", [.command, .option])
@@ -285,6 +289,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .copyCleaned: return "Copy the selected text cleaned for prose — joins lines, de-hyphenates"
         case .open: return "Open the selected documents for reading"
         case .preview: return "Preview the selection 2-up without opening it (Space or \(glyph))"
+        case .openInDefaultApp: return "Open the file in the app the Mac opens it with, such as Preview"
+        case .print: return "Print the file: every page of the PDF, or the JPEG original while it is shown"
         case .copyLinks: return "Copy links to the selected files"
         case .copyArchiveLinks: return "Copy durable archive links"
         case .exportToZotero:

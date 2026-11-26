@@ -130,6 +130,8 @@ struct DocumentTagActions {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
+    func openInDefaultApp() { viewer.openInDefaultApp() }
+
     func copyLinks() {
         guard let url = viewer.currentURL else { return }
         viewer.tagStatus = NavigationModel.copyLinks([url])

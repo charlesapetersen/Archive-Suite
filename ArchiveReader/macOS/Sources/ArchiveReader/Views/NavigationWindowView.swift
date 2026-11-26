@@ -282,8 +282,8 @@ struct NavigationWindowView: View {
         if model.canShowInAllFiles {
             menu.addItem(withTitle: "Show in All Files", action: #selector(ContextMenuActions.showInAllFiles), keyEquivalent: "")
         }
-        menu.addItem(withTitle: "Reveal in Finder", action: #selector(ContextMenuActions.revealInFinder), keyEquivalent: "")
-        menu.addItem(withTitle: "Open in Default App", action: #selector(ContextMenuActions.openInDefaultApp), keyEquivalent: "")
+        menu.addItem(withTitle: ReaderCommand.revealInFinder.title, action: #selector(ContextMenuActions.revealInFinder), keyEquivalent: "")
+        menu.addItem(withTitle: ReaderCommand.openInDefaultApp.title, action: #selector(ContextMenuActions.openInDefaultApp), keyEquivalent: "")
         menu.addItem(withTitle: "Copy Link(s)", action: #selector(ContextMenuActions.copyLinks), keyEquivalent: "")
         menu.addItem(withTitle: "Copy Archive Link(s)", action: #selector(ContextMenuActions.copyArchiveLinks), keyEquivalent: "")
         menu.addItem(withTitle: ReaderCommand.exportToZotero.title, action: #selector(ContextMenuActions.exportToZotero), keyEquivalent: "")

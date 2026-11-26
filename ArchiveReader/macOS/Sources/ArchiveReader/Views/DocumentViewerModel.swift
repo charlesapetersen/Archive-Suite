@@ -781,6 +781,24 @@ final class DocumentViewerModel: ObservableObject {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
+    // MARK: Print and Open in Default App (W49.reader-print-open-app)
+
+    /// What File ▸ Print… prints: the JPEG original while it is shown, else the open PDF. The contact sheet's tiles
+    /// are PDF pages, so it prints the PDF.
+    var printFileURL: URL? { showingAllPages ? currentURL : shownImageFileURL ?? currentURL }
+
+    /// The print panel for `printFileURL`; a file that cannot be printed says why in the status line.
+    func printShownFile() {
+        guard let url = printFileURL else { return }
+        if let refusal = ReaderPrinting.print(url) { tagStatus = refusal }
+    }
+
+    /// The open PDF in the app the Mac opens it with (e.g. Preview). Read-only — just opens it.
+    func openInDefaultApp() {
+        guard let url = currentURL else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     // MARK: In-document find (⌘F) — highlight all matches, next/prev across every open PDF
 
     /// Rebuild the match list for `findQuery` across ALL open documents — every page pair of each, which

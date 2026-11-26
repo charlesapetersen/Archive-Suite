@@ -262,6 +262,15 @@ struct ArchiveReaderCommands: Commands {
                 .disabled(tagSheetNav == nil)
         }
 
+        // File ▸ Print… (W49.reader-print-open-app), in place of the system's item, which printed only the view with the
+        // keyboard. A viewer in front (a document window, or the preview sheet) prints the file it shows; the list, the
+        // one file selected.
+        CommandGroup(replacing: .printItem) {
+            Button(ReaderCommand.print.title) { if let doc { doc.printShownFile() } else { nav?.printSelection() } }
+                .keyboardShortcut(.print)
+                .disabled((doc.map { $0.printFileURL } ?? nav?.printFileURL) == nil)
+        }
+
         // Go — Back and Forward, as in Finder and Preview (W40.reader-back-forward). A viewer in front (a document
         // window, or the preview sheet over the navigation window) steps through its page jumps; the navigation
         // window alone, through the folders it has shown.
@@ -282,10 +291,15 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.preview.title) { nav?.showingPreview = true }
                 .keyboardShortcut(.preview)
                 .disabled(noSelection)
-            // These five follow the window in front too (W49.reader-doc-window-parity): a document window's open file.
+            // These six follow the window in front too (W49.reader-doc-window-parity): a document window's open file.
             Button(ReaderCommand.revealInFinder.title) { if let nav { nav.revealInFinder() } else { docTags?.revealInFinder() } }
                 .keyboardShortcut(.revealInFinder)
                 .disabled(noFileTarget)
+            // Was only in the list's right-click menu (W49.reader-print-open-app).
+            Button(ReaderCommand.openInDefaultApp.title) {
+                if let nav { nav.openInDefaultApp() } else { docTags?.openInDefaultApp() }
+            }
+            .disabled(noFileTarget)
             Button(ReaderCommand.copyLinks.title) { if let nav { nav.copyLinks() } else { docTags?.copyLinks() } }
                 .keyboardShortcut(.copyLinks)
                 .disabled(noFileTarget)

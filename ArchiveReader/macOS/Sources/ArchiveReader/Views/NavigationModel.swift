@@ -3486,4 +3486,12 @@ final class NavigationModel: ObservableObject {
     func openInDefaultApp() {
         for url in selectedFiles.map(\.url) { NSWorkspace.shared.open(url) }
     }
+
+    /// File ▸ Print… from the list prints one file; with several selected it is off (W49.reader-print-open-app).
+    var printFileURL: URL? { selectedFiles.count == 1 ? selectedFiles.first?.url : nil }
+
+    func printSelection() {
+        guard let url = printFileURL else { return }
+        if let refusal = ReaderPrinting.print(url) { statusMessage = refusal }
+    }
 }

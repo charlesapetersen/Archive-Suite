@@ -369,6 +369,17 @@ struct DocumentWindowView: View {
             Button { model.showingTagEditor.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
                 .help(ReaderCommand.showInspector.help)
                 .accessibilityIdentifier("ar.doc.inspector")
+            // W49.reader-print-open-app: Selection ▸ Open in Default App and File ▸ Print… (⌘P), here too.
+            Button { model.openInDefaultApp() } label: {
+                Label(ReaderCommand.openInDefaultApp.title, systemImage: "arrow.up.forward.app")
+            }
+            .disabled(model.currentURL == nil)
+            .help(ReaderCommand.openInDefaultApp.help)
+            .accessibilityIdentifier("ar.doc.openInDefaultApp")
+            Button { model.printShownFile() } label: { Label("Print", systemImage: "printer") }
+                .disabled(model.printFileURL == nil)
+                .help(ReaderCommand.print.help)
+                .accessibilityIdentifier("ar.doc.print")
         }
     }
 
