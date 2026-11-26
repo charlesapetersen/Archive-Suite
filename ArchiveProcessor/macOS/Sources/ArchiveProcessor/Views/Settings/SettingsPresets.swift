@@ -40,7 +40,7 @@ enum WorkflowPreset: String, CaseIterable, Identifiable {
         case .fastFree:
             return "Apple Vision on typed and printed pages. Free, fast and completely offline; it transcribes only, so tagging is off unless a cloud model is chosen for the text."
         case .localHD:
-            return "An open-weight model served on this Mac (LM Studio, Ollama or mlx-vlm) for harder pages. Free and offline, one page at a time; start the server first."
+            return "A reader the app downloads and runs on this Mac (Qwen3.5 9B or Qwen3-VL 8B) for harder pages and handwriting. Free and offline, one page at a time. Your own model server is in Settings › Advanced."
         case .cloud:
             return "Your API key for the highest accuracy on hard scans, handwriting and metadata, at the provider's price per page."
         case .cluster:
@@ -48,12 +48,14 @@ enum WorkflowPreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Whether the stored choices are this preset's.
+    /// Whether the stored choices are this preset's: for Local HD, a model the app runs or the user's own server on this Mac.
     @MainActor func matches(_ d: UserDefaults = .standard, cluster: Bool) -> Bool {
         let reader = ReaderChoice.current(d)
         switch self {
         case .fastFree: return reader == .appleVision
-        case .localHD: return reader == .gateway && d.bool(forKey: DefaultsKeys.gatewayLocalModel)
+        case .localHD:
+            if case .managed = reader { return true }
+            return reader == .gateway && d.bool(forKey: DefaultsKeys.gatewayLocalModel)
         case .cloud:
             if case .direct = reader { return true }
             return false
@@ -61,18 +63,31 @@ enum WorkflowPreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Why the preset cannot be applied on this Mac, or nil when it can.
-    @MainActor var unavailableReason: String? {
-        if self == .localHD, LocalModelRoute.picks(memoryGB: LocalModelRoute.thisMacMemoryGB).isEmpty {
-            return "A local reading model needs at least 16 GB of memory."
-        }
-        return nil
+    /// What Local HD does when chosen (W49.proc-local-ocr-onboarding): use a downloaded managed model, else the
+    /// user's own server on this Mac, else offer the recommended download. It never rewrites the user's server fields.
+    enum LocalHDPlan: Equatable {
+        case managed(ManagedOCRModel)
+        case ownServer
+        case download(ManagedOCRModel)
+        case unavailable
     }
 
-    /// The gateway the Local HD preset would replace: a configured address that is not on this Mac.
-    @MainActor static func remoteGateway(_ d: UserDefaults = .standard) -> String? {
+    @MainActor static func localHDPlan(_ d: UserDefaults = .standard, offered: [ManagedOCRModel] = ManagedOCRModel.offered(),
+                                       installed: (ManagedOCRModel) -> Bool = { ManagedLocalOCR.shared.state($0) == .installed })
+        -> LocalHDPlan {
+        if let m = offered.first(where: installed) ?? ManagedOCRModel.allCases.first(where: installed) { return .managed(m) }
         let base = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
-        return base.isEmpty || LocalModelRoute.isLoopback(base) ? nil : base
+        let model = d.string(forKey: DefaultsKeys.gatewayModelID) ?? ""
+        if d.bool(forKey: DefaultsKeys.gatewayLocalModel), LocalModelRoute.isLoopback(base), !model.isEmpty { return .ownServer }
+        return offered.first.map { .download($0) } ?? .unavailable
+    }
+
+    /// Why the preset cannot be applied on this Mac, or nil when it can.
+    @MainActor var unavailableReason: String? {
+        if self == .localHD, Self.localHDPlan() == .unavailable {
+            return "A reader on this Mac needs an Apple silicon Mac with at least 16 GB of memory."
+        }
+        return nil
     }
 
     /// Fill this preset's choices. `keyed` is the providers with a saved key. A preset already matched changes nothing.
@@ -86,20 +101,13 @@ enum WorkflowPreset: String, CaseIterable, Identifiable {
             // Vision alone cannot tag, so Start would stay off: the preset says so in its caption.
             if tagging != .none && tagging != .copySource { d.set(TaggingMode.none.rawValue, forKey: DefaultsKeys.taggingModeRaw) }
         case .localHD:
-            let base = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
-            // Fill the local server's fields only where nothing local is set yet; a remote gateway is replaced only
-            // after the row's confirmation.
-            if base.isEmpty || !LocalModelRoute.isLoopback(base) || !d.bool(forKey: DefaultsKeys.gatewayLocalModel),
-               let pick = LocalModelRoute.picks(memoryGB: LocalModelRoute.thisMacMemoryGB).first {
-                let server = LocalModelRoute.Server.lmStudio
-                d.set(server.baseURL, forKey: DefaultsKeys.gatewayBaseURL)   // side effect: the preset fills the server
-                d.set(pick.modelID(for: server), forKey: DefaultsKeys.gatewayModelID)   // side effect
-                d.set(pick.displayName, forKey: DefaultsKeys.gatewayDisplayName)   // side effect
-                d.set(0.0, forKey: DefaultsKeys.gatewayInputCost)   // side effect
-                d.set(0.0, forKey: DefaultsKeys.gatewayOutputCost)   // side effect
+            // A model still to download becomes the Reader too: the row starts its download first, and a run before it
+            // finishes stops with "download it, or choose Apple Vision".
+            switch Self.localHDPlan(d) {
+            case .managed(let m), .download(let m): ReaderChoice.managed(m).apply(d)
+            case .ownServer: ReaderChoice.gateway.apply(d)
+            case .unavailable: break
             }
-            d.set(true, forKey: DefaultsKeys.gatewayLocalModel)   // side effect
-            ReaderChoice.gateway.apply(d)
         case .cloud:
             // The provider in use if it has a key, with the model already chosen for it; else the first keyed one.
             let order: [LLMProvider] = [.gemini, .anthropic, .openai, .mistral, .openrouter]
@@ -123,19 +131,23 @@ struct WorkflowPresetRow: View {
     @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
     @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel = false
+    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
     @ObservedObject private var modelStore = ModelSelectionStore.shared
-    /// The remote gateway the Local HD preset would replace, while its confirmation is up.
-    @State private var replacing: String?
+    @ObservedObject private var managedOCR = ManagedLocalOCR.shared
+    /// The model Local HD would download, while its confirmation is up.
+    @State private var downloading: ManagedOCRModel?
 
     var body: some View {
-        _ = (useAppleVision, useGateway, useLocalAgent, gatewayLocalModel, modelStore.selectedModelIDs)
+        _ = (useAppleVision, useGateway, useLocalAgent, gatewayLocalModel, gatewayManagedModel, modelStore.selectedModelIDs,
+             managedOCR.states)
         let cluster = scope.store.resolver(for: nil).resolve(.cluster).value.bool ?? false
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 ForEach(WorkflowPreset.allCases) { preset in
                     let on = preset.matches(cluster: cluster)
                     Button {
-                        if preset == .localHD, !on, let remote = WorkflowPreset.remoteGateway() { replacing = remote }
+                        if preset == .localHD, !on, case .download(let m) = WorkflowPreset.localHDPlan(),
+                           !Self.underWay(managedOCR.state(m)) { downloading = m }
                         else { preset.apply(keyed: keyed, scope: scope) }
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
@@ -169,11 +181,25 @@ struct WorkflowPresetRow: View {
                     .accessibilityIdentifier("ap.settings.preset.caption")
             }
         }
-        .confirmationDialog("Replace your gateway with a server on this Mac?",
-                            isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })) {
-            Button("Replace") { WorkflowPreset.localHD.apply(keyed: keyed, scope: scope); replacing = nil }
-        } message: {
-            Text("Local HD reads with a model served on this Mac. Your gateway at \(replacing ?? "") and its model and prices are replaced; you can set them again in Settings › Advanced.")
+        .confirmationDialog("Download \(downloading?.model.name ?? "the model") for Local HD?",
+                            isPresented: Binding(get: { downloading != nil }, set: { if !$0 { downloading = nil } }),
+                            titleVisibility: .visible, presenting: downloading) { m in
+            Button("Download") {
+                managedOCR.download(m)
+                // Only a download that started makes the model the Reader (none starts while it is being removed).
+                if Self.underWay(managedOCR.state(m)) { WorkflowPreset.localHD.apply(keyed: keyed, scope: scope) }
+                downloading = nil
+            }
+        } message: { m in
+            Text(m.sizeNote + " It comes from Hugging Face under the Apache 2.0 licence and becomes the Reader: a run can"
+                 + " start once it has downloaded, and if the download is cancelled or fails, Apple Vision is the Reader"
+                 + " again. Its progress is in Settings › Accounts.")
         }
+    }
+
+    /// A download already started (one ticked in the first-run interview) needs no second question.
+    private static func underWay(_ state: ManagedLocalOCR.State) -> Bool {
+        if case .installing = state { return true }
+        return false
     }
 }

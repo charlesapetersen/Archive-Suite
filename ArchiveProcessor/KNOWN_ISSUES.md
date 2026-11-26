@@ -1199,9 +1199,6 @@ included, at a 7.71 GB peak. Open:
   model and loads Gemma for each label and back (about 9.5 s of switching a label, `segbench-results/ct-gemma-swap.md`);
   never both in memory. Whether to keep that, read labels with Vision and the parser during such a session, or batch
   them is the question already asked for a user's own server. (asked: W49.proc-gemma-external-switch-owner-ok)
-- **The Local HD preset** (Settings › Processing) looks only at the user's own local server: it does not show a
-  managed Reader as Local HD, and choosing it replaces the managed Reader with the server preset. (queued:
-  W49.proc-local-ocr-onboarding)
 
 ## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
 

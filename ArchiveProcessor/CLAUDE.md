@@ -58,7 +58,7 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **The macOS 27 on-device model** (`OCR/OnDeviceModelClient.swift`, W47.wh-readers-lost-clients) is the second
   Apple Vision model (`apple-fm-27`), chosen only as the Reader in Settings › Processing or on the Advisor's reading card (lower-scoring, owner call 15); its loop stop
   fails a page whose reply starts repeating, as a page at the token cap fails on every client.
-- **Apple Vision** is additive, never the default. Its optional text-only judgement call goes to a **direct** LLM
+- **Apple Vision** is the Reader a fresh setup starts with (owner, 2026-11-23: the fastest), and a reader already chosen is never replaced by it. Its optional text-only judgement call goes to a **direct** LLM
   with the extracted text only — no image bytes, image URL, gateway or Local Agent. With judgement and image correction
   off, Vision is fully offline (No tagging / Copy source tags only).
 - **A failed reply is never a transcription:** an OpenRouter 200 with `finish_reason` error, or an in-body provider

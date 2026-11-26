@@ -18,6 +18,9 @@ struct GeneralInterviewView: View {
     @State private var claudeMessage: String?
     @State private var showKeyWizard = false
     @State private var problem: String?
+    @ObservedObject private var managedOCR = ManagedLocalOCR.shared
+    /// The page readers to download once the answers are saved (W49.proc-local-ocr-onboarding). None by default.
+    @State private var downloads: Set<ManagedOCRModel> = []
 
     static func readMac() -> MacInventory {
         let d = UserDefaults.standard
@@ -44,6 +47,7 @@ struct GeneralInterviewView: View {
                     Text("Archive Processor saves the exact originals in a Preservation folder beside your reading PDFs. This uses extra space. Archive Reader can show the originals. When you share only a PDF, the originals stay behind.")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
+                readersSection
                 foundSection
                 startingPointSection
                 questionsSection
@@ -74,6 +78,61 @@ struct GeneralInterviewView: View {
                 inventory = Self.readMac().keepingClaudeCheck(of: inventory)
             }
         }
+    }
+
+    // MARK: Page readers (W49.proc-local-ocr-onboarding)
+
+    /// Apple Vision stays the Reader (owner, 2026-11-23: it is the fastest). The measured page readers this Mac can run
+    /// are offered by name, each with its download, disk and memory, and nothing downloads unless one is ticked.
+    private var readersSection: some View {
+        let offered = ManagedOCRModel.offered()
+        return Section {
+            LabeledContent("Apple Vision (built in)", value: rerun && ReaderChoice.current() != .appleVision ? "Ready" : "The Reader")
+            Text("Apple Vision reads typed and printed pages on this Mac, fast and at no cost. It stays the Reader unless you choose another in Settings › Processing.")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            ForEach(offered) { m in readerRow(m, recommended: m == offered.first) }
+            if offered.isEmpty {
+                Text("Readers to download need an Apple silicon Mac with at least 16 GB of memory.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            } else if !answers.downloadsAllowed {
+                Text("Turn on “Models may be downloaded to this Mac” below to choose one.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        } header: {
+            Text("Reading pages")
+        } footer: {
+            Text(offered.isEmpty ? "Your own model server (LM Studio, Ollama or mlx-vlm) is in Settings › Advanced."
+                 : "A download starts when you save and goes on in Settings › Accounts, where you can cancel or remove it. Once it is there, choose it as the Reader for harder pages and handwriting. Your own model server (LM Studio, Ollama or mlx-vlm) is in Settings › Advanced.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder private func readerRow(_ m: ManagedOCRModel, recommended: Bool) -> some View {
+        let name = "\(m.model.name)\(recommended ? " (recommended)" : "")"
+        VStack(alignment: .leading, spacing: 2) {
+            switch managedOCR.state(m) {
+            case .installed:
+                LabeledContent(name, value: "Downloaded")
+            case .installing, .removing:
+                LabeledContent(name, value: "Downloading in Settings › Accounts")
+            case .notInstalled, .failed:
+                Toggle("Download \(name)", isOn: Binding(get: { downloads.contains(m) && answers.downloadsAllowed },
+                                                         set: { on in if on { downloads.insert(m) } else { downloads.remove(m) } }))
+                    .disabled(!answers.downloadsAllowed)
+                    .accessibilityIdentifier("ap.generalInterview.download.\(m.shortID)")
+            }
+            Text(m.plainNote + " " + m.sizeNote)
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Owner, 2026-11-23: Apple Vision is the Reader a fresh setup starts with. Only where no reader was ever stored, so
+    /// a reader the user already chose, or their own server, is kept.
+    static func startWithAppleVision(_ d: UserDefaults = .standard) {
+        let readerKeys = [DefaultsKeys.useAppleVision, DefaultsKeys.useLocalAgent, DefaultsKeys.useGateway,
+                          DefaultsKeys.selectedProvider]
+        guard readerKeys.allSatisfy({ d.object(forKey: $0) == nil }) else { return }
+        ReaderChoice.appleVision.apply(d)
     }
 
     // MARK: Found on this Mac
@@ -303,7 +362,10 @@ struct GeneralInterviewView: View {
     private func save() {
         var layer = store.general
         answers.apply(to: &layer, inventory: inventory)
-        write(layer)
+        if write(layer), answers.downloadsAllowed {
+            // Apple Vision stays the Reader: a download only adds a reader to choose.
+            for m in ManagedOCRModel.offered() where downloads.contains(m) { managedOCR.download(m) }
+        }
     }
 
     private func skip() {
@@ -312,12 +374,14 @@ struct GeneralInterviewView: View {
         write(layer)
     }
 
-    private func write(_ layer: SettingsLayer) {
+    @discardableResult private func write(_ layer: SettingsLayer) -> Bool {
         if store.replaceGeneral(layer) {
+            Self.startWithAppleVision()
             onDone()
-        } else {
-            problem = store.lastProblem ?? "Your answers could not be saved."
+            return true
         }
+        problem = store.lastProblem ?? "Your answers could not be saved."
+        return false
     }
 }
 

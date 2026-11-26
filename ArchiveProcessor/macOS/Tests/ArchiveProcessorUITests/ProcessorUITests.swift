@@ -1008,6 +1008,90 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")
     }
 
+    /// W49.proc-local-ocr-onboarding: a fresh setup offers the measured page readers by name, downloads only the one
+    /// ticked, and keeps Apple Vision as the Reader. The guest has 6 GB, so the run says it has 18; the download is a
+    /// stand-in that fetches nothing.
+    func testFirstRunOffersReaderDownloadsAndKeepsVision() throws {
+        relaunch(extra: ["-APUITestGeneralInterview", "-APUITestManagedOCR", "-APUITestFreshReader"])
+        let save = element("ap.generalInterview.save")
+        XCTAssertTrue(save.waitForExistence(timeout: 10), "the general interview opens at first start")
+        let nine = element("ap.generalInterview.download.qwen35-9b")
+        let eight = element("ap.generalInterview.download.qwen3vl-8b")
+        if !nine.waitForExistence(timeout: 5) { attachScreenshot("processor-first-run-readers-missing") }
+        XCTAssertTrue(nine.exists, "the interview offers Qwen3.5 9B by name")
+        XCTAssertTrue(eight.exists, "and Qwen3-VL 8B")
+        XCTAssertTrue(shown("About 6 GB to download"), "with its download size before anything starts")
+        XCTAssertEqual(checkboxValue(nine), 0, "nothing is ticked for download by default")
+        nine.click()
+        XCTAssertEqual(checkboxValue(nine), 1)
+        attachScreenshot("processor-first-run-readers")
+        save.click()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Save closes the interview")
+
+        openSettings("Accounts")
+        let cancel = app.buttons["ap.managedOCR.cancel.qwen35-9b"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), "the ticked model's download is under way in Accounts")
+        XCTAssertTrue(app.buttons["ap.managedOCR.download.qwen3vl-8b"].exists, "the other model is not downloading")
+        attachScreenshot("processor-first-run-download-in-accounts")
+        cancel.click()
+        XCTAssertTrue(app.buttons["ap.managedOCR.download.qwen35-9b"].waitForExistence(timeout: 5),
+                      "a cancelled download can be started again")
+
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        assertReaderIsAppleVision("Apple Vision stays the Reader")
+    }
+
+    /// W49.proc-local-ocr-onboarding: Skip downloads nothing, even with a model ticked, and the Reader is Apple Vision.
+    /// The user's own model server is reached in Settings › Advanced.
+    func testFirstRunSkipDownloadsNothingAndServerIsInAdvanced() throws {
+        relaunch(extra: ["-APUITestGeneralInterview", "-APUITestManagedOCR", "-APUITestFreshReader"])
+        let nine = element("ap.generalInterview.download.qwen35-9b")
+        XCTAssertTrue(nine.waitForExistence(timeout: 10), "the interview offers the page readers")
+        XCTAssertTrue(shown("is in Settings › Advanced"), "it says where the user's own server is")
+        nine.click()
+        let skip = app.buttons["Skip: free, on this Mac"]
+        XCTAssertTrue(skip.exists)
+        skip.click()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+                                             object: element("ap.generalInterview.save"))
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip closes the interview")
+
+        openSettings("Accounts")
+        XCTAssertTrue(app.buttons["ap.managedOCR.download.qwen35-9b"].waitForExistence(timeout: 10),
+                      "Skip starts no download")
+        XCTAssertFalse(app.buttons["ap.managedOCR.cancel.qwen35-9b"].exists)
+
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        assertReaderIsAppleVision("Skip keeps Apple Vision as the Reader")
+
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
+        let local = element("ap.settings.localModel")
+        XCTAssertTrue(local.waitForExistence(timeout: 5), "Advanced has the switch for a model server on this Mac")
+        let wasOn = checkboxValue(local) == 1
+        if !wasOn { local.click() }
+        XCTAssertTrue(element("ap.settings.localModelFill").waitForExistence(timeout: 5),
+                      "and with it the server controls: the preset and Check server")
+        XCTAssertTrue(app.buttons["Check server"].firstMatch.exists)
+        attachScreenshot("processor-advanced-own-server")
+        if !wasOn { local.click() }
+    }
+
+    private func shown(_ fragment: String) -> Bool {
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", fragment, fragment))
+            .firstMatch.exists
+    }
+
+    private func checkboxValue(_ element: XCUIElement) -> Int? {
+        (element.value as? NSNumber)?.intValue ?? Int(element.value as? String ?? "")
+    }
+
+    private func assertReaderIsAppleVision(_ message: String) {
+        let reader = element("ap.settings.readerPicker")
+        XCTAssertTrue(reader.waitForExistence(timeout: 5), "Processing has the Reader menu")
+        XCTAssertTrue(waitUntil { self.renderedText(of: reader).contains("Apple Vision") }, "\(message): \(renderedText(of: reader))")
+    }
+
     func testCollectionInterviewWaitsForPickerIntake() throws {
         let first = scratchRoot.appendingPathComponent("First collection", isDirectory: true)
         let second = scratchRoot.appendingPathComponent("Second collection", isDirectory: true)

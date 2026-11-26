@@ -33,6 +33,7 @@ enum SettingsTabsTestDriver {
         advanced()
         routeTiers()
         readerAndPresets()
+        localHD()
         runConfigRoundTrip()
     }
 
@@ -269,6 +270,51 @@ enum SettingsTabsTestDriver {
               && !WorkflowPreset.fastFree.matches(d, cluster: false))
         check("6 the Cluster preset follows the cluster answer", WorkflowPreset.cluster.matches(d, cluster: true)
               && !WorkflowPreset.cluster.matches(d, cluster: false))
+    }
+
+    // 6h (W49.proc-local-ocr-onboarding). Local HD recognises a managed Reader, uses a downloaded model first, keeps
+    // the user's own server, offers the recommended download otherwise, and never rewrites the server fields.
+    private static func localHD() {
+        let suite = "settings-localhd-test-\(UUID().uuidString)"
+        guard let d = UserDefaults(suiteName: suite) else { return check("6h a scratch defaults domain", false) }
+        defer { d.removePersistentDomain(forName: suite) }
+        let both: [ManagedOCRModel] = [.qwen35_9B, .qwen3VL8B]
+        ReaderChoice.managed(.qwen3VL8B).apply(d)
+        check("6h a managed Reader is the Local HD preset", WorkflowPreset.localHD.matches(d, cluster: false)
+              && !WorkflowPreset.cloud.matches(d, cluster: false) && !WorkflowPreset.fastFree.matches(d, cluster: false))
+        ReaderChoice.localAgent.apply(d)
+        d.set("https://gateway.example/v1", forKey: DefaultsKeys.gatewayBaseURL)
+        d.set("remote-model", forKey: DefaultsKeys.gatewayModelID)
+        check("6h nothing downloaded and a remote gateway: Local HD offers the recommended download",
+              WorkflowPreset.localHDPlan(d, offered: both, installed: { _ in false }) == .download(.qwen35_9B))
+        check("6h a downloaded model is used first",
+              WorkflowPreset.localHDPlan(d, offered: both, installed: { $0 == .qwen3VL8B }) == .managed(.qwen3VL8B))
+        check("6h below 16 GB with no server of its own, Local HD is unavailable",
+              WorkflowPreset.localHDPlan(d, offered: [], installed: { _ in false }) == .unavailable)
+        d.set("http://127.0.0.1:1234/v1", forKey: DefaultsKeys.gatewayBaseURL)
+        d.set("qwen/qwen3.5-9b", forKey: DefaultsKeys.gatewayModelID)
+        d.set(true, forKey: DefaultsKeys.gatewayLocalModel)
+        check("6h the user's own local server is kept when no model is downloaded",
+              WorkflowPreset.localHDPlan(d, offered: both, installed: { _ in false }) == .ownServer
+              && WorkflowPreset.localHDPlan(d, offered: [], installed: { _ in false }) == .ownServer)
+        d.set("https://gateway.example/v1", forKey: DefaultsKeys.gatewayBaseURL)
+        d.set("remote-model", forKey: DefaultsKeys.gatewayModelID)
+        d.set(false, forKey: DefaultsKeys.gatewayLocalModel)
+        // This Mac's own plan: a downloaded or offered model becomes the Reader; where none can run, nothing changes.
+        let plan = WorkflowPreset.localHDPlan(d)
+        WorkflowPreset.localHD.apply(d, keyed: [], scope: SettingsScopeModel())
+        switch plan {
+        case .managed(let m), .download(let m):
+            check("6h applied, Local HD makes its model the Reader", ReaderChoice.current(d) == .managed(m))
+        case .ownServer, .unavailable:
+            check("6h applied where no model can run, Local HD leaves the Reader", ReaderChoice.current(d) == .localAgent)
+        }
+        GeneralInterviewView.startWithAppleVision(d)
+        check("6h closing the first-run interview keeps a reader already chosen", ReaderChoice.current(d) != .appleVision)
+        check("6h and leaves the user's gateway fields as they were",
+              d.string(forKey: DefaultsKeys.gatewayBaseURL) == "https://gateway.example/v1"
+              && d.string(forKey: DefaultsKeys.gatewayModelID) == "remote-model"
+              && !d.bool(forKey: DefaultsKeys.gatewayLocalModel))
     }
 
     // 7. What the tabs store is what a run reads (W49.proc-settings-docs-tests-cleanup): a value set on Processing,

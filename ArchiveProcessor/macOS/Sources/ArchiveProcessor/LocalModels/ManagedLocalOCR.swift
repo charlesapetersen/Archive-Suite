@@ -38,6 +38,17 @@ enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Plain words for the first-run interview (W49.proc-local-ocr-onboarding), from the scores in this type's header.
+    var plainNote: String {
+        switch self {
+        case .qwen35_9B:
+            "The most accurate reader measured on a Mac: it scored 92 out of 100 on the app's test pages, against Apple "
+                + "Vision's 83. Handwriting still reads better with an online reader."
+        case .qwen3VL8B:
+            "Close behind at 90 out of 100 on the same pages, but it gives up on more of them."
+        }
+    }
+
     /// The shared software (uv, Python and mlx-vlm), measured: about 1.3 GB, once for every model.
     static let softwareGB = 1.3
 
@@ -107,6 +118,12 @@ final class ManagedLocalOCR: ObservableObject {
         installations[m] = Task {
             defer { installations[m] = nil }
             do {
+#if DEBUG
+                if ProcessorUITestConfiguration.standsInManagedDownload {
+                    states[m] = .installing("Downloading \(m.model.name)…", 0)
+                    try await Task.sleep(for: .seconds(24 * 3600))
+                }
+#endif
                 try await supervisor.install(m.model) { step in
                     guard case .installing = self.states[m] else { return }
                     self.states[m] = switch step {
@@ -119,6 +136,11 @@ final class ManagedLocalOCR: ObservableObject {
                 partial.remove(m)
             } catch {
                 if supervisor.downloadedBytes(m.model) > 0 { partial.insert(m) }
+                // A Reader chosen before its download finished (Local HD) is not left on a model that never arrived.
+                let d = UserDefaults.standard
+                if ManagedOCRModel.stored(d) == m, d.bool(forKey: DefaultsKeys.useGateway), !supervisor.isInstalled(m.model) {
+                    ReaderChoice.appleVision.apply(d)
+                }
                 states[m] = Task.isCancelled || error is CancellationError
                     ? .failed("Download cancelled. What arrived is kept; Download again resumes it.")
                     : .failed(Self.failure(error))

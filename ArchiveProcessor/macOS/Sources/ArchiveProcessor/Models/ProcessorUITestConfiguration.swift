@@ -17,6 +17,8 @@ enum ProcessorUITestConfiguration {
 
     /// W49.proc-managed-local-ocr: the guest has too little memory for the managed page readers; this run says 18 GB.
     static var managedOCRMemoryGB: Double? { isActive && arguments.contains("-APUITestManagedOCR") ? 18 : nil }
+    /// W49.proc-local-ocr-onboarding: in that run a started download fetches nothing and waits until cancelled.
+    static var standsInManagedDownload: Bool { managedOCRMemoryGB != nil }
 
     static var offersCollectionInterview: Bool { arguments.contains("-APUITestCollectionInterview") }
 
@@ -262,10 +264,18 @@ enum ProcessorUITestConfiguration {
         defaults.set(true, forKey: DefaultsKeys.keychainExplained)
         defaults.set(!arguments.contains("-APUITestGeneralInterview"), forKey: DefaultsKeys.hasSeenGeneralInterview)
         defaults.set(false, forKey: DefaultsKeys.useGateway)
+        defaults.set(false, forKey: DefaultsKeys.useAppleVision)   // a test that chose Vision or a server cannot leak it
+        defaults.set(false, forKey: DefaultsKeys.gatewayLocalModel)
         defaults.set(arguments.contains("-APUITestLocalAgent"), forKey: DefaultsKeys.useLocalAgent)
         defaults.set(LocalAgentTool.claude.rawValue, forKey: DefaultsKeys.localAgentTool)
         defaults.set(claudeAuthFixture()?.path ?? "", forKey: DefaultsKeys.localAgentBinaryPath)
         defaults.set("", forKey: DefaultsKeys.localAgentModel)
+        if arguments.contains("-APUITestFreshReader") {   // W49.proc-local-ocr-onboarding: a Mac that never chose a reader
+            for key in [DefaultsKeys.useAppleVision, DefaultsKeys.useLocalAgent, DefaultsKeys.useGateway,
+                        DefaultsKeys.selectedProvider, DefaultsKeys.gatewayManagedModel] {
+                defaults.removeObject(forKey: key)
+            }
+        }
         if arguments.contains("-APUITestOpenRouterImageCharge") {
             let listing = #"""
                 {"data":[{"id":"test/vision-per-image","name":"Fixture Image Reader",
