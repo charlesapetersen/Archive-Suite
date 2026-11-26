@@ -1,0 +1,140 @@
+file	line	function	executable_lines
+ArchiveReader/macOS/Sources/ArchiveReader/ArchiveReaderCommands.swift	419	ArchiveReaderCommands.sortBy(_:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Core/AdvancedSearch.swift	418	static AdvancedSearch.dateKeys(_:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Core/AppSettings.swift	55	static AppSettings.setViewerSplitFraction(_:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ArchiveFile.swift	103	ArchiveFile.catalogueFieldLabels.getter	8
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ArchiveFile.swift	111	ArchiveFile.catalogueItemFieldsText.getter	4
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ArchiveFile.swift	204	ArchiveFile.hash(into:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift	257	AuditLedger.lastError.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ContainerCatalog.swift	58	static ContainerRow.== infix(_:_:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ContainerCatalog.swift	109	static ContainerDisagreement.== infix(_:_:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Core/FileLink.swift	44	FileLinkFormatter.htmlEscaped(_:)	6
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ImproveOCRHandoff.swift	22	ImproveOCRHandoff.Problem.description.getter	10
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ImproveOCRSupport.swift	66	static ImproveOCRSupport.suggestedPanelLocation()	7
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ImproveOCRSupport.swift	146	static ImproveOCRSupport.describe(_:)	12
+ArchiveReader/macOS/Sources/ArchiveReader/Core/NavigationHistory.swift	55	NavigationHistory.clear()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Core/PoorOCRFlagGuard.swift	44	PoorOCRFlagGuard.Refusal.description.getter	9
+ArchiveReader/macOS/Sources/ArchiveReader/Core/PoorOCRFlagGuard.swift	63	PoorOCRFlagGuard.Unfinished.note(_:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ReaderCatalogueFacets.swift	10	CatalogueRecord.Field.readerIsCleared.getter	4
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ReaderCatalogueFacets.swift	17	static ReaderCatalogueFacets.itemFields(_:)	13
+ArchiveReader/macOS/Sources/ArchiveReader/Core/ReaderCatalogueFacets.swift	48	static ReaderCatalogueFacets.hasAssessedDate(_:roles:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Search/ArchiveLibrary.swift	1270	ArchiveLibrary.takeTouchedSidecarFolders()	4
+ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndex.swift	522	ContentIndex.snippets(expression:for:budget:bodyOnly:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndex.swift	996	ContentIndex.lastMessage.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndexer.swift	184	ContentIndexer.forget(_:)	9
+ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndexer.swift	559	ContentIndexer.snippets(expression:for:bodyOnly:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Search/CorpusWatcher.swift	19	CorpusWatchPathSet.removeAll()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Search/LibraryChangeSet.swift	44	LibraryChangeSet.isEmpty.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Search/LibraryChangeSet.swift	45	LibraryChangeSet.isWhole.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1378	TagTokenCellView.init(coder:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1602	IconSortHeaderCell.drawSortIndicator(withFrame:in:ascending:priority:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1703	ColumnPickerHeaderView.setSecondaryAsc(_:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1707	ColumnPickerHeaderView.setSecondaryDesc(_:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1711	ColumnPickerHeaderView.removeSecondary(_:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1714	ColumnPickerHeaderView.resetSort(_:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1810	QualityCellView.Button.accessibilityPerformPress()	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1825	QualityCellView.mouseDown(with:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1949	ContextMenuTableView.mouseDragged(with:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/CatalogueInspectorView.swift	326	CatalogueInspectorView.fileEdit(_:_:_:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/CatalogueRepairSection.swift	121	NavigationModel.catalogueRepairError(_:operation:)	10
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	111	ContainerSection.editorField(_:)	21
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	133	ContainerSection.warningList(_:)	21
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	158	ContainerSection.begin(_:naming:text:)	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	164	ContainerSection.commit(_:)	11
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	220	ContainerSelectionSection.set()	6
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	310	ContainerLevelsSheet.skippedRows.getter	28
+ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentTagActions.swift	80	DocumentTagActions.toggleFlag()	7
+ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentTagActions.swift	91	DocumentTagActions.togglePoorOCR()	12
+ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentTagActions.swift	104	DocumentTagActions.improveOCR()	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentViewerModel.swift	471	DocumentViewerModel.reloadReplaced(paths:)	9
+ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentViewerModel.swift	779	DocumentViewerModel.revealShownImageFile()	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/FieldStatusSection.swift	220	ItemFieldSelectionEditor.set()	6
+ArchiveReader/macOS/Sources/ArchiveReader/Views/FilenameFilterField.swift	38	static FilenameFilterTextField.cellClass.setter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	17	NavigationModel.applyCatalogueFileField(_:_:paths:observed:)	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	27	NavigationModel.updateCatalogueNames(_:paths:physicalPageIndex:observed:update:)	18
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	47	NavigationModel.applyCatalogueRotation(path:pageIndex:turns:observed:completed:)	8
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	56	NavigationModel.applyCatalogueTagEdit(_:paths:physicalPageIndex:)	11
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	69	NavigationModel.applyCatalogueItemEdit(_:_:paths:physicalPageIndex:)	28
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	100	NavigationModel.editCatalogueSubjects(paths:_:)	7
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	110	NavigationModel.markCatalogue(_:paths:completed:)	7
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	287	static NavigationModel.catalogueTagEdit(_:id:fields:)	43
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	288	edit #1 (_:_:) in static NavigationModel.catalogueTagEdit(_:id:fields:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	291	date #1 (_:_:uncertain:) in static NavigationModel.catalogueTagEdit(_:id:fields:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	331	static NavigationModel.catalogueField(_:)	15
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	347	static NavigationModel.value<A>(_:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	376	CatalogueEditPlan.Member.stillRefers(to:in:)	11
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	464	static CatalogueActionResult.explain(_:)	12
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerEdits.swift	212	NavigationModel.setContainerStandardName(_:for:field:forPath:undo:)	10
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerEdits.swift	377	NavigationModel.editError(_:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerSetAside.swift	27	ContainerSetAsideNeeded.documentPath.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerSetAside.swift	90	ContainerSetAsideOffer.title.getter	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerSetAside.swift	98	NavigationModel.acceptContainerSetAside(_:)	13
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Containers.swift	283	NavigationModel.dismissContainerLevels()	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Containers.swift	291	containerLevelsWriteMessage(_:)	8
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+FolderDating.swift	62	FolderDatingOffer.recorded.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ImproveOCR.swift	114	NavigationModel.chooseImproveOCRFolder()	23
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ImproveOCR.swift	291	static TextPageSummary.summarize(_:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ImproveOCR.swift	308	TextPageSummary.kindLabel.getter	7
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ItemFieldEdits.swift	149	NavigationModel.syncSidecarNamesToIndex()	17
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	14	NavigationModel.exportToZotero()	31
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	49	NavigationModel.addToZotero()	16
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	79	NavigationModel.zoteroGatherer(_:)	10
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	119	NavigationModel.zoteroProtectedFolders(_:)	16
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	152	static NavigationModel.zoteroExportedMessage(count:name:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	146	NavigationModel.requestFocusTagFilter()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	561	NavigationModel.askItemTypeColoursIfNeeded()	12
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	708	NavigationModel.relativeFolderName(_:)	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	716	NavigationModel.chooseFolderForRule(startingAt:)	12
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	971	NavigationModel.extendSelectionToDocumentRun()	31
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	1032	NavigationModel.selectFiles(withTag:)	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	1585	NavigationModel.setFullTextResultForTesting(query:paths:snippets:)	8
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	1594	NavigationModel.pendingSnippetCountForTesting.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2439	NavigationModel.adoptChosenRoot(_:)	50
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2897	NavigationModel.selectNextUnread()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2899	NavigationModel.selectPreviousUnread()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2901	NavigationModel.advanceToUnread(forward:)	19
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2957	NavigationModel.groupSummary.getter	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	3331	NavigationModel.jpegPartnerUnavailableMessage.getter	12
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	3473	NavigationModel.revealInFinder()	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	3480	NavigationModel.openInDefaultApp()	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	322	NavigationWindowView.displayCalendarMenu()	12
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	693	NavigationWindowView.dateFilterPopover.getter	31
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1035	DataQualityView.containerWarnings(_:)	34
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1117	ContextMenuActions.openInDocView()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1118	ContextMenuActions.preview()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1120	ContextMenuActions.revealInFinder()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1121	ContextMenuActions.openInDefaultApp()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1122	ContextMenuActions.copyLinks()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1123	ContextMenuActions.copyArchiveLinks()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1124	ContextMenuActions.exportToZotero()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1125	ContextMenuActions.addToZotero()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1126	ContextMenuActions.markRead()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1127	ContextMenuActions.markUnread()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1128	ContextMenuActions.toggleFlag()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1129	ContextMenuActions.togglePoorOCR()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1130	ContextMenuActions.improveOCR()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1131	ContextMenuActions.editTags()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1132	ContextMenuActions.selectDocRun()	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1133	ContextMenuActions.setDisplayCalendar(_:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/OptionsView.swift	117	OptionsView.addExcludedFolder()	21
+ArchiveReader/macOS/Sources/ArchiveReader/Views/OptionsView.swift	140	OptionsView.resolveArchiveRoot()	6
+ArchiveReader/macOS/Sources/ArchiveReader/Views/PDFPaneView.swift	537	StandInFindOverlayView.init(coder:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/PageTurnInput.swift	173	NSEvent.swipeTurnsToNext.getter	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/PanelDivider.swift	70	PanelDividerView.init(coder:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/PreviewImagePrefetcher.swift	259	PlaceholderPageOverlayView.init(coder:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	78	SubjectFilterTokenField.Coordinator.tokenField(_:completionsForSubstring:indexOfToken:indexOfSelectedItem:)	4
+ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	88	SubjectFilterTokenField.Coordinator.tokenField(_:shouldAdd:at:)	11
+ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	102	SubjectFilterTokenField.Coordinator.controlTextDidChange(_:)	8
+ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	114	SubjectFilterTokenField.Coordinator.controlTextDidEndEditing(_:)	9
+ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	126	static SubjectFilterTokenField.Coordinator.union<A>(_:_:)	6
+ArchiveReader/macOS/Sources/ArchiveReader/Views/TagEditorView.swift	441	TagEditorView.markReadState(_:)	1
+ArchiveReader/macOS/Sources/ArchiveReader/Views/TagEditorView.swift	442	TagEditorView.toggleFlag()	3
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	34	ViewerSwitchProbe.().init()	9
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	44	ViewerSwitchProbe.observe(_:)	13
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	60	ViewerSwitchProbe.switchStarted(bitmapReady:)	8
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	69	ViewerSwitchProbe.close()	14
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	85	ViewerSwitchProbe.noteFootprint(_:)	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	91	ViewerSwitchProbe.publish()	10
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	92	pct #1 (_:_:) in ViewerSwitchProbe.publish()	5
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	102	static ViewerSwitchProbe.footprintMiB()	10
+ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	118	ViewerSwitchProbeLabel.body.getter	8
