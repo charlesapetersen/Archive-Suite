@@ -69,7 +69,10 @@ run_processor() {
       -destination 'platform=macOS' -enableCodeCoverage YES -derivedDataPath ./build/DD) >"$OUT/processor-build.log" 2>&1 \
     || { log "processor: build FAILED ($OUT/processor-build.log)"; worst=2; return; }
   for d in ${DRIVERS:-$DEFAULT_DRIVERS}; do
-    LLVM_PROFILE_FILE="$pdir/${d%.sh}-%p.profraw" bash "$dir/scripts/$d" >"$pdir/${d%.sh}.out" 2>&1
+    # %c = continuous mode: counters are mapped into the file as they change. Without it the app writes its
+    # profile only at exit, and test-child.sh TERMs it as soon as the script has its report: 15 of 28 drivers
+    # left no profile in the first run (measured 2026-11-26; merge-safety alone wrote none).
+    LLVM_PROFILE_FILE="$pdir/${d%.sh}-%c%p.profraw" bash "$dir/scripts/$d" >"$pdir/${d%.sh}.out" 2>&1
     rc=$?
     log "processor: $d exit $rc"
     [ "$rc" = 0 ] || failed+=("$d")
