@@ -34,6 +34,7 @@ struct OrganizationPartialReadTests {
         let budget = try await org.createFolder(name: "Budget")
         try await org.addMembership(item: Self.first, folder: budget.id)
         try await org.addMembership(item: Self.second, folder: budget.id)
+        await org.flushPendingMirror()
         await index.close()
         let mirror = try Data(contentsOf: dir.appendingPathComponent("organization.json"))
         return Env(dir: dir, budget: budget.id, mirror: mirror)

@@ -2208,7 +2208,12 @@ final class NotesModel: ObservableObject {
     /// mutation, and leaving the warning up through it was merely untidy; now that a retry can heal the
     /// mirror with the operator doing nothing at all, a line still claiming the durable mirror is
     /// behind would be a false statement the app never takes back.
+    ///
+    /// While a mirror write is still pending this does nothing (W49.notes-org-export-async): the outcome
+    /// on show would be the previous write's, and `onMirrorOutcome` calls back here when the pending
+    /// one lands, which is still after the path's own status text.
     func adoptMirrorFailure() {
+        guard !organization.isMirrorWritePending else { return }
         if let failure = organization.mirrorFailure {
             statusMessage = failure.message
             postedMirrorMessage = failure.message
@@ -2229,9 +2234,12 @@ final class NotesModel: ObservableObject {
     ///
     /// Wired to the two moments that matter (see `observeMirrorRecoveryTriggers`), and public so the
     /// app can call it from anywhere else that turns out to be a good moment.
+    ///
+    /// The status line is updated by `onMirrorOutcome` when the retry's write lands
+    /// (W49.notes-org-export-async). Adopting here, before it lands, would re-post the old warning over
+    /// whatever another subsystem has said since, even when the retry is about to succeed.
     func retryStaleMirrorExport() {
-        guard organization.retryStaleMirrorExport() else { return }
-        adoptMirrorFailure()
+        organization.retryStaleMirrorExport()
     }
 
     /// Retry the stale-mirror export when the app is **activated** and when it is about to **quit**.
@@ -2248,11 +2256,22 @@ final class NotesModel: ObservableObject {
     /// keeps it to moments a write is expected. `queue: nil` runs the block synchronously on the
     /// poster's thread, which is what makes the terminate leg useful at all; AppKit posts both of these
     /// on the main thread, hence `assumeIsolated`.
+    ///
+    /// Mirror writes are coalesced and run off the main actor (W49.notes-org-export-async), so the
+    /// outcome of a mutation's write arrives after the mutation's own `adoptMirrorFailure()`;
+    /// `onMirrorOutcome` adopts it again when it lands. The terminate leg writes synchronously, both
+    /// what is still pending and a stale mirror, because the process ends when the notification returns.
     private func observeMirrorRecoveryTriggers() {
+        organization.onMirrorOutcome = { [weak self] in self?.adoptMirrorFailure() }
         let observers = NotificationObservers(center: notificationCenter)
-        for name in [NSApplication.didBecomeActiveNotification, NSApplication.willTerminateNotification] {
-            observers.observe(name) { [weak self] _ in
-                MainActor.assumeIsolated { self?.retryStaleMirrorExport() }
+        observers.observe(NSApplication.didBecomeActiveNotification) { [weak self] _ in
+            MainActor.assumeIsolated { self?.retryStaleMirrorExport() }
+        }
+        observers.observe(NSApplication.willTerminateNotification) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.organization.flushMirrorSynchronously()
+                self.adoptMirrorFailure()
             }
         }
         mirrorRecoveryObservers = observers

@@ -74,6 +74,7 @@ struct OrganizationMirrorFailureTests {
         defer { Task { await cleanup(scratch, index) } }
 
         try await store.createFolder(name: "Ledgers")
+        await store.flushPendingMirror()
 
         #expect(store.mirrorFailure == nil, "a working export must not raise a false warning")
         #expect(store.isMirrorStale == false)
@@ -90,10 +91,12 @@ struct OrganizationMirrorFailureTests {
         defer { try? setWritable(root, true) }
 
         try await store.createFolder(name: "Before")
+        await store.flushPendingMirror()
         #expect(store.mirrorFailure == nil, "precondition: the mirror starts in sync")
 
         try setWritable(root, false)                    // the volume goes read-only / full
         try await store.createFolder(name: "After")
+        await store.flushPendingMirror()
 
         // The mutation itself committed — that is exactly why the silence was dangerous.
         #expect(store.folders.contains { $0.name == "After" },
@@ -118,12 +121,15 @@ struct OrganizationMirrorFailureTests {
         defer { try? setWritable(root, true) }
 
         try await store.createFolder(name: "Before")
+        await store.flushPendingMirror()
         try setWritable(root, false)
         try await store.createFolder(name: "Missed")       // export fails
+        await store.flushPendingMirror()
         #expect(store.isMirrorStale)
 
         try setWritable(root, true)                        // the volume comes back
         try await store.createFolder(name: "After")
+        await store.flushPendingMirror()
 
         #expect(store.mirrorFailure == nil, "a working export must clear a stale warning")
         let onDisk = mirroredFolderNames(at: root)
@@ -166,10 +172,12 @@ struct OrganizationMirrorFailureTests {
         defer { try? setWritable(root, true) }
 
         try await setup(store)
+        await store.flushPendingMirror()
         #expect(store.mirrorFailure == nil, "\(label): setup must leave the mirror in sync")
 
         try setWritable(root, false)
         try await mutate(store)
+        await store.flushPendingMirror()
 
         #expect(store.isMirrorStale, "\(label): a mutation whose mirror write failed must report it")
     }
@@ -245,6 +253,8 @@ struct OrganizationMirrorFailureTests {
         try setWritable(root, false)
 
         let id = await model.createFolder(name: "Correspondence", under: nil)
+        // The mirror write runs after the façade returns; its outcome reaches the sidebar when it lands.
+        await store.flushPendingMirror()
 
         // Anti-regression for the shape of this fix: the export is the LAST step, so the folder DOES
         // exist. Turning the failure into a thrown error would make this `nil` and skip the rebuild —
@@ -265,6 +275,7 @@ struct OrganizationMirrorFailureTests {
 
         let model = NotesModel(organization: store)
         let id = await model.createFolder(name: "Correspondence", under: nil)
+        await store.flushPendingMirror()
 
         #expect(id != nil)
         #expect(model.statusMessage == nil, "no false warning on a working volume")
@@ -277,17 +288,20 @@ struct OrganizationMirrorFailureTests {
         defer { try? setWritable(root, true) }
 
         let target = try await store.createFolder(name: "Filed").id
+        await store.flushPendingMirror()
         let model = NotesModel(organization: store)
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
         let item = UUID()
 
         try setWritable(root, false)
         await nav.replicate([item], to: target)
+        await store.flushPendingMirror()
         #expect(model.statusMessage?.isEmpty == false, "replicate must report the unwritten mirror")
         #expect(store.memberships.contains { $0.itemId == item && $0.folderId == target })
 
         model.statusMessage = nil
         await nav.move([item], to: OrganizationStore.inboxFolderId, from: target)
+        await store.flushPendingMirror()
         #expect(model.statusMessage?.isEmpty == false, "move must report the unwritten mirror")
     }
 }

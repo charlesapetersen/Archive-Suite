@@ -166,6 +166,7 @@ struct NotesIndexerFailureTests {
         let writer = OrganizationStore(index: healthy)
         try await writer.load(storeRoot: dir)
         let budget = try await writer.createFolder(name: "Budget")
+        await writer.flushPendingMirror()
         await healthy.close()
         let mirrorURL = dir.appendingPathComponent("organization.json")
         let mirrorBefore = try Data(contentsOf: mirrorURL)

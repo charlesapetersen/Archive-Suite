@@ -69,8 +69,10 @@ struct OrganizationMirrorRetryTests {
     /// Returns with the mirror stale and the root writable — the exact state a retry should heal.
     private func makeRecoverableStaleMirror(_ store: OrganizationStore, root: URL) async throws {
         try await store.createFolder(name: "Before")
+        await store.flushPendingMirror()
         try setWritable(root, false)
         try await store.createFolder(name: "Missed")
+        await store.flushPendingMirror()
         #expect(store.isMirrorStale, "fixture: the export must actually have failed")
         try setWritable(root, true)
     }
@@ -83,6 +85,7 @@ struct OrganizationMirrorRetryTests {
         defer { Task { await cleanup(scratch, index) } }
 
         try await store.createFolder(name: "Ledgers")
+        await store.flushPendingMirror()
         #expect(store.isMirrorStale == false, "precondition: the mirror is in sync")
 
         // Sentinel bytes stand in for the user's file: if the retry exports unconditionally they are
@@ -107,6 +110,7 @@ struct OrganizationMirrorRetryTests {
 
         // No mutation — the operator does nothing at all. This is the whole point of the item.
         #expect(store.retryStaleMirrorExport() == true)
+        await store.flushPendingMirror()
 
         #expect(store.mirrorFailure == nil, "a working export must clear the stale warning")
         let onDisk = mirroredFolderNames(at: root)
@@ -122,11 +126,14 @@ struct OrganizationMirrorRetryTests {
         defer { try? setWritable(root, true) }
 
         try await store.createFolder(name: "Before")
+        await store.flushPendingMirror()
         try setWritable(root, false)
         try await store.createFolder(name: "Missed")
+        await store.flushPendingMirror()
         #expect(store.isMirrorStale)
 
         #expect(store.retryStaleMirrorExport() == true, "it should have tried")
+        await store.flushPendingMirror()
         #expect(store.isMirrorStale, "…and an optimistic retry must not invent a recovery")
         #expect(!mirroredFolderNames(at: root).contains("Missed"))
     }
@@ -167,12 +174,15 @@ struct OrganizationMirrorRetryTests {
 
         let (model, center) = makeModel(store)
         try await store.createFolder(name: "Before")
+        await store.flushPendingMirror()
         try setWritable(root, false)
         _ = await model.createFolder(name: "Missed", under: nil)
+        await store.flushPendingMirror()
         #expect(model.statusMessage?.isEmpty == false, "precondition: the operator was told")
 
         try setWritable(root, true)                     // the volume comes back…
         center.post(name: NSApplication.didBecomeActiveNotification, object: nil)  // …and so does the operator
+        await store.flushPendingMirror()
 
         #expect(store.mirrorFailure == nil, "activation must retry the export")
         #expect(mirroredFolderNames(at: root).contains("Missed"),
@@ -208,11 +218,13 @@ struct OrganizationMirrorRetryTests {
         let (model, center) = makeModel(store)
         try setWritable(root, false)
         _ = await model.createFolder(name: "Missed", under: nil)
+        await store.flushPendingMirror()
         let warning = model.statusMessage
         #expect(warning?.isEmpty == false)
 
         model.statusMessage = nil                       // the operator dismisses the line
         center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        await store.flushPendingMirror()
 
         #expect(model.statusMessage == warning,
                 "while the mirror is still behind, the app must keep saying so")
@@ -225,11 +237,13 @@ struct OrganizationMirrorRetryTests {
 
         let (model, center) = makeModel(store)
         _ = await model.createFolder(name: "Ledgers", under: nil)
+        await store.flushPendingMirror()
         #expect(model.statusMessage == nil, "precondition: nothing is wrong")
 
         let sentinel = Data("not-json-at-all".utf8)
         try sentinel.write(to: mirrorURL(root))
         center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        await store.flushPendingMirror()
 
         #expect(model.statusMessage == nil, "no false warning on a working volume")
         #expect(try Data(contentsOf: mirrorURL(root)) == sentinel,
@@ -245,6 +259,7 @@ struct OrganizationMirrorRetryTests {
         let (model, center) = makeModel(store)
         try setWritable(root, false)
         _ = await model.createFolder(name: "Missed", under: nil)
+        await store.flushPendingMirror()
         #expect(model.statusMessage?.isEmpty == false)
 
         // Something else takes the shared status line over — the index, a failed write, anything.
@@ -253,6 +268,7 @@ struct OrganizationMirrorRetryTests {
 
         try setWritable(root, true)
         center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        await store.flushPendingMirror()
 
         #expect(store.mirrorFailure == nil, "the mirror did recover")
         #expect(model.statusMessage == other,

@@ -544,6 +544,7 @@ struct OrganizationStoreTests {
         try await store1.addMembership(item: itemId, folder: folder.id)
         let templateId = UUID()
         try await store1.assignTemplate(templateId, to: folder.id)
+        await store1.flushPendingMirror()
 
         // Verify organization.json exists
         let jsonURL = root.appendingPathComponent("organization.json")

@@ -115,7 +115,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
 // MARK: - OrganizationStore
 
 /// Owns the folder tree, memberships, and template assignments (§16.1).
-/// Persists to the index DB **and** `organization.json` (atomic) on every mutation.
+/// Persists to the index DB on every mutation and to `organization.json` (atomic) in a coalesced write
+/// shortly after, off the main actor (W49.notes-org-export-async).
 /// The DB is a disposable cache; `organization.json` is the durable mirror (§11).
 @MainActor final class OrganizationStore: ObservableObject {
     /// Stable system folder IDs (§16.6) — deterministic across launches.
@@ -170,6 +171,11 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     ///    source removal now report — but they report the *mutation's* failure; the mirror is a
     ///    separate degradation that outlives the call, which is the next reason.
     /// 3. Staleness persists until a later export succeeds. That is a state, not an event.
+    ///
+    /// **It reports the last write that finished, not the mutation just made (W49.notes-org-export-async).**
+    /// A mutation schedules a coalesced write off the main actor, so right after its `await` this still
+    /// shows the previous outcome; `onMirrorOutcome` fires when the new one lands, and
+    /// `flushPendingMirror()` waits for it. `.noStoreRoot` is the exception and is set at once.
     @Published private(set) var mirrorFailure: OrganizationMirrorFailure?
 
     /// `true` while `organization.json` does not reflect committed organization state.
@@ -195,8 +201,16 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// The Extracts system folder ID (§16.1 / §16.6).
     var extractsHomeFolderId: UUID { Self.extractsFolderId }
 
-    init(index: NotesIndex) {
+    /// How long a mutation's mirror write waits for more mutations to join it (W49.notes-org-export-async).
+    private let mirrorDebounce: Duration
+
+    /// Called on the main actor each time a mirror write's outcome lands on `mirrorFailure`, so the
+    /// model can show or retract its status line once the write it scheduled has actually finished.
+    var onMirrorOutcome: (() -> Void)?
+
+    init(index: NotesIndex, mirrorDebounce: Duration = .milliseconds(250)) {
         self.index = index
+        self.mirrorDebounce = mirrorDebounce
     }
 
     /// Load the organizational graph from the DB; if the DB has no folders
@@ -215,6 +229,9 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// as `loadReadOnlyMirror` does, with `storeRoot` cleared: no later mutation or speculative retry can
     /// write the database or export what this call left half-built over `organization.json`.
     func load(storeRoot: URL) async throws {
+        // A write still waiting for the previous graph must land at the previous root before either
+        // changes; otherwise it could fire mid-load and put the old graph in the new store's mirror.
+        await flushPendingMirror()
         self.storeRoot = storeRoot
         do {
             try await loadGraph(storeRoot: storeRoot)
@@ -862,23 +879,150 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// export overwrites it a moment later with the new one. (If that mutation instead throws, memory
     /// never moved and the pre-mutation graph was the right thing to have written.) A mutation that
     /// updated memory before its await would break that — hence this note next to the convention.
+    ///
+    /// The retry starts its write at once, without the mutation debounce; its outcome lands through
+    /// `onMirrorOutcome` like any other write's (W49.notes-org-export-async).
     @discardableResult
     func retryStaleMirrorExport() -> Bool {
         guard isMirrorStale, didLoadGraph else { return false }
-        exportOrganization()
+        guard storeRoot != nil else { mirrorFailure = .noStoreRoot; return true }
+        mirrorDirty = true
+        cancelPendingDebounce()
+        startMirrorWrite()
         return true
     }
 
+    // MARK: - Mirror writes (W49.notes-org-export-async)
+    //
+    // Every mutation used to encode the whole graph and rewrite `organization.json` on the main actor,
+    // so a bulk change of N items paid N whole-graph writes while the UI waited. A mutation now marks
+    // the mirror dirty; the first one in a burst starts a short debounce, and when it ends the graph as
+    // it is AT THAT MOMENT is encoded and written on `mirrorQueue`. Later mutations in the burst join
+    // the same write, and one that lands while a write is running starts the next.
+    //
+    // Ordering. The snapshot is taken on the main actor, where the graph is always consistent (see
+    // `retryStaleMirrorExport` for the commit-order convention that guarantees it). Writes run in
+    // order on one serial queue, so the newest snapshot is always the last one renamed into place, and
+    // outcomes are applied in sequence order, so an older write's result never overwrites a newer
+    // one's on `mirrorFailure`. Each write is whole-graph, so one success heals every failure before it.
+    //
+    // Quitting. `flushMirrorSynchronously()` runs from `willTerminate`: it waits for any running write
+    // and writes what is still pending before the process ends. A single file write bounds it.
+
+    /// Committed organization changes not yet handed to a write.
+    private var mirrorDirty = false
+    /// The debounce sleep before the next write, if one is scheduled.
+    private var pendingDebounce: Task<Void, Never>?
+    /// The latest write: its snapshot written and its outcome applied once this task finishes.
+    private var mirrorWriteChain: Task<Void, Never>?
+    /// The sequence number given to the latest snapshot, and that of the latest outcome applied.
+    private var mirrorWriteSeq = 0
+    private var appliedMirrorSeq = 0
+    /// How many whole-graph writes have been started, for the coalescing tests.
+    private(set) var mirrorWriteCount = 0
+    /// Where every mirror encode and write runs, one at a time, in order.
+    private let mirrorQueue = DispatchQueue(label: "ArchiveNotes.OrganizationStore.mirror", qos: .utility)
+
+    /// `true` from a mutation until the write that carries it has landed on `mirrorFailure`.
+    var isMirrorWritePending: Bool {
+        mirrorDirty || pendingDebounce != nil || appliedMirrorSeq < mirrorWriteSeq
+    }
+
     private func exportOrganization() {
-        guard let root = storeRoot else { mirrorFailure = .noStoreRoot; return }
+        guard storeRoot != nil else { mirrorFailure = .noStoreRoot; return }
+        mirrorDirty = true
+        guard pendingDebounce == nil else { return }
+        let delay = mirrorDebounce
+        pendingDebounce = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.pendingDebounce = nil
+            self.startMirrorWrite()
+        }
+    }
+
+    private func cancelPendingDebounce() {
+        pendingDebounce?.cancel()
+        pendingDebounce = nil
+    }
+
+    /// Snapshot the graph now and queue its write after any write already running.
+    private func startMirrorWrite() {
+        guard mirrorDirty else { return }
+        mirrorDirty = false
+        guard let root = storeRoot else { return }
+        let snapshot = MirrorSnapshot(folders: folders, memberships: memberships,
+                                      assignments: assignments, root: root)
+        mirrorWriteSeq += 1
+        mirrorWriteCount += 1
+        let seq = mirrorWriteSeq
+        let queue = mirrorQueue
+        let previous = mirrorWriteChain
+        mirrorWriteChain = Task { [weak self] in
+            await previous?.value
+            let outcome: OrganizationMirrorFailure? = await withCheckedContinuation { done in
+                queue.async { done.resume(returning: snapshot.write()) }
+            }
+            self?.applyMirrorOutcome(outcome, seq: seq)
+        }
+    }
+
+    private func applyMirrorOutcome(_ outcome: OrganizationMirrorFailure?, seq: Int) {
+        guard seq > appliedMirrorSeq else { return }
+        appliedMirrorSeq = seq
+        mirrorFailure = outcome
+        onMirrorOutcome?()
+    }
+
+    /// Write anything pending now and wait until every write so far has finished and its outcome is on
+    /// `mirrorFailure`. For a caller that must read the result, or must not race a later root change.
+    func flushPendingMirror() async {
+        cancelPendingDebounce()
+        startMirrorWrite()
+        while let chain = mirrorWriteChain {
+            await chain.value
+            // A write started while this one ran (a reentrant mutation) is waited for as well.
+            if mirrorWriteChain == chain { mirrorWriteChain = nil }
+        }
+    }
+
+    /// The quit path: block until any running write is done and write what is still pending, so the
+    /// file the next launch inherits holds every committed change. A mirror known to be stale is
+    /// retried here too: after quitting, nothing else would write it (W23.m10-fu).
+    func flushMirrorSynchronously() {
+        cancelPendingDebounce()
+        if isMirrorStale, didLoadGraph { mirrorDirty = true }
+        guard mirrorDirty, let root = storeRoot else {
+            mirrorQueue.sync {}
+            return
+        }
+        mirrorDirty = false
+        let snapshot = MirrorSnapshot(folders: folders, memberships: memberships,
+                                      assignments: assignments, root: root)
+        mirrorWriteSeq += 1
+        mirrorWriteCount += 1
+        let seq = mirrorWriteSeq
+        let outcome = mirrorQueue.sync { snapshot.write() }
+        applyMirrorOutcome(outcome, seq: seq)
+    }
+}
+
+/// One graph to write, captured on the main actor (W49.notes-org-export-async).
+private struct MirrorSnapshot: Sendable {
+    let folders: [VFolder]
+    let memberships: [Membership]
+    let assignments: [TemplateAssignment]
+    let root: URL
+
+    /// Encode and write the snapshot; returns the failure to record, or `nil` on success.
+    func write() -> OrganizationMirrorFailure? {
         do {
-            try OrganizationFile.export(
-                folders: folders, memberships: memberships,
-                assignments: assignments, to: root)
-            mirrorFailure = nil
+            try OrganizationFile.export(folders: folders, memberships: memberships,
+                                        assignments: assignments, to: root)
+            return nil
         } catch {
-            mirrorFailure = .writeFailed(detail: error.localizedDescription)
             NSLog("OrganizationStore: organization.json export failed: \(error)")
+            return .writeFailed(detail: error.localizedDescription)
         }
     }
 }
