@@ -19,5 +19,9 @@
 	     (ZoteroConnector). The Reader contacts nothing else. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- W49.reader-print-open-app: File ▸ Print… (⌘P). Without it the sandbox refuses the print panel with
+	     "This application does not support printing" (seen in the VM, 2026-11-26). -->
+	<key>com.apple.security.print</key>
+	<true/>
 </dict>
 </plist>

@@ -380,10 +380,51 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
-    private func selectionMenuItem(_ title: String) -> XCUIElement {
+    /// W49.reader-print-open-app: Selection ▸ Open in Default App and File ▸ Print… are enabled for the list's one
+    /// selected file and for a document window's open file; the document window's toolbar has both buttons, and ⌘P
+    /// there opens the print panel on it, which Cancel closes. Open in Default App is only checked enabled, so no
+    /// second app is launched.
+    func testPrintAndOpenInDefaultAppReachTheListAndTheDocumentWindow() throws {
+        waitForRows(minimum: 1, timeout: 10)
+        clickRow(0)
+        for (menu, title) in [("Selection", "Open in Default App"), ("File", "Print…")] {
+            let item = selectionMenuItem(title, in: menu)
+            XCTAssertTrue(item.exists, "\(menu) ▸ \(title) should be in the menu")
+            XCTAssertTrue(item.isEnabled, "\(menu) ▸ \(title) should act on the list's one selected file")
+            closeMenu()
+        }
+
+        pressKey("o", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window appeared")
+        let open = selectionMenuItem("Open in Default App")
+        XCTAssertTrue(open.isEnabled, "Open in Default App should act on the document shown")
+        closeMenu()
+        for id in ["ar.doc.openInDefaultApp", "ar.doc.print"] {
+            let button = app.buttons[id].firstMatch
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "the document window's toolbar has \(id)")
+            XCTAssertTrue(button.isEnabled, "\(id) should be enabled with a document open")
+        }
+
+        // Without the sandbox's print entitlement this was an alert, "This application does not support printing".
+        pressKey("p", modifiers: .command)
+        let panel = app.sheets.firstMatch
+        XCTAssertTrue(panel.waitForExistence(timeout: 15), "⌘P opens the print panel on the document window")
+        XCTAssertFalse(app.staticTexts["This application does not support printing."].exists)
+        captureScreenshot("w49-print-panel")
+        let cancel = panel.buttons["Cancel"]
+        if cancel.exists { cancel.click() } else { app.typeKey(.escape, modifierFlags: []) }
+        settle(1)
+        XCTAssertFalse(panel.exists, "Cancel closes the print panel and prints nothing")
+
+        pressKey("w", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+
+    private func selectionMenuItem(_ title: String, in menu: String = "Selection") -> XCUIElement {
         let bar = app.menuBars.element(boundBy: 0)
-        let selection = bar.menuBarItems["Selection"]
-        XCTAssertTrue(selection.waitForExistence(timeout: 5), "the Selection menu should exist")
+        let selection = bar.menuBarItems[menu]
+        XCTAssertTrue(selection.waitForExistence(timeout: 5), "the \(menu) menu should exist")
         selection.click()
         let item = bar.menuItems[title]
         _ = item.waitForExistence(timeout: 5)
