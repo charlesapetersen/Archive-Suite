@@ -531,7 +531,7 @@ struct NoteInfoSection: View {
         return Self.countsText(counts)
     }
 
-    static func countsText(_ counts: NoteTextStats.Counts) -> String {
+    nonisolated static func countsText(_ counts: NoteTextStats.Counts) -> String {
         let words = counts.words.formatted(), characters = counts.characters.formatted()
         return "\(words) \(counts.words == 1 ? "word" : "words") · "
             + "\(characters) \(counts.characters == 1 ? "character" : "characters")"

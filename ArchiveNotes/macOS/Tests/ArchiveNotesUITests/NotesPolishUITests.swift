@@ -5,17 +5,17 @@ import XCTest
 /// fixture only.
 final class NotesPolishUITests: NotesFixtureUITestCase {
 
-    /// A double-click on the row's Kind cell, with the list holding the keyboard, sends typing into the note body.
+    /// A double-click on the row's In (instances) cell, with the list holding the keyboard, sends typing into the note body.
     func testDoubleClickOnARowFocusesTheEditor() throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
             let id = Self.idPlain
             let titleBefore = rawMarkdown(inItemDir: id)?.components(separatedBy: "\n").first { $0.hasPrefix("title:") }
             _ = selectItem(uuid: Self.idZotero)   // the list now has the keyboard
-            let kindCell = mainWindow.descendants(matching: .any)["an.cell.kind.\(id)"]
-            XCTAssertTrue(kindCell.waitForExistence(timeout: 10), "the list shows the Kind column")
-            revealRow(kindCell)
-            kindCell.doubleClick()
+            let cell = mainWindow.descendants(matching: .any)["an.cell.instances.\(id)"]
+            XCTAssertTrue(cell.waitForExistence(timeout: 10), "the list shows the In column")
+            revealRow(cell)
+            cell.doubleClick()
             wait(1)
             app.typeText("zqxpolish")
             XCTAssertTrue(pollUntil(timeout: 12) { (self.noteBody(uuid: id) ?? "").contains("zqxpolish") },
