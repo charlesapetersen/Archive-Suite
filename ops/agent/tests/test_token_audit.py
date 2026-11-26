@@ -332,7 +332,7 @@ class VerdictTest(Fixture):
         self.assertEqual(b["ArchiveProcessor/CLAUDE.md"], 24000)
         self.assertEqual(b["CLAUDE.md"], 40000)
         self.assertIsNotNone(b["ops/autonomous/resume-prompt.txt"])
-        self.assertEqual(b["~/Claude/CLAUDE.md"], 12000)
+        self.assertEqual(b["~/Claude/CLAUDE.md"], 21000)
 
     def test_no_open_reports_only(self):
         open(os.path.join(self.repo, "CLAUDE.md"), "w").write("x" * 40001)

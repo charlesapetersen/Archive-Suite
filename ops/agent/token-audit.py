@@ -36,7 +36,10 @@ Budgets: the repo files' figures are read from context-budget.sh's BUDGETS table
 24000, CLAUDE.md 40000, the prompt 31000: W40.docs-startup-size's result). The 20 KB app-guide target is reported
 beside them; it does not open a fix on its own, because the Processor guide sits over it by rules a reviewer
 restored (SUITE_TODO_DONE.md, W40.docs-startup-size). ~/Claude/CLAUDE.md and the memory index have their budgets
-here (EXTRA_BUDGETS).
+here (EXTRA_BUDGETS). ~/Claude/CLAUDE.md was raised 12000 -> 21000 by W40.token-fix (2026-11-26): it grew 10,890 ->
+19,382 B in a week, all of it owner-written rules dated 2026-11-20 to 11-25 (secrets scan, Agent Manager approvals,
+the walkthrough's steps), and it is outside every git repository and shared by every project and Codex, so an
+unattended session does not trim it by hand. The budget stays a tripwire for growth beyond those rules.
 
 Tests: ops/agent/tests/test_token_audit.py (a synthetic transcript folder with known figures).
 """
@@ -64,7 +67,7 @@ APP_GUIDE_TARGET = 20000  # W40.docs-startup-size's target; reported, not enforc
 FIX_GATE = "W40.token-fix-due"
 FIX_ITEM = "W40.token-fix"
 EXTRA_BUDGETS = {          # always loaded, outside the repo, so not in context-budget.sh
-    "~/Claude/CLAUDE.md": 12000,
+    "~/Claude/CLAUDE.md": 21000,  # raised 2026-11-26, see the header
     "memory/MEMORY.md": 12000,
 }
 ALWAYS = ["CLAUDE.md", "ops/autonomous/resume-prompt.txt", "ArchiveProcessor/CLAUDE.md",
