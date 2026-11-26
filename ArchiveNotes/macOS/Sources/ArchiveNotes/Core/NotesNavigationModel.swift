@@ -381,10 +381,12 @@ final class NotesNavigationModel: ObservableObject {
     /// Remove `tag` from every note in `ids` that has it. Returns the notes it could not be saved on.
     @discardableResult
     func removeTag(_ tag: String, from ids: [UUID]) async -> [UUID] {
-        let key = NotesTagVocabulary.titleCased(tag).lowercased()
+        // The token `NotesModel.removeTag` removes, so a note that would be saved unchanged is not rewritten.
+        guard let token = NotesTagVocabulary.normalizedSubjects([tag]).first else { return [] }
         let holders = ids.filter { id in
-            model.allItems.first { $0.id == id }?.managedTags
-                .contains { NotesTagVocabulary.titleCased($0).lowercased() == key } ?? true
+            model.allItems.first { $0.id == id }.map {
+                NotesTagVocabulary.normalizedSubjects($0.managedTags).contains(token)
+            } ?? true
         }
         var failed: [UUID] = []
         for id in holders where !(await model.removeTag(tag, from: id)) { failed.append(id) }
@@ -789,7 +791,11 @@ final class NotesNavigationModel: ObservableObject {
     /// The notes Edit ▸ Delete… (⌘⌫) asks to delete: the selected rows of the note list in list order, or empty
     /// when the list is not showing (W40.fix-notes-delete-redo, notes-2 row 16; several since
     /// W49.notes-multiselect-actions).
-    var deletableSelection: [UUID] { exportableSelection }
+    var deletableSelection: [UUID] {
+        guard paneMode == .notes else { return [] }
+        if selection.count == 1, let only = selection.first { return [only] }
+        return exportableSelection
+    }
 
     /// What File ▸ Export… and Print… act on (W49.notes-export-print): the selected rows, in list order. Empty
     /// while the list is not showing (templates, the Trash).

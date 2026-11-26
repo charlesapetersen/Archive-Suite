@@ -38,7 +38,7 @@ struct NoteBulkInspector: View {
         let items = selectedItems
         let ids = items.map(\.id)
         VStack(alignment: .leading, spacing: 14) {
-            Text("\(nav.selection.count) items selected")
+            Text("\(items.count) items selected")
                 .font(.headline)
                 .accessibilityIdentifier("an.bulk.count")
             qualitySection(items, ids: ids)
@@ -91,6 +91,7 @@ struct NoteBulkInspector: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("an.bulk.tags.tokens")
             }
             SubjectEntryField(draft: $draft, placeholder: "Add tag to all…", identifier: "an.bulk.tags.input",

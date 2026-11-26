@@ -120,7 +120,8 @@ enum NotesItemContextMenu {
         let delete = NSMenuItem(title: selection.count > 1 ? "Delete \(selection.count) Notes…" : "Delete…",
                                 action: #selector(NotesMenuAction.fire), keyEquivalent: "\u{8}")
         delete.keyEquivalentModifierMask = .command
-        let deleteAction = NotesMenuAction { nav.requestDeleteItems(orderedIDs) }
+        let deletable = orderedIDs.filter { id in summaries.contains { $0.id == id } }
+        let deleteAction = NotesMenuAction { nav.requestDeleteItems(deletable) }
         delete.target = deleteAction
         delete.representedObject = deleteAction
         menu.addItem(delete)

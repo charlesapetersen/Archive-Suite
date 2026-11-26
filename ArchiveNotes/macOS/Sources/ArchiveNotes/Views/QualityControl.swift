@@ -21,6 +21,8 @@ struct QualityFacetRow: View {
                 facetButton("\(q)", current: !isMixed && quality == q) { onSet(q) }
             }
         }
+        // A container, so the buttons keep their own labels under the row's identifier.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
     }
 

@@ -745,7 +745,9 @@ private struct NoteInspectorPanel: View {
             } else if nav.paneMode == .notes, !nav.showingTemplates, nav.selection.count > 1 {
                 // Several notes: Quality and Tags for them all (W49.notes-multiselect-actions).
                 ScrollView {
+                    // Keyed by the selection, so a tag half-typed for one set of notes is not offered to the next.
                     NoteBulkInspector(nav: nav)
+                        .id(nav.selection)
                         .padding(.trailing, scrollerTrailing)
                 }
             } else if nav.showingTemplates,

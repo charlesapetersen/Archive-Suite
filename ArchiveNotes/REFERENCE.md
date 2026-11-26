@@ -389,6 +389,9 @@ macOS/Sources/ArchiveNotes/
                                    pasteboardWriterForRow, id-only) + accent-glyph replicant title styling (W6-S5)
     QualityControl.swift           Inspector facet buttons plus compact borderless list menu; both call
                                    the existing quality setter (W9.d4)
+    NoteBulkInspector.swift        The inspector with several notes selected: Quality and Tags (add on Return,
+                                   ✕ removes) for them all, each note saved on its own; `NoteBulkTags` counts
+                                   the tags across them, also for the row menu's Remove Tag (W49.notes-multiselect-actions)
     NotesFilterBar.swift           Item-list filter bar: kind segmented control · keyword search (FTS,
                                    bm25 relevance as-you-type) · quality ★1–★3 toggles · tag chips
                                    (all must match; Any is Advanced Search's) · year date range + its own
