@@ -70,6 +70,8 @@ struct ReOCRJob {
         /// Zero-based image page indexes replaced by the candidate. Nil when there is nothing to accept.
         let replacedImagePages: Set<Int>?
         let candidateProblem: String?
+        /// What acceptance does to the file's catalogue record (`ReOCRCatalogue`).
+        var catalogue: ReOCRCatalogue.Plan = .none
     }
 
     enum Failure: Error, Equatable, CustomStringConvertible {
@@ -185,16 +187,36 @@ struct ReOCRJob {
             try? writer.reject(op)
             throw error
         }
-        func review(_ candidate: Data? = nil, updatedLayers: Set<Int>? = nil, problem: String? = nil) -> Review {
+        func review(_ candidate: Data? = nil, updatedLayers: Set<Int>? = nil, problem: String? = nil,
+                    catalogue: ReOCRCatalogue.Plan = .none) -> Review {
             Review(operation: op, key: key, reviewedGeneration: reviewed.generation, flaggedAtReview: flaggedAtReview,
-                   results: results, candidate: candidate, replacedImagePages: updatedLayers, candidateProblem: problem)
+                   results: results, candidate: candidate, replacedImagePages: updatedLayers, candidateProblem: problem,
+                   catalogue: catalogue)
         }
         guard results.allSatisfy({ (try? $0.outcome.get()) != nil }) else { return review() }
+        let updated: (bytes: Data, layerPages: Set<Int>)
         do {
-            let updated = try ReOCRIncrementalWriter.candidate(original: original, replacements: replacements, layers: layers)
-            return review(updated.bytes, updatedLayers: updated.layerPages)
+            updated = try ReOCRIncrementalWriter.candidate(original: original, replacements: replacements, layers: layers)
         } catch {
             return review(problem: "\(error)")
+        }
+        // New text is a new content generation: a verified catalogue pair gets it in the candidate's identity, and the
+        // job's record keeps the step so the companion follows after publication, at launch recovery too.
+        let catalogue = ReOCRCatalogue.plan(
+            root: root.url, relativePath: ReOCRImageInput.storedPath(of: file, in: root.url) ?? key.relativePath,
+            snapshot: original)
+        guard case .advance(let step) = catalogue else {
+            return review(updated.bytes, updatedLayers: updated.layerPages, catalogue: catalogue)
+        }
+        do {
+            let stamped = try ReOCRCatalogue.stamp(updated.bytes, for: step)
+            var planned = record
+            planned.catalogue = step
+            try writer.writeRecord(planned, named: Record.file, for: op.journal.operationID)
+            return review(stamped, updatedLayers: updated.layerPages, catalogue: catalogue)
+        } catch {
+            return review(problem: "The new text could not be given its catalogue record's new version: \(error)",
+                          catalogue: catalogue)
         }
     }
 
@@ -215,6 +237,10 @@ struct ReOCRJob {
         var restoredBy: UUID?
         /// A restore's re-flag outcome.
         var reflag: ReflagOutcome?
+        /// The catalogue companion's move to the published generation (`ReOCRCatalogue`); nil: the file has none to move.
+        var catalogue: ReOCRCatalogue.Step?
+        /// Nil until tried; a `failed` move is retried by `recover`.
+        var catalogueOutcome: ReOCRCatalogue.Outcome?
 
         static let file = "job.json"
     }
@@ -237,6 +263,8 @@ struct ReOCRJob {
         let flag: FlagOutcome
         /// Nil when the job's record was updated; else a later `recover` may repeat a settled step's check.
         let recordProblem: String?
+        /// Nil when the file has no catalogue record to move.
+        let catalogue: ReOCRCatalogue.Outcome?
     }
 
     /// Publishes, then records the receipt, then clears the reviewed flag. The publication throws: before the swap the
@@ -247,20 +275,26 @@ struct ReOCRJob {
         guard let candidate = review.candidate else { throw Failure.noCandidate }
         try flags.checkSuitable()
         let journal = try writer.accept(review.operation, candidate: candidate)
-        let fallback = Record(operationID: journal.operationID, key: review.key, reviewedGeneration: review.reviewedGeneration,
+        var fallback = Record(operationID: journal.operationID, key: review.key, reviewedGeneration: review.reviewedGeneration,
                               flaggedAtReview: review.flaggedAtReview, textPages: review.results.map(\.pair.textIndex))
+        if case .advance(let step) = review.catalogue { fallback.catalogue = step }
         let done = finish(journal, fallback: fallback)
-        return Accepted(journal: journal, receiptProblem: done.receiptProblem, flag: done.flag, recordProblem: done.recordProblem)
+        return Accepted(journal: journal, receiptProblem: done.receiptProblem, flag: done.flag, recordProblem: done.recordProblem,
+                        catalogue: done.catalogue)
     }
 
-    /// The steps after a publication, from the job's record: the receipt if not yet written, then the flag unless it
-    /// is settled. Records each outcome. Used by `accept` and by `recover` after a relaunch.
+    /// The steps after a publication, from the job's record: the catalogue companion's move unless it is settled, the
+    /// receipt if not yet written, then the flag unless it is settled. Records each outcome. Used by `accept` and by
+    /// `recover` after a relaunch (for a restore's record too: its own move, receipt and flag barrier).
     private func finish(_ journal: ReOCRFileWriter.Journal, fallback: Record? = nil)
-        -> (receiptProblem: String?, flag: FlagOutcome, recordProblem: String?) {
+        -> (receiptProblem: String?, flag: FlagOutcome, recordProblem: String?, catalogue: ReOCRCatalogue.Outcome?) {
         let id = journal.operationID
         guard var record = (try? writer.readRecord(Record.self, named: Record.file, for: id)) ?? fallback else {
-            return ("the job's record cannot be read", .failed("the job's record cannot be read"), "the job's record cannot be read")
+            return ("the job's record cannot be read", .failed("the job's record cannot be read"), "the job's record cannot be read",
+                    nil)
         }
+        // Before the receipt, so the Reader that re-reads the file finds the record at its new generation.
+        settleCatalogue(&record)
         var receiptProblem: String?
         if !record.receiptWritten {
             do {
@@ -286,7 +320,14 @@ struct ReOCRJob {
         record.flag = flag
         var recordProblem: String?
         do { try writer.writeRecord(record, named: Record.file, for: id) } catch { recordProblem = "\(error)" }
-        return (receiptProblem, flag, recordProblem)
+        return (receiptProblem, flag, recordProblem, record.catalogueOutcome)
+    }
+
+    /// The companion's move for a published operation, unless it is settled, or a restore has since put the old
+    /// generation back (that restore's own record moves the companion back).
+    private func settleCatalogue(_ record: inout Record) {
+        guard let step = record.catalogue, record.restoredBy == nil, record.catalogueOutcome?.isSettled != true else { return }
+        record.catalogueOutcome = ReOCRCatalogue.settle(step)
     }
 
     /// The receipt for a published operation: `published` for an acceptance, `restored` for a restore. Before and after
@@ -436,6 +477,8 @@ struct ReOCRJob {
         let journal: ReOCRFileWriter.Journal
         let receiptProblem: String?
         let flag: ReflagOutcome
+        /// Nil when the file has no catalogue record to move back.
+        let catalogue: ReOCRCatalogue.Outcome?
     }
 
     /// Puts back the text an accepted operation replaced (plan §5): its own guarded transaction through
@@ -461,6 +504,9 @@ struct ReOCRJob {
         var own = Record(operationID: op.journal.operationID, key: record.key, reviewedGeneration: nil,
                          flaggedAtReview: false, textPages: record.textPages)
         own.restores = accepted
+        // The kept original carries the generation acceptance moved the companion from; move it back. A Reader
+        // correction made since acceptance is in the companion and stays.
+        own.catalogue = record.catalogue?.reversed
         do {
             // What `prepare` kept is what is overwritten: it must still be the accepted revision, the published file.
             guard op.journal.original.sha256 == acceptedSHA, op.journal.original.inode == journal.stagedInode else {
@@ -482,6 +528,7 @@ struct ReOCRJob {
             }
             throw failure
         }
+        settleCatalogue(&own)
         var receiptProblem: String?
         do {
             try writeReceipt(own, restored)
@@ -493,7 +540,7 @@ struct ReOCRJob {
         record.restoredBy = restored.operationID
         try? writer.writeRecord(record, named: Record.file, for: accepted)
         try? writer.writeRecord(own, named: Record.file, for: restored.operationID)
-        return Restored(journal: restored, receiptProblem: receiptProblem, flag: flag)
+        return Restored(journal: restored, receiptProblem: receiptProblem, flag: flag, catalogue: own.catalogueOutcome)
     }
 
     private func reflag(_ record: Record, accepted: ReOCRFileWriter.Journal, restore: ReOCRFileWriter.Journal) -> ReflagOutcome {

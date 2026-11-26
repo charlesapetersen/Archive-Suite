@@ -37,6 +37,28 @@ final class CataloguePDFIdentityTests: XCTestCase {
         }
     }
 
+    func testReplacingNamesANewGenerationOfTheSameFileOnly() throws {
+        let headers = ["Extracted text.\nOriginal & copy"]
+        let old = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+        let written = try XCTUnwrap(old.adding(to: XCTUnwrap(PDFHeaderCarrier.adding(pages: headers, to: packet))))
+        let new = CataloguePDFIdentity(fileID: old.fileID, contentRevision: UUID())
+        let replaced = try XCTUnwrap(new.replacing(old, in: written))
+        XCTAssertEqual(CataloguePDFIdentity.identity(inXMP: replaced), new)
+        XCTAssertEqual(PDFHeaderCarrier.pages(inXMP: replaced), headers)
+        XCTAssertEqual(replaced.count, written.count)
+        XCTAssertEqual(try XCTUnwrap(old.replacing(new, in: replaced)), written)
+        // A lowercase identity written elsewhere is still found.
+        let lower = Data(String(decoding: written, as: UTF8.self)
+            .replacingOccurrences(of: old.contentRevision.uuidString, with: old.contentRevision.uuidString.lowercased())
+            .replacingOccurrences(of: old.fileID.uuidString, with: old.fileID.uuidString.lowercased()).utf8)
+        XCTAssertEqual(new.replacing(old, in: lower).flatMap(CataloguePDFIdentity.identity(inXMP:)), new)
+        // Another file, the same generation, a packet naming another identity, or none: refused.
+        XCTAssertNil(CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID()).replacing(old, in: written))
+        XCTAssertNil(old.replacing(old, in: written))
+        XCTAssertNil(new.replacing(CataloguePDFIdentity(fileID: old.fileID, contentRevision: UUID()), in: written))
+        XCTAssertNil(new.replacing(old, in: packet))
+    }
+
     func testBorrowedDescriptorSurvivesRenameAndKeepsItsOffset() throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }

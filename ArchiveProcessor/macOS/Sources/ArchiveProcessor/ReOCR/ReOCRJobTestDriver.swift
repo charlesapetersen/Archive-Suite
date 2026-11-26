@@ -210,6 +210,8 @@ enum ReOCRJobTestDriver {
             try await testRawScanWithVisibleText()
             // 18. Preservation Copies as the input (W49.proc-reocr-preservation).
             await ReOCRImageInputTestDriver.run(in: root) { check($0, $1, $2) }
+            // 19. The catalogue record through Improve OCR and Restore (W49.proc-item-fields-rerun).
+            await ReOCRCatalogueTestDriver.run(in: root) { check($0, $1, $2) }
 
             // 6. Changed between run and accept.
             try await testSection6()

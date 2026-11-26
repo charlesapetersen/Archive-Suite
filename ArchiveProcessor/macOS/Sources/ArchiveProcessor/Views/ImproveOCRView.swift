@@ -318,6 +318,7 @@ final class ImproveOCRController: ObservableObject {
                 if done.receiptProblem != nil || done.recordProblem != nil {
                     text += " Its record for the Reader is not finished yet; it will be completed at the next launch."
                 }
+                if let problem = done.catalogue?.problem { text += " " + problem }
             } catch {
                 text = "Could not finish accepting: \(error)"
                 let id = review.operation.journal.operationID
@@ -523,7 +524,7 @@ struct ImproveOCRHistoryView: View {
                            support: s.url)
         busy = true
         Task {
-            let text: String
+            var text: String
             do {
                 let r = try await ImproveOCRWork.perform { try job.restore(entry.id) }
                 switch r.flag {
@@ -532,6 +533,7 @@ struct ImproveOCRHistoryView: View {
                 case .changedSinceClear(let why): text = "The old text is back. The flag was left: \(why)."
                 case .failed(let why): text = "The old text is back; the flag could not be put back (\(why))."
                 }
+                if let problem = r.catalogue?.problem { text += " " + problem }
             } catch { text = "\(error)" }
             note = text
             entries = ReOCRHistory(writer: job.writer).entries()
@@ -717,6 +719,10 @@ struct ImproveOCRView: View {
                 if let review = controller.reviews[fileID] {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(URL(fileURLWithPath: fileID).lastPathComponent).font(.headline)
+                        if let catalogue = review.catalogue.summary {
+                            Text(catalogue).font(.caption).foregroundStyle(.secondary)
+                                .accessibilityIdentifier("ap.reocr.catalogue")
+                        }
                         ForEach(review.results, id: \.pair.textIndex) { r in
                             VStack(alignment: .leading, spacing: 6) {
                                 if let replaced = review.replacedImagePages {

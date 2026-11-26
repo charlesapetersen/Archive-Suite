@@ -57,6 +57,23 @@ public struct CataloguePDFIdentity: Equatable, Sendable {
         return candidate
     }
 
+    /// A packet carrying `old` with this identity in its place: an explicit content operation's new generation of the
+    /// same file. Only the identity text changes, so the page headers and the extension schema stay as written. Nil
+    /// unless the packet carries exactly `old` once, in the form `adding(to:)` writes, and this is the same file.
+    public func replacing(_ old: Self, in packet: Data) -> Data? {
+        guard old.fileID == fileID, old.contentRevision != contentRevision,
+              Self.identity(inXMP: packet) == old, let text = String(data: packet, encoding: .utf8) else { return nil }
+        let written = "\(old.fileID.uuidString) \(old.contentRevision.uuidString)"
+        guard let before = [written, written.lowercased()].map({ "<ascat:identity>\($0)</ascat:identity>" })
+                .first(where: { text.contains($0) }),
+              let range = text.range(of: before), !text[range.upperBound...].contains(before) else { return nil }
+        let after = "<ascat:identity>\(fileID.uuidString) \(contentRevision.uuidString)</ascat:identity>"
+        let candidate = Data(text.replacingCharacters(in: range, with: after).utf8)
+        guard candidate.count == packet.count, Self.parse(candidate)?.schemaCount == Self.parse(packet)?.schemaCount,
+              Self.identity(inXMP: candidate) == self else { return nil }
+        return candidate
+    }
+
     public static func identity(inXMP packet: Data) -> Self? {
         guard let reader = parse(packet), reader.count == 1, !reader.malformed else { return nil }
         let identifiers = reader.value.split(separator: " ", omittingEmptySubsequences: false)

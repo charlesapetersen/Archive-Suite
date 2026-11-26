@@ -35,27 +35,51 @@ enum SearchableArchival {
     /// selected input stays untouched, and the candidate must preserve every active page and its
     /// rendering, document information, catalog and existing XMP before it can become a working PDF.
     static func catalogueCopy(of source: URL, identity: CataloguePDFIdentity) throws -> Data {
-        guard let qpdf = CompressedPage.qpdf else { throw Failure.noQPDF }
-        let original = try Data(contentsOf: source)
-        try ReOCRIncrementalWriter.eligibility(of: original).get()
-        guard let originalDoc = ReOCRPreservationCheck.document(original), originalDoc.numberOfPages > 0,
-              let catalog = originalDoc.catalog else { throw PDFError.sourceUnreadable(source) }
-        let packet: Data
-        if CGPDFDictionaryGetObject(catalog, "Metadata", nil) {
-            guard let existing = ReOCRPreservationCheck.metadata(of: originalDoc, requireKnownStreamKeys: true) else {
-                throw Failure.check("the source metadata could not be read")
-            }
-            packet = existing
-        } else {
-            packet = Data("""
+        try withCatalogueMetadata(Data(contentsOf: source), identity: identity,
+                                  unreadable: PDFError.sourceUnreadable(source)) { existing in
+            let packet = existing ?? Data("""
                 <x:xmpmeta xmlns:x="adobe:ns:meta/">
                 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
                 </rdf:RDF></x:xmpmeta>
                 """.utf8)
+            guard let xmp = identity.adding(to: packet) else {
+                throw Failure.check("the source metadata could not safely carry a new identity")
+            }
+            return xmp
         }
-        guard let xmp = identity.adding(to: packet) else {
-            throw Failure.check("the source metadata could not safely carry a new identity")
+    }
+
+    /// Improve OCR's verified candidate as the file's next content generation (W49.proc-item-fields-rerun): the same
+    /// pages and the same metadata with `identity` in place of `old`, checked the same way as `catalogueCopy`. A full
+    /// qpdf save, so the candidate no longer keeps the original's bytes as a prefix; Processor history keeps those.
+    static func nextGeneration(of candidate: Data, replacing old: CataloguePDFIdentity,
+                               with identity: CataloguePDFIdentity) throws -> Data {
+        try withCatalogueMetadata(candidate, identity: identity,
+                                  unreadable: Failure.check("the revised PDF could not be read")) { existing in
+            guard let existing, let xmp = identity.replacing(old, in: existing) else {
+                throw Failure.check("the revised PDF's metadata could not safely carry its new content generation")
+            }
+            return xmp
         }
+    }
+
+    /// `original` with its catalog's XMP replaced by what `metadata` makes of the existing packet (nil: none), as a
+    /// full qpdf save that keeps every stream as it is; refused unless the preservation check finds only that change
+    /// and the result reads back `identity`.
+    private static func withCatalogueMetadata(_ original: Data, identity: CataloguePDFIdentity, unreadable: Error,
+                                              metadata: (Data?) throws -> Data) throws -> Data {
+        guard let qpdf = CompressedPage.qpdf else { throw Failure.noQPDF }
+        try ReOCRIncrementalWriter.eligibility(of: original).get()
+        guard let originalDoc = ReOCRPreservationCheck.document(original), originalDoc.numberOfPages > 0,
+              let catalog = originalDoc.catalog else { throw unreadable }
+        var existing: Data?
+        if CGPDFDictionaryGetObject(catalog, "Metadata", nil) {
+            guard let packet = ReOCRPreservationCheck.metadata(of: originalDoc, requireKnownStreamKeys: true) else {
+                throw Failure.check("the source metadata could not be read")
+            }
+            existing = packet
+        }
+        let xmp = try metadata(existing)
 
         let budget = PDFChildBudget(seconds: PDFChildBudget.secondsPerPage * Double(originalDoc.numberOfPages))
         let fm = FileManager.default

@@ -31,7 +31,7 @@ ALLOW=(
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift${SEP}try PDFGenerator.installArchival(candidate, at: mergedURL, replacingExisting: false)"
   # W49.storage-processor: the DEBUG recovery driver stages a synthetic PDF carrying the companion's
   # catalogue identity. All calls write under its UUID-named test directory with isolated backup enabled.
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/Capture/LiveCaptureRecoveryTestDriver.swift${SEP}try? PDFGenerator.writeArchival(document, to: pdf, catalogueIdentity: identity)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/Capture/LiveCaptureRecoveryFinalizeTests.swift${SEP}try? PDFGenerator.writeArchival(document, to: pdf, catalogueIdentity: identity)"
   # W49.proc-reocr-preservation: the Improve OCR input test (DEBUG only) writes a two-page PDF standing in for a
   # scanner's intake original, under its scratch folder. It is a fixture input, never app output.
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRImageInputTestDriver.swift${SEP}guard original.write(to: scan) else { throw CocoaError(.fileWriteUnknown) }"

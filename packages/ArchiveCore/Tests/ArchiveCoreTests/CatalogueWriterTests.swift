@@ -340,6 +340,88 @@ struct CatalogueWriterTests {
 
     private enum Interruption: Error { case stop }
 
+    @Test func contentRevisionAdvanceKeepsEveryFieldAndCheckThroughReplaceAndRestore() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let writer = CatalogueWriter(reader: try fixture.reader())
+        let title = CatalogueEdit.Target.document(fixture.document, .title)
+        let place = CatalogueEdit.Target.document(fixture.document, .recipientPlaces)
+        let corrected = try writer.save([.init(title, .set(.text("Corrected"))), .init(place, .clear)],
+                                        basedOn: fixture.selection())
+        let checked = try writer.save([.init(title, .check(true))], basedOn: corrected.after)
+        let before = checked.after.pair.record
+
+        // Improve OCR: new bytes prove a new generation; the pair is mismatched until the companion follows.
+        let improved = UUID()
+        try fixture.replacePDF(content: improved)
+        #expect(throws: (any Error).self) { try fixture.selection() }
+        #expect(throws: CatalogueWriter.ContentRevisionRefusal.companionNotAtExpectedRevision(found: fixture.content)) {
+            try writer.advanceContentRevision(at: checked.after.pair.occurrence, fileID: fixture.file,
+                                              from: UUID(), to: improved)
+        }
+        let advanced = try writer.advanceContentRevision(at: checked.after.pair.occurrence, fileID: fixture.file,
+                                                         from: fixture.content, to: improved)
+        #expect(advanced.recoveryArtifact != nil)
+        let after = advanced.after.pair.record
+        #expect(after.contentRevision == improved && after.parents == [before.revision])
+        #expect(try unchangedExceptRevisions(before, after))
+        #expect(after.documents.first?.fields?.title?.isChecked == true)
+        #expect(try fixture.selection().revision == advanced.after.revision)
+        // Repeating the step (a recovery) verifies and leaves the record alone.
+        let repeated = try writer.advanceContentRevision(at: checked.after.pair.occurrence, fileID: fixture.file,
+                                                         from: fixture.content, to: improved)
+        #expect(repeated.recoveryArtifact == nil && repeated.after.revision == advanced.after.revision)
+
+        // A Reader correction on the improved generation, then Restore puts the old bytes back.
+        let later = try writer.save([.init(.file(.quality), .set(.rating(2)))], basedOn: fixture.selection())
+        try fixture.pdfBytes.write(to: fixture.pdf, options: .atomic)
+        let restored = try writer.advanceContentRevision(at: later.after.pair.occurrence, fileID: fixture.file,
+                                                         from: improved, to: fixture.content)
+        let final = restored.after.pair.record
+        #expect(final.contentRevision == fixture.content)
+        #expect(try unchangedExceptRevisions(later.after.pair.record, final))
+        if case .value(2)? = final.fileFields.quality?.current {} else { Issue.record("Later correction was lost") }
+        #expect(final.documents.first?.fields?.title?.isChecked == true)
+        #expect(try Data(contentsOf: fixture.pdf) == fixture.pdfBytes)
+    }
+
+    @Test func contentRevisionAdvanceRefusesAnUnprovenPDFOrChangedPages() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let writer = CatalogueWriter(reader: try fixture.reader())
+        let occurrence = try fixture.selection().pair.occurrence
+        let companion = try Data(contentsOf: fixture.companion)
+        #expect(throws: CatalogueWriter.ContentRevisionRefusal.pdfNotAtNewRevision) {
+            try writer.advanceContentRevision(at: occurrence, fileID: fixture.file, from: fixture.content, to: UUID())
+        }
+        #expect(throws: CatalogueWriter.ContentRevisionRefusal.pdfNotAtNewRevision) {
+            try writer.advanceContentRevision(at: occurrence, fileID: UUID(), from: fixture.content, to: fixture.content)
+        }
+        let improved = UUID()
+        try fixture.replacePDF(content: improved, pages: 2)
+        #expect(throws: CatalogueWriter.ContentRevisionRefusal.pageCountChanged) {
+            try writer.advanceContentRevision(at: occurrence, fileID: fixture.file, from: fixture.content, to: improved)
+        }
+        try Data("not a pdf".utf8).write(to: fixture.pdf, options: .atomic)
+        #expect(throws: CatalogueWriter.ContentRevisionRefusal.pdfNotAtNewRevision) {
+            try writer.advanceContentRevision(at: occurrence, fileID: fixture.file, from: fixture.content, to: improved)
+        }
+        #expect(try Data(contentsOf: fixture.companion) == companion)
+    }
+
+    /// Every top-level key but the three a content advance owns is byte-identical.
+    private func unchangedExceptRevisions(_ before: CatalogueRecord, _ after: CatalogueRecord) throws -> Bool {
+        let owned: Set<String> = ["contentRevision", "revision", "parents"]
+        guard let old = try JSONSerialization.jsonObject(with: before.originalJSON) as? [String: Any],
+              let new = try JSONSerialization.jsonObject(with: after.originalJSON) as? [String: Any],
+              Set(old.keys) == Set(new.keys) else { return false }
+        return try old.keys.filter { !owned.contains($0) }.allSatisfy { key in
+            let options: JSONSerialization.WritingOptions = [.sortedKeys, .fragmentsAllowed]
+            return try JSONSerialization.data(withJSONObject: old[key]!, options: options)
+                == JSONSerialization.data(withJSONObject: new[key]!, options: options)
+        }
+    }
+
     private struct Fixture: Sendable {
         let root: URL
         let pdf: URL
@@ -348,18 +430,16 @@ struct CatalogueWriterTests {
         let rootID = UUID()
         let document = UUID()
         let path = "Letter.PDF"
+        let file = UUID()
+        let content = UUID()
 
         init() throws {
             root = FileManager.default.temporaryDirectory.appendingPathComponent("catalogue-writer-\(UUID())")
             pdf = root.appendingPathComponent(path)
             companion = root.appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: path))
-            let file = UUID()
-            let content = UUID()
-            let documentPDF = PDFDocument()
-            documentPDF.insert(PDFPage(), at: 0)
-            documentPDF.documentAttributes = [PDFDocumentAttribute.titleAttribute: file.uuidString,
-                                              PDFDocumentAttribute.subjectAttribute: content.uuidString]
-            pdfBytes = try #require(documentPDF.dataRepresentation())
+            let file = self.file
+            let content = self.content
+            pdfBytes = try Self.pdf(file: file, content: content)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
             try pdfBytes.write(to: pdf)
             try Data("""
@@ -384,6 +464,19 @@ struct CatalogueWriterTests {
 
         func selection() throws -> ItemFacts.FileFacts {
             try reader().snapshot(.init(relativePDFPaths: [path], isComplete: true)).facts(at: path).file.get()
+        }
+
+        static func pdf(file: UUID, content: UUID, pages: Int = 1) throws -> Data {
+            let documentPDF = PDFDocument()
+            for index in 0..<pages { documentPDF.insert(PDFPage(), at: index) }
+            documentPDF.documentAttributes = [PDFDocumentAttribute.titleAttribute: file.uuidString,
+                                              PDFDocumentAttribute.subjectAttribute: content.uuidString]
+            return try #require(documentPDF.dataRepresentation())
+        }
+
+        /// A content operation's replacement of the PDF: new bytes at the same path proving `content`.
+        func replacePDF(content: UUID, pages: Int = 1) throws {
+            try Self.pdf(file: file, content: content, pages: pages).write(to: pdf, options: .atomic)
         }
 
         func cleanUp() { try? FileManager.default.removeItem(at: root) }

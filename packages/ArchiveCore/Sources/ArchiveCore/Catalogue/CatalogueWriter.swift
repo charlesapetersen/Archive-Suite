@@ -84,7 +84,8 @@ public struct CatalogueWriter: Sendable {
                     guard !changed.isEmpty else { throw CatalogueRecord.Invalid.inconsistentRecord }
                     let artifact = CatalogueEditArtifact(filename: filename, pdf: base.pdfVersion.identity,
                                                          before: live.facts.pair.record, after: candidate)
-                    let staged = try stage(candidate, as: artifact.name, replacing: live, in: scope) {
+                    let staged = try stage(candidate, as: artifact.name, replacing: live.version, companion: scope.companion,
+                                           root: scope.root, parent: scope.parent) {
                         recoveryArtifact = artifact.name
                     }
                     try boundary(.staged)
@@ -125,7 +126,8 @@ public struct CatalogueWriter: Sendable {
                             throw Failure.changedDuringSave
                         }
                     } catch {
-                        try restore(published: published, displaced: displaced, artifact: artifact.name, in: scope)
+                        try restore(published: published, displaced: displaced, artifact: artifact.name,
+                                    companion: scope.companion, root: scope.root, parent: scope.parent)
                         throw error
                     }
                     try sync(parent.descriptor, operation: "flush exchange")
@@ -192,19 +194,18 @@ public struct CatalogueWriter: Sendable {
         return try body()
     }
 
-    private func stage(_ record: CatalogueRecord, as name: String,
-                       replacing live: (facts: ItemFacts.FileFacts, version: CatalogueReadDirectory.FileVersion),
-                       in scope: Scope, created: () -> Void) throws -> CatalogueReadDirectory.FileVersion {
-        let parent = scope.parent
-        try reader.validateScope(root: scope.root, parent: parent)
-        try requireWritableCompanion(scope.companion, in: parent)
+    func stage(_ record: CatalogueRecord, as name: String, replacing live: CatalogueReadDirectory.FileVersion,
+               companion: String, root: CatalogueReadDirectory.Entry, parent: CatalogueReadDirectory.Entry,
+               created: () -> Void) throws -> CatalogueReadDirectory.FileVersion {
+        try reader.validateScope(root: root, parent: parent)
+        try requireWritableCompanion(companion, in: parent)
         let fd = try createExclusive(name, in: parent)
         created()
         defer { close(fd) }
         try write(record.originalJSON, to: fd)
         // Preserve permissions, ACLs and xattrs of the existing JSON. Never open a PDF for writing.
-        try reader.directory.withFile(scope.companion, in: parent, artifact: .companion) { source in
-            guard CatalogueReadDirectory.FileVersion(source.info) == live.version else { throw Failure.changedDuringSave }
+        try reader.directory.withFile(companion, in: parent, artifact: .companion) { source in
+            guard CatalogueReadDirectory.FileVersion(source.info) == live else { throw Failure.changedDuringSave }
             guard fcopyfile(source.descriptor, fd, nil, copyfile_flags_t(COPYFILE_METADATA)) == 0 else {
                 throw Failure.io(operation: "copy companion filesystem metadata", code: errno)
             }
@@ -244,7 +245,7 @@ public struct CatalogueWriter: Sendable {
         }
     }
 
-    private func version(of name: String, in parent: CatalogueReadDirectory.Entry) throws -> CatalogueReadDirectory.FileVersion {
+    func version(of name: String, in parent: CatalogueReadDirectory.Entry) throws -> CatalogueReadDirectory.FileVersion {
         var info = stat()
         guard fstatat(parent.descriptor, name, &info, AT_SYMLINK_NOFOLLOW) == 0 else {
             throw Failure.io(operation: "inspect exchanged name", code: errno)
@@ -252,20 +253,21 @@ public struct CatalogueWriter: Sendable {
         return .init(info)
     }
 
-    private func restore(published: CatalogueReadDirectory.FileVersion, displaced: CatalogueReadDirectory.FileVersion,
-                         artifact: String, in scope: Scope) throws {
+    func restore(published: CatalogueReadDirectory.FileVersion, displaced: CatalogueReadDirectory.FileVersion,
+                 artifact: String, companion: String, root: CatalogueReadDirectory.Entry,
+                 parent: CatalogueReadDirectory.Entry) throws {
         // Restore an external edit that won the race to the swap, even if it was unreadable.
         // Neither path is followed or deleted. If a name changed again, leave both for recovery.
-        guard try version(of: scope.companion, in: scope.parent) == published,
-              try version(of: artifact, in: scope.parent) == displaced else {
+        guard try version(of: companion, in: parent) == published,
+              try version(of: artifact, in: parent) == displaced else {
             throw Failure.changedDuringSave
         }
-        try reader.validateScope(root: scope.root, parent: scope.parent)
-        try exchange(artifact, with: scope.companion, in: scope.parent)
-        try sync(scope.parent.descriptor, operation: "flush restored companion")
+        try reader.validateScope(root: root, parent: parent)
+        try exchange(artifact, with: companion, in: parent)
+        try sync(parent.descriptor, operation: "flush restored companion")
     }
 
-    private func exchange(_ artifact: String, with companion: String, in parent: CatalogueReadDirectory.Entry) throws {
+    func exchange(_ artifact: String, with companion: String, in parent: CatalogueReadDirectory.Entry) throws {
         guard renameatx_np(parent.descriptor, artifact, parent.descriptor, companion, UInt32(RENAME_SWAP)) == 0 else {
             throw Failure.io(operation: "exchange companion", code: errno)
         }
