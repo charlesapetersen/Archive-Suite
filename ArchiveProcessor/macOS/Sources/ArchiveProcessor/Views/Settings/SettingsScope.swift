@@ -89,14 +89,6 @@ final class SettingsScopeModel: ObservableObject {
         updateCollection { $0.collection.reset(key) }
     }
 
-    /// Clear `key` from every layer this collection reads (the Advanced tab's Reset all).
-    func clearEverywhere(_ key: SettingsKey) {
-        let outcome = SettingsSheetWriter(store: store, folder: effectiveScope == .collection ? folder : nil)
-            .clear(key, doc: doc)
-        doc = outcome.doc
-        problem = outcome.ok ? nil : store.lastProblem
-    }
-
     func updateCollection(_ change: (inout CollectionSettingsDocument) -> Void) {
         guard let folder else { return }
         if let written = store.updateCollection(in: folder, change) {
@@ -137,8 +129,10 @@ struct LayeredSourceLine: View {
 
     var body: some View {
         let resolved = scope.resolve(key)
+        // Nothing set in any layer: the built-in value, said plainly rather than as the interview's skip answer.
+        let source = resolved.layer == nil ? "Default" : resolved.sourceText.prefix(1).uppercased() + resolved.sourceText.dropFirst()
         HStack(alignment: .firstTextBaseline) {
-            Text(resolved.sourceText.prefix(1).uppercased() + resolved.sourceText.dropFirst() + ".")
+            Text(source + ".")
                 .font(.caption2).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("ap.settings.source.\(key.rawValue)")

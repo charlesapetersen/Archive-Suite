@@ -84,6 +84,7 @@ struct SettingsReaderPicker: View {
     @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel = false
     @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName = ""
     @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL = ""
+    @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID = ""
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
     @AppStorage(DefaultsKeys.offerExperimentalRoutes) private var offerExperimental = false
     @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
@@ -109,7 +110,7 @@ struct SettingsReaderPicker: View {
     }
 
     private var gatewayName: String {
-        if gatewayBaseURL.isEmpty { return "Gateway (set up in Advanced)" }
+        if gatewayBaseURL.isEmpty || gatewayModelID.isEmpty { return "Gateway (set up in Advanced)" }
         let name = gatewayDisplayName.isEmpty ? "Gateway" : gatewayDisplayName
         return gatewayLocalModel ? "\(name) (local server on this Mac)" : "\(name) (gateway)"
     }
@@ -150,7 +151,7 @@ struct SettingsReaderPicker: View {
             }
             if p == .openrouter { openRouterModelNote }
         } else if choice == .gateway {
-            Text(gatewayBaseURL.isEmpty
+            Text(gatewayBaseURL.isEmpty || gatewayModelID.isEmpty
                  ? "Set the gateway's address and model in Settings › Advanced › Custom endpoints."
                  : "The gateway's address, model and prices are in Settings › Advanced; its key is in Settings › Accounts.")
                 .font(.caption).foregroundStyle(.primary)

@@ -65,11 +65,11 @@ struct SettingsOutputTab: View {
         Binding(get: {
             let entries = searchable
             if entries.isEmpty { return .imageAndText }
-            return entries == ["*/*"] ? .searchable : .custom
+            return entries == SettingsAdvanced.searchableEverywhere ? .searchable : .custom
         }, set: { form in
             switch form {
             case .imageAndText: scope.set(.searchableFor, .strings([]))
-            case .searchable: scope.set(.searchableFor, .strings(["*/*"]))
+            case .searchable: scope.set(.searchableFor, .strings(SettingsAdvanced.searchableEverywhere))
             case .custom: break
             }
         })

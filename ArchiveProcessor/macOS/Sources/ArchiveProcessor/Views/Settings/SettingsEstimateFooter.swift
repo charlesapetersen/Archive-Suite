@@ -86,7 +86,8 @@ struct SettingsEstimateFooter: View {
               let model = useGateway ? gatewayModel : selectedModel else { return nil }
         let tagging = taggingMode.llmTags
         let gateway = GatewayConfig.fromDefaults()
-        let settings = scope.resolver
+        // The layers the run will read: the output folder's collection, whichever scope the window edits.
+        let settings = scope.store.resolver(for: scope.doc)
         let namesCallShare = EntityRunPolicy.estimatedCallShare(
             taggingMode: taggingMode, gateway: gateway, usesLocalAgent: false, usesVision: false,
             setting: { settings.resolve($0).value })
@@ -113,10 +114,11 @@ struct SettingsEstimateFooter: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
+                // The line a reader and the UI suite read as the estimate (`ap.settings.costPane`).
                 Text(headline)
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("ap.settings.estimate.headline")
+                    .accessibilityIdentifier("ap.settings.costPane")
                 Spacer(minLength: 4)
                 Button(showDetails ? "Hide details" : "Details") { showDetails.toggle() }
                     .controlSize(.small)
@@ -131,9 +133,8 @@ struct SettingsEstimateFooter: View {
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.bar)
-        // One read-only summary for the accessibility tree: it reads what the operator sees.
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("ap.settings.costPane")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ap.settings.estimate")
         .onAppear { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
             segmentationRoutes = SegmentationRoutes.currentPreselecting()
@@ -168,7 +169,7 @@ struct SettingsEstimateFooter: View {
         guard let f = figures else { return "Enter the gateway model's prices in Settings › Advanced to estimate its cost." }
         var line = "1,000 pages: about " + CostEstimate.money(f.est.totalStandard + f.segmentation)
         if f.batch { line += " (batch " + CostEstimate.money(f.est.totalBatch + f.segmentation) + ")" }
-        return line + " · about " + f.time.totalFormatted
+        return line + " · " + f.time.totalFormatted
     }
 
     @ViewBuilder private var details: some View {

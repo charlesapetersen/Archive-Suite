@@ -38,7 +38,7 @@ Process scanned images through any of five cloud LLM providers or the free, loca
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard pricing, and batch pricing too when batch mode is on)
 - Custom OCR prompts — append additional instructions to the default OCR prompt
-- **Image-grounded OCR correction** — in Advanced Settings › Reading, enable **Correct OCR against the page image**.
+- **Image-grounded OCR correction** — in Settings › Advanced, enable **Correct OCR against the page image**.
   This adds one paid OpenRouter request per eligible page, sending its image and initial transcription to Qwen3.6 27B
   on Chutes. The first reading is kept on a failed, blank, or cut-off reply. When the text changes, the PDF
   credits the initial reader and the corrector. Standard Process Files runs with a direct API or Apple Vision can use
@@ -89,7 +89,7 @@ Every image is automatically classified as one of:
 
 Mistral (which uses a dedicated OCR endpoint without prompt support) classifies via text heuristics instead; for pre-OCRed PDFs it uses a short text-only Mistral chat call. Apple Vision returns no classification unless its text-only LLM judgement is turned on.
 
-In **Settings › Documents**, **Review document segmentation** starts on. For a fresh Process Files run with
+In **Settings › Processing**, **Review document breaks before filing** starts on. For a fresh Process Files run with
 model-proposed document boundaries, turn it off to skip the whole-run review before tagging. The run still
 confirms detected box and folder labels, checks flagged boundaries when a window model is used, and shows any
 rotation, final tagging and collection-name reviews that apply. Manual Segment & Tag uses its own combined window.
@@ -280,7 +280,7 @@ All durable settings live in a native macOS Settings window: provider/model/API 
 **Item fields on this Mac.** In automatic tagging, with **Export segment JSON metadata** on, a Mac model or Local
 Agent run suggests kind and byline from Qwen3-VL 8B and publication date from Qwen3.5 4B. The Reader's Checks section
 marks the suggestions as lower confidence and lets you confirm them. Turn off **Fill item fields on this Mac**
-under **Settings › Documents** to stop the two calls.
+under **Settings › Processing** to stop the two calls.
 
 Run `mlx_vlm.server --host 127.0.0.1 --port 8080` with the 4-bit models
 `mlx-community/Qwen3-VL-8B-Instruct-4bit` and `lmstudio-community/Qwen3.5-4B-MLX-4bit` available. The local
@@ -344,7 +344,7 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 
 **About the collection** opens before Start when the first files are added for a new output folder.
 If files are already queued when you change the output folder, the new collection can ask about those files.
-You can skip the interview or open it yourself in **Settings › Collection**.
+You can skip the interview or open it yourself in **Settings › Processing** (scope: this collection).
 
 ### Other Features
 

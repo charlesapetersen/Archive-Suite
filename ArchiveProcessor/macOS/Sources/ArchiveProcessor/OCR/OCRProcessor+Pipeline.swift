@@ -1587,7 +1587,7 @@ extension OCRProcessor {
         if fieldProvider == provider && hasKey { return nil }
         return fieldProvider == provider
             ? "Add your \(provider.rawValue) API key in Settings › Accounts, then click Resume."
-            : "Select \(provider.rawValue) in Settings › Reading and save its API key in Settings › Accounts, then click Resume."
+            : "Select \(provider.rawValue) in Settings › Processing and save its API key in Settings › Accounts, then click Resume."
     }
     /// The key `resumeRun` gets for the pending run's backend, or nil (with the reason in `statusMessage`) when a
     /// gateway run's saved key is missing. A direct run takes the field's key, which the button has already

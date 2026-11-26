@@ -23,7 +23,7 @@ final class SettingsTabsUITests: XCTestCase {
             "-APUITestMode",
             "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
-            "-offerExperimentalRoutes", "NO", "-writeLogFile", "NO",
+            "-offerExperimentalRoutes", "NO",
         ])
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"
     }
@@ -160,13 +160,16 @@ final class SettingsTabsUITests: XCTestCase {
                       "View opens the Advanced tab")
         XCTAssertTrue(app.showSettingsPanel("Processing"))
         settings.buttons["ap.settings.advancedInUse.reset"].firstMatch.click()
+        let confirm = app.descendants(matching: .button).matching(NSPredicate(format: "label == %@", "Reset")).firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Reset asks first")
+        confirm.click()
         XCTAssertTrue(waitUntil { !banner.exists }, "Reset puts the Advanced setting back")
     }
 
     /// A preset fills the reader, and the rows below follow it.
     func testFastAndFreePresetChoosesAppleVision() throws {
-        guard let settings = launch(["-useAppleVision", "NO", "-useGateway", "NO", "-useLocalAgent", "NO",
-                                     "-selectedProvider", "Gemini"]) else { return }
+        // No launch arguments for the reader's flags: an argument outranks what the preset writes.
+        guard let settings = launch() else { return }
         XCTAssertTrue(app.showSettingsPanel("Processing"))
         let fast = settings.buttons["ap.settings.preset.fastFree"].firstMatch
         XCTAssertTrue(fast.waitForExistence(timeout: 5))

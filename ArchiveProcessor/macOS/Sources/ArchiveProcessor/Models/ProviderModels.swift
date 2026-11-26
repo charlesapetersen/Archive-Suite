@@ -685,7 +685,7 @@ struct OpenRouterRoute: Sendable, Equatable {
     static let unavailableModelCode = "openrouter_model_unavailable"
 
     static func unavailableMessage(_ id: String) -> String {
-        "OpenRouter model “\(id)” is no longer available in the model list. Choose another model in Settings › Reading."
+        "OpenRouter model “\(id)” is no longer available in the model list. Choose another model in the Reader menu of Settings › Processing."
     }
 
     static func unavailableSelection(_ id: String) -> String? {

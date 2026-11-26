@@ -229,7 +229,7 @@ struct OCRView: View {
     }
     private var gatewaySetupIssue: String? {
         guard !useAppleVision, !useLocalAgent, useGateway, currentGatewayConfig == nil else { return nil }
-        return "Set the gateway URL and model in Settings › Reading before starting."
+        return "Set the gateway URL and model in Settings › Advanced before starting."
     }
     private var currentLocalAgentConfig: LocalAgentConfig? {
         useAppleVision ? nil : LocalAgentConfig.fromDefaults()
@@ -810,7 +810,7 @@ struct OCRView: View {
                 .disabled(isPDFOnlyReOCR)
 
                 // Who proposes the boundaries (W36.seg-opt-chooser). Not for Live Capture: the phone already
-                // gave them. A shortcut to Settings › Documents, and says so.
+                // gave them. A shortcut to Settings › Processing, and says so.
                 if captureBoundaries.isEmpty {
                     GroupBox("Segmentation") {
                         VStack(alignment: .leading, spacing: 4) {
@@ -1235,7 +1235,7 @@ struct OCRView: View {
                 + (enableCollectionSegmentation ? " Turn off Collection ID as well." : "")
         }
         if unavailableOpenRouterSelection != nil {
-            return "Choose an available OpenRouter model in Settings › Reading before starting."
+            return "Choose an available OpenRouter model in Settings › Processing before starting."
         }
         if let gatewaySetupIssue { return gatewaySetupIssue }
         if runNeedsAPIKey && !hasConfiguredAPIKey {

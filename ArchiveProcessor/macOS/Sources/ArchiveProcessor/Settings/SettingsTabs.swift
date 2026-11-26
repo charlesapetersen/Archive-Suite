@@ -56,6 +56,7 @@ enum SettingsTabOwnership {
         ] + LLMProvider.allCases.map { ModelSelectionStore.modelKey(for: $0) })
         add(.output, [
             SettingsKey.keepPreservationCopies.rawValue, SettingsKey.straightenReadingCopy.rawValue,
+            SettingsKey.searchableFor.rawValue,   // the PDF form; Advanced holds its per-format editor
             DefaultsKeys.pdfImageSizeMB, DefaultsKeys.textColumns, DefaultsKeys.outputImageFile,
             DefaultsKeys.exportedImageSizeMB, DefaultsKeys.rotationModeRaw, DefaultsKeys.reviewRotation,
             DefaultsKeys.skipAlreadyProcessed, DefaultsKeys.itemTypeColourBox, DefaultsKeys.itemTypeColourFolder,
@@ -67,7 +68,7 @@ enum SettingsTabOwnership {
         ])
         add(.accounts, [DefaultsKeys.localAgentTool, "keychain:Gateway"]
             + LLMProvider.allCases.filter { $0 != .appleVision }.map { "keychain:\($0.rawValue)" })
-        add(.advanced, SettingsAdvanced.groups.flatMap { $0.keys + $0.layered.map(\.rawValue) } + [
+        add(.advanced, SettingsAdvanced.groups.flatMap { $0.keys + $0.layered.filter { $0 != .searchableFor }.map(\.rawValue) } + [
             DefaultsKeys.gatewayBaseURL, DefaultsKeys.gatewayModelID, DefaultsKeys.gatewayDisplayName,
             DefaultsKeys.gatewayInputCost, DefaultsKeys.gatewayOutputCost, DefaultsKeys.gatewayUpstreamProvider,
             DefaultsKeys.gatewayLocalModel, DefaultsKeys.gatewayLocalEscalates,
@@ -198,13 +199,15 @@ enum SettingsAdvanced {
     /// Whether a stored key holds something other than its built-in value. Numbers compare as numbers, so a Double
     /// stored for an Int setting (or `normalizeSizingDefaults` writing back the default) is no change.
     static func changed(_ key: String, in defaults: UserDefaults = .standard) -> Bool {
-        guard let stored = defaults.object(forKey: key) else { return false }
-        guard let builtIn = defaultValue(key) else { return true }
-        switch (stored, builtIn) {
-        case let (s as String, d as String): return s.trimmingCharacters(in: .whitespacesAndNewlines) != d
-        case let (s as NSNumber, d as Bool): return s.boolValue != d
-        case let (s as NSNumber, d as Double): return abs(s.doubleValue - d) > 1e-9
-        default: return true   // a value of another kind than the setting's own
+        guard defaults.object(forKey: key) != nil else { return false }
+        // Read as the setting's own kind, as `@AppStorage` reads it: a value given as a launch argument arrives as text
+        // ("NO", "4"), and the defaults' typed getters convert it.
+        switch defaultValue(key) {
+        case let d as Bool: return defaults.bool(forKey: key) != d
+        case let d as Double: return abs(defaults.double(forKey: key) - d) > 1e-9
+        case let d as String:
+            return (defaults.string(forKey: key) ?? "").trimmingCharacters(in: .whitespacesAndNewlines) != d
+        default: return true
         }
     }
 
@@ -212,8 +215,17 @@ enum SettingsAdvanced {
     static func changed(_ group: Group, in defaults: UserDefaults = .standard, resolver: SettingsResolver?) -> Bool {
         if group.keys.contains(where: { changed($0, in: defaults) }) { return true }
         guard let resolver else { return false }
-        return group.layered.contains { resolver.resolve($0).value != $0.defaultValue }
+        return group.layered.contains { key in
+            let value = resolver.resolve(key).value
+            // The Output tab's "One searchable page where possible" is a Standard choice; only a per-format list is
+            // the Advanced editor's.
+            if key == .searchableFor, value == .strings(SettingsAdvanced.searchableEverywhere) { return false }
+            return value != key.defaultValue
+        }
     }
+
+    /// The Output tab's "One searchable page where possible": every format, every kind.
+    static let searchableEverywhere = ["*/*"]
 
     /// The groups in use, for the Processing tab's "N Advanced settings in use" line.
     static func activeGroups(in defaults: UserDefaults = .standard, resolver: SettingsResolver?) -> [Group] {

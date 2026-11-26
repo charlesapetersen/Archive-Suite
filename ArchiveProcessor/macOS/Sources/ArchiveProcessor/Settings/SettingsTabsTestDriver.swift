@@ -122,6 +122,22 @@ enum SettingsTabsTestDriver {
         if let workers = SettingsAdvanced.group("workers") { SettingsAdvanced.reset(workers, in: d) }
         check("4 Reset removes the stored value", d.object(forKey: DefaultsKeys.ocrWorkerCount) == nil
               && !SettingsAdvanced.activeGroups(in: d, resolver: general).map(\.id).contains("workers"))
+        // A launch argument arrives as text: "NO" and "4" are the defaults, not changes.
+        d.removeObject(forKey: DefaultsKeys.selectedThinking)
+        d.set("NO", forKey: DefaultsKeys.offerExperimentalRoutes)
+        d.set("4", forKey: DefaultsKeys.ocrWorkerCount)
+        check("4 a default given as text is not in use", SettingsAdvanced.activeGroups(in: d, resolver: general).isEmpty,
+              SettingsAdvanced.activeGroups(in: d, resolver: general).map(\.id).joined(separator: ", "))
+        d.removeObject(forKey: DefaultsKeys.offerExperimentalRoutes)
+        var forms = SettingsLayer(kind: .collection, name: "Letters")
+        forms.set(.searchableFor, .strings(SettingsAdvanced.searchableEverywhere), source: .setByUser(Date()))
+        check("4 the Output tab's searchable PDF form is not an Advanced setting",
+              !SettingsAdvanced.activeGroups(in: d, resolver: SettingsResolver(general: general.general, project: nil, collection: forms))
+                .map(\.id).contains("searchable"))
+        forms.set(.searchableFor, .strings(["jpeg/*"]), source: .setByUser(Date()))
+        check("4 a per-format searchable list is",
+              SettingsAdvanced.activeGroups(in: d, resolver: SettingsResolver(general: general.general, project: nil, collection: forms))
+                .map(\.id).contains("searchable"))
         check("4 lower-scoring choices are off by default", RouteTier.current(d) == .standard)
         d.set(true, forKey: DefaultsKeys.offerExperimentalRoutes)
         check("4 the Advanced switch offers them", RouteTier.current(d) == .advanced

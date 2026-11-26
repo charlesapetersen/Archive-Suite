@@ -80,11 +80,14 @@ struct SettingsAdvancedTab: View {
             Button("Reset", role: .destructive) {
                 for g in SettingsAdvanced.groups {
                     SettingsAdvanced.reset(g)
-                    g.layered.forEach(scope.clearEverywhere)
+                    // The Output tab's PDF form shares the searchable key: only a per-format list is this tab's.
+                    if SettingsAdvanced.changed(g, resolver: scope.resolver) {
+                        g.layered.forEach(scope.reset)
+                    }
                 }
             }
         } message: {
-            Text("Every setting on this tab goes back to its default. The gateway's address and fields stay as they are.")
+            Text("Every setting on this tab goes back to its default, including any text typed in it; a collection's own switches are reset in the layer you are editing. The gateway's address and fields stay as they are.")
         }
     }
 
@@ -251,13 +254,15 @@ struct SettingsAdvancedTab: View {
 
     @ViewBuilder private var tuningSection: some View {
         Section("Pipeline tuning and diagnostics") {
-            if selectedModel.supportsThinking {
-                Picker("Thinking level", selection: $selectedThinking) {
-                    ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .accessibilityIdentifier("ap.settings.thinking")
-                why("thinking")
+            Picker("Thinking level", selection: $selectedThinking) {
+                ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
             }
+            .accessibilityIdentifier("ap.settings.thinking")
+            if !selectedModel.supportsThinking {
+                Text("The Reader's model has no thinking level; this applies to the models that support it.")
+                    .font(.caption2).foregroundStyle(.primary)
+            }
+            why("thinking")
             cascadeRows
             VStack(alignment: .leading, spacing: 4) {
                 Text("Apple Vision tuning")
@@ -285,7 +290,7 @@ struct SettingsAdvancedTab: View {
             SearchableFormatControls(
                 forms: SettingsSheetModel.FormsRow(entries: scope.resolve(.searchableFor).value.strings ?? [],
                                                    source: scope.resolve(.searchableFor).sourceText),
-                setEntries: { scope.set(.searchableFor, .strings($0)) })
+                setEntries: { scope.set(.searchableFor, .strings($0)) })   // side effect: the Output PDF form's per-format editor
             why("searchable")
             Toggle(isOn: $sendPreviousImage) {
                 HelpLabel("Send previous page image", help: "Gives the model the previous page's image as context for document breaks (about twice the image cost). Used only when the reader's own per-page tags find the breaks (Automatic tagging with Full manual breaks). Gemini and Anthropic only.")
@@ -346,11 +351,12 @@ struct SettingsAdvancedTab: View {
                 Text("No \(target.provider.rawValue) key is saved: escalated pages will fail until one is.")
                     .font(.caption).foregroundStyle(.orange)
             }
-            Toggle(isOn: $ocrCascadeOnDisagreement) {
-                HelpLabel("Also escalate pages whose word count disagrees with Apple Vision's", help: "Experimental. Apple Vision also reads each page on this Mac, and a page whose word count differs by more than half again is sent on too. On the bench its gain over escalating failures alone was not consistent; it escalates about one page in ten.")
-            }
-            .accessibilityIdentifier("ap.settings.cascadeDisagreement")
         }
+        Toggle(isOn: $ocrCascadeOnDisagreement) {
+            HelpLabel("Also escalate pages whose word count disagrees with Apple Vision's", help: "Experimental. Apple Vision also reads each page on this Mac, and a page whose word count differs by more than half again is sent on too. On the bench its gain over escalating failures alone was not consistent; it escalates about one page in ten. Needs an escalation model above.")
+        }
+        .disabled(OCRCascade(routeID: ocrCascadeRoute).escalationModel == nil && !ocrCascadeOnDisagreement)
+        .accessibilityIdentifier("ap.settings.cascadeDisagreement")
         why("cascade")
     }
 

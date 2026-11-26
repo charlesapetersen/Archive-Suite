@@ -79,6 +79,20 @@ for rel, panel in files.items():   # panel: the tab
         checked += 1
         if panel is None or owner.get(key) != panel:
             bad.append(f'{rel}: writes {key} (owned by {owner.get(key, "no tab")})')
+    # Writes that are not `@AppStorage` bindings: a layered key through the scope, a defaults key set directly.
+    for lineno, l in enumerate(text.split('\n'), 1):
+        if '// side effect' in l:
+            continue
+        for m in re.finditer(r'scope\.set\(\.(\w+)', l):
+            key = m.group(1)
+            checked += 1
+            if panel is None or owner.get(key) != panel:
+                bad.append(f'{rel}:{lineno}: writes {key} (owned by {owner.get(key, "no tab")})')
+        for m in re.finditer(r'\bd\.set\([^\n]*forKey: DefaultsKeys\.(\w+)\)', l):
+            key = defaults.get(m.group(1))
+            checked += 1
+            if panel is None or owner.get(key) != panel:
+                bad.append(f'{rel}:{lineno}: writes {key} (owned by {owner.get(key, "no tab")})')
 if bad:
     print('FAIL source: a tab writes a setting it does not own'); print('\n'.join(bad)); sys.exit(1)
 print(f'PASS source: the {checked} stored settings the tabs write are each written by their home tab only')

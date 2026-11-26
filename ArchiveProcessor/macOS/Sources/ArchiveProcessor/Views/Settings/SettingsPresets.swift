@@ -61,32 +61,52 @@ enum WorkflowPreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Fill this preset's choices. `keyed` is the providers with a saved key.
+    /// Why the preset cannot be applied on this Mac, or nil when it can.
+    @MainActor var unavailableReason: String? {
+        if self == .localHD, LocalModelRoute.picks(memoryGB: LocalModelRoute.thisMacMemoryGB).isEmpty {
+            return "A local reading model needs at least 16 GB of memory."
+        }
+        return nil
+    }
+
+    /// The gateway the Local HD preset would replace: a configured address that is not on this Mac.
+    @MainActor static func remoteGateway(_ d: UserDefaults = .standard) -> String? {
+        let base = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
+        return base.isEmpty || LocalModelRoute.isLoopback(base) ? nil : base
+    }
+
+    /// Fill this preset's choices. `keyed` is the providers with a saved key. A preset already matched changes nothing.
     @MainActor func apply(_ d: UserDefaults = .standard, keyed: Set<LLMProvider>, scope: SettingsScopeModel) {
+        if self != .cluster, matches(d, cluster: false) { return }
         let tagging = TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic
         switch self {
         case .fastFree:
             ReaderChoice.appleVision.apply(d)
-            d.set(false, forKey: DefaultsKeys.visionUseLLMJudgment)
+            d.set(false, forKey: DefaultsKeys.visionUseLLMJudgment)   // side effect: Vision alone transcribes
+            // Vision alone cannot tag, so Start would stay off: the preset says so in its caption.
             if tagging != .none && tagging != .copySource { d.set(TaggingMode.none.rawValue, forKey: DefaultsKeys.taggingModeRaw) }
         case .localHD:
             let base = d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? ""
-            if !d.bool(forKey: DefaultsKeys.gatewayLocalModel) || base.isEmpty || !LocalModelRoute.isLoopback(base),
+            // Fill the local server's fields only where nothing local is set yet; a remote gateway is replaced only
+            // after the row's confirmation.
+            if base.isEmpty || !LocalModelRoute.isLoopback(base) || !d.bool(forKey: DefaultsKeys.gatewayLocalModel),
                let pick = LocalModelRoute.picks(memoryGB: LocalModelRoute.thisMacMemoryGB).first {
                 let server = LocalModelRoute.Server.lmStudio
-                d.set(server.baseURL, forKey: DefaultsKeys.gatewayBaseURL)
-                d.set(pick.modelID(for: server), forKey: DefaultsKeys.gatewayModelID)
-                d.set(pick.displayName, forKey: DefaultsKeys.gatewayDisplayName)
-                d.set(0.0, forKey: DefaultsKeys.gatewayInputCost)
-                d.set(0.0, forKey: DefaultsKeys.gatewayOutputCost)
+                d.set(server.baseURL, forKey: DefaultsKeys.gatewayBaseURL)   // side effect: the preset fills the server
+                d.set(pick.modelID(for: server), forKey: DefaultsKeys.gatewayModelID)   // side effect
+                d.set(pick.displayName, forKey: DefaultsKeys.gatewayDisplayName)   // side effect
+                d.set(0.0, forKey: DefaultsKeys.gatewayInputCost)   // side effect
+                d.set(0.0, forKey: DefaultsKeys.gatewayOutputCost)   // side effect
             }
-            d.set(true, forKey: DefaultsKeys.gatewayLocalModel)
+            d.set(true, forKey: DefaultsKeys.gatewayLocalModel)   // side effect
             ReaderChoice.gateway.apply(d)
         case .cloud:
+            // The provider in use if it has a key, with the model already chosen for it; else the first keyed one.
             let order: [LLMProvider] = [.gemini, .anthropic, .openai, .mistral, .openrouter]
-            let provider = order.first(where: keyed.contains) ?? .gemini
-            ReaderChoice.direct(provider, provider.models[0].id).apply(d)
-            if tagging == .none { d.set(TaggingMode.automatic.rawValue, forKey: DefaultsKeys.taggingModeRaw) }
+            let current = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "")
+            let provider = current.flatMap { keyed.contains($0) && $0 != .appleVision ? $0 : nil }
+                ?? order.first(where: keyed.contains) ?? .gemini
+            ReaderChoice.direct(provider, ModelSelectionStore.shared.model(for: provider).id).apply(d)
         case .cluster:
             let on = scope.store.resolver(for: nil).resolve(.cluster).value.bool ?? false
             scope.set(.cluster, .bool(!on))
@@ -104,6 +124,8 @@ struct WorkflowPresetRow: View {
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
     @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel = false
     @ObservedObject private var modelStore = ModelSelectionStore.shared
+    /// The remote gateway the Local HD preset would replace, while its confirmation is up.
+    @State private var replacing: String?
 
     var body: some View {
         _ = (useAppleVision, useGateway, useLocalAgent, gatewayLocalModel, modelStore.selectedModelIDs)
@@ -112,7 +134,10 @@ struct WorkflowPresetRow: View {
             HStack(spacing: 8) {
                 ForEach(WorkflowPreset.allCases) { preset in
                     let on = preset.matches(cluster: cluster)
-                    Button { preset.apply(keyed: keyed, scope: scope) } label: {
+                    Button {
+                        if preset == .localHD, !on, let remote = WorkflowPreset.remoteGateway() { replacing = remote }
+                        else { preset.apply(keyed: keyed, scope: scope) }
+                    } label: {
                         VStack(alignment: .leading, spacing: 2) {
                             Label(preset.title, systemImage: preset.symbol).font(.callout.weight(.semibold))
                             Text(preset.subtitle).font(.caption).foregroundStyle(.primary)
@@ -126,7 +151,8 @@ struct WorkflowPresetRow: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help(preset.caption)
+                    .disabled(preset.unavailableReason != nil)
+                    .help(preset.unavailableReason ?? preset.caption)
                     .accessibilityLabel("\(preset.title) preset, \(preset.subtitle)")
                     .accessibilityHint(preset.caption)
                     .accessibilityAddTraits(on ? .isSelected : [])
@@ -142,6 +168,12 @@ struct WorkflowPresetRow: View {
                     .font(.caption2).foregroundStyle(.primary)
                     .accessibilityIdentifier("ap.settings.preset.caption")
             }
+        }
+        .confirmationDialog("Replace your gateway with a server on this Mac?",
+                            isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })) {
+            Button("Replace") { WorkflowPreset.localHD.apply(keyed: keyed, scope: scope); replacing = nil }
+        } message: {
+            Text("Local HD reads with a model served on this Mac. Your gateway at \(replacing ?? "") and its model and prices are replaced; you can set them again in Settings › Advanced.")
         }
     }
 }

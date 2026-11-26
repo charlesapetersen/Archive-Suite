@@ -354,7 +354,7 @@ struct SettingsSheetPage: View {
     }
 }
 
-/// The limits the user set and this batch's totals: the top of the sheet, and the Collection panel's strip.
+/// The limits the user set and this batch's totals: the top of the sheet.
 struct SheetLimitsAndTotals: View {
     let model: SettingsSheetModel
 
@@ -600,7 +600,7 @@ struct StageCardView: View {
     var seeRange: (() -> Void)? = nil
     /// Where the card's stage is set, in the modal sheet (W47.settings-panels).
     var homeNote: String? = nil
-    /// The Reading panel leads with the live reader and keeps the measured pick beneath it.
+    /// A host that leads with the live reader keeps the measured pick beneath it.
     var activeReader: String? = nil
     /// The Advanced route rows are listed while Settings › Advanced offers them (W49.proc-settings-redesign-core), and
     /// a card's own choice always.

@@ -10,7 +10,9 @@ struct SettingsProcessingTab: View {
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision = false
     @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
+    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel = false
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
+    @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
     @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment = false
     @AppStorage(DefaultsKeys.visionLanguages) private var visionLanguages = "en-US"
     @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting = false
@@ -59,6 +61,10 @@ struct SettingsProcessingTab: View {
                 privacySection
             }
             .formStyle(.grouped)
+            // On a view of its own: two sheets on one view present only one (the scope section holds New project's).
+            .sheet(item: $interview) { target in
+                CollectionInterviewView(target: target) { interview = nil; scope.reload() }
+            }
             Divider()
             SettingsEstimateFooter()
         }
@@ -66,7 +72,7 @@ struct SettingsProcessingTab: View {
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
         // The Advanced groups' keys are plain defaults another tab writes: count them again on any change.
         .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
-            .receive(on: RunLoop.main)) { _ in defaultsTick += 1 }
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)) { _ in defaultsTick += 1 }
         .sheet(isPresented: $showGeneralInterview) { GeneralInterviewView { showGeneralInterview = false } }
     }
 
@@ -110,9 +116,6 @@ struct SettingsProcessingTab: View {
                 scope.updateCollection { $0.projectID = project.id }
                 projectToAsk = project.id
             }
-        }
-        .sheet(item: $interview) { target in
-            CollectionInterviewView(target: target) { interview = nil; scope.reload() }
         }
     }
 
@@ -198,13 +201,21 @@ struct SettingsProcessingTab: View {
                 ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
             }
             .accessibilityIdentifier("ap.settings.visionJudgmentProviderPicker")
-            Picker("Text model", selection: Binding(get: { modelStore.model(for: selectedProvider).id },
+            let unavailable: String? = { _ = openRouterListingData; return modelStore.unavailableOpenRouterSelection(for: selectedProvider) }()
+            let savedID = modelStore.selectedModelIDs[selectedProvider.rawValue]
+            Picker("Text model", selection: Binding(get: { unavailable != nil ? (savedID ?? "") : modelStore.model(for: selectedProvider).id },
                                                      set: { id in
                 if let m = selectedProvider.models.first(where: { $0.id == id }) { modelStore.setModel(m, for: selectedProvider) }
             })) {
+                if unavailable != nil, let savedID { Text("\(savedID) (unavailable)").tag(savedID) }
                 ForEach(selectedProvider.models) { Text($0.displayName).tag($0.id) }
             }
             .accessibilityIdentifier("ap.settings.visionJudgmentModelPicker")
+            if let unavailable {
+                Text(unavailable).font(.caption).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("ap.settings.openRouterUnavailable")
+            }
         } else {
             let localAutoDate = !preOCRedInput && taggingMode == .autoDate
                 && DateRoute.localImageEnabled(scope.resolve(.dateLocalImage).value)
@@ -318,7 +329,13 @@ struct SettingsProcessingTab: View {
     @ViewBuilder private var privacySection: some View {
         Section("Privacy, spending and the app") {
             LayeredToggle(key: .staysOnMac) {
-                HelpLabel("Keep pages on this Mac", help: "No page image or text leaves this Mac: the app's picks and the settings sheet offer only readers that run here.")
+                HelpLabel("Keep pages on this Mac", help: "The app's picks and the settings sheet offer only readers that run on this Mac, so no page image or text leaves it. A cloud reader you choose yourself above still sends pages to its provider.")
+            }
+            if scope.resolve(.staysOnMac).value.bool == true, !useAppleVision, !(useGateway && gatewayLocalModel) {
+                Text("Your Reader above is not on this Mac: pages go to it when you run.")
+                    .font(.caption2).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("ap.settings.staysOnMacConflict")
             }
             LayeredToggle(key: .noTraining) {
                 HelpLabel("Exclude routes that may train on your pages", help: "Pages go only where the provider's terms say uploads do not train its models; a route that may train, or whose terms depend on your account, is not offered.")
@@ -386,6 +403,7 @@ struct AdvancedInUseBanner: View {
     /// Read so a change in the Advanced tab redraws the count.
     @AppStorage(DefaultsKeys.offerExperimentalRoutes) private var offerExperimental = false
     @State private var tick = 0
+    @State private var confirmReset = false
 
     var body: some View {
         let active = SettingsAdvanced.activeGroups(resolver: scope.resolver)
@@ -399,19 +417,26 @@ struct AdvancedInUseBanner: View {
                     Spacer()
                     Button("View") { showAdvanced() }.controlSize(.small)
                         .accessibilityIdentifier("ap.settings.advancedInUse.view")
-                    Button("Reset") {
-                        for g in active {
-                            SettingsAdvanced.reset(g)
-                            g.layered.forEach(scope.clearEverywhere)
-                        }
-                        tick += 1
-                    }
-                    .controlSize(.small)
-                    .help("Puts these Advanced settings back to their defaults.")
-                    .accessibilityIdentifier("ap.settings.advancedInUse.reset")
+                    Button("Reset…") { confirmReset = true }
+                        .controlSize(.small)
+                        .help("Puts these Advanced settings back to their defaults.")
+                        .accessibilityIdentifier("ap.settings.advancedInUse.reset")
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("ap.settings.advancedInUse")
+                .confirmationDialog("Reset \(active.count) Advanced setting\(active.count == 1 ? "" : "s")?",
+                                    isPresented: $confirmReset) {
+                    Button("Reset", role: .destructive) {
+                        for g in active {
+                            SettingsAdvanced.reset(g)
+                            g.layered.forEach(scope.reset)
+                        }
+                        tick += 1
+                    }
+                } message: {
+                    Text(active.map(\.title).joined(separator: ", ") + " go back to their defaults, including any text "
+                         + "typed in them. A collection's own switches are reset in the layer you are editing.")
+                }
             }
             .id(tick)
         }

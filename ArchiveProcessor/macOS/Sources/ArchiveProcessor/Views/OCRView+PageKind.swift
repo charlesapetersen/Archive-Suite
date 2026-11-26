@@ -182,7 +182,7 @@ struct PageKindBatchControl: View {
             .fixedSize()
             .accessibilityIdentifier("ap.ocr.pageKindBatch")
             // W47.settings-panels: these menus choose for this batch only and store nothing; say where the stored switch is.
-            Text("For this batch only. Sending handwritten pages to a handwriting reader is set in Settings › Reading.")
+            Text("For this batch only. Sending handwritten pages to a handwriting reader is set in Settings › Processing.")
                 .font(.caption2).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
             let routed = plan.routedCounts(runModel: runModel)
