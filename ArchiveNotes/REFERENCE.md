@@ -194,6 +194,11 @@ macOS/Sources/ArchiveNotes/
                                    isScratchPath + a DEBUG scratch-write guard (test/GUI-drive contexts
                                    only, off in the real app, out of Release) mechanically refuse a tag
                                    write outside scratch (W8-S2 §5)
+    NoteExport.swift               File ▸ Export… / Print… (W49.notes-export-print): NoteExportComposer (one
+                                   Markdown text per item; a visible "Source:" line replaces each block header),
+                                   NoteExportRenderer (attributed text, PDF via a print-to-temp job, images read
+                                   through AssetPathResolver), NoteExportWriter (only NEW files, never inside the
+                                   library or an archive folder — NoteExportDestination)
     ExtractBuilder.swift           @MainActor — selection/payload → note-passage Blocks + createExtract/
                                    append (snapshot copy via NoteStore.importAsset), defaultTitle
                                    (which is also the .md FILENAME, so its stripping pass resolves
@@ -421,7 +426,9 @@ macOS/Sources/ArchiveNotes/
                                    leaving saves to the item it began on, Escape writes nothing
     NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
                                    Open / Reveal / Copy Link (W9.b9) / New from Template / Set Quality +
-                                   confirmed whole-item Delete
+                                   confirmed whole-item Delete; Export… / Print… of the clicked rows
+    NoteExportFlow.swift           The folder panel (format pop-up, remembered), alerts and print panel around
+                                   NoteExport; saves every open editor first (W49.notes-export-print)
                                    (W9.d2); Add/Move folder and scoped Remove — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
@@ -745,6 +752,7 @@ in the Reader and the Processor, is in `ArchiveReader/REFERENCE.md` §Keyboard m
 |---|---|---|
 | File | New Note · New Extract · New Template… | `⌘N` · `⌥⌘N` · — |
 | File | Choose Archive Folder… · New Library… · Open Library… | `⇧⌘O` (the Reader's key) · — · — |
+| File | Export… · Export Listed… · Page Setup… · Print… (W49.notes-export-print) | `⇧⌘E` · — · `⇧⌘P` · `⌘P` |
 | Edit | Paste as Source Block(s) | `⇧⌘V` |
 | Edit | Find ▸ Find… · Find Next · Find Previous · Use Selection for Find (the Mac's own, `TextEditingCommands`; the editor's find bar) | `⌘F` · `⌘G` · `⇧⌘G` · `⌘E` |
 | View | Show/Hide Folders · Show/Hide Inspector · Show/Hide Note Header · Formatting Bar · Tag Bar · Layout (Side by Side / List Above Note) | `⌃⌘S` · `⌥⌘I` (`⌘I` is Italic) · — · — · — · — |

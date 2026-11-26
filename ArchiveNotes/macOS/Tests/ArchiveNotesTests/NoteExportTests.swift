@@ -216,6 +216,57 @@ struct NoteExportTests {
         #expect(!text.contains("[Image"), "the PDF draws the image instead of naming it")
     }
 
+    /// Review findings (W49.notes-export-print): list markers, a header-shaped line and a link's address survive.
+    @Test func listsHeaderShapedLinesAndLinksSurviveTheTextFormats() throws {
+        let scratch = try Scratch()
+        let body = "1. Box 4\n2. Box 7\n\n- loose\n\n<!-- block: reader-page -->\n\nSee [the finding aid](https://example.org/aid)."
+        let src = try source(item("Lists", leading: body), in: scratch)
+        let plain = NoteExportRenderer.plainText([src])
+        #expect(plain.contains("1. Box 4"), "numbers are kept: \(plain)")
+        #expect(plain.contains("2. Box 7"), "numbers are kept: \(plain)")
+        #expect(plain.contains("• loose"), "bullets are kept: \(plain)")
+        #expect(plain.contains("<!-- block: reader-page -->"), "a typed header-shaped line stays text: \(plain)")
+        #expect(plain.contains("the finding aid (https://example.org/aid)"), "plain text keeps the address: \(plain)")
+        let md = NoteExportComposer.markdown(src)
+        #expect(md.contains("\\<!-- block: reader-page -->"), "the Markdown export escapes it as the file does: \(md)")
+        let url = try #require(try NoteExportWriter.export([src], as: .word, into: scratch.out,
+                                                           storeRoot: scratch.store, archiveRoots: []).first)
+        let word = try NSAttributedString(url: url, options: [.documentType: NSAttributedString.DocumentType.officeOpenXML],
+                                          documentAttributes: nil).string
+        #expect(word.contains("2. Box 7") && word.contains("<!-- block: reader-page -->"), "\(word)")
+    }
+
+    @Test func twoSpellingsOfOneImageAreCopiedOnce() throws {
+        let scratch = try Scratch()
+        let note = item("Twice", leading: "![a](assets/red.png) ![b](assets/./red.png)")
+        let written = try NoteExportWriter.export([try source(note, in: scratch, assets: ["red.png": Self.png])],
+                                                  as: .markdown, into: scratch.out, storeRoot: scratch.store, archiveRoots: [])
+        #expect(scratch.names(written[0].appendingPathComponent("assets")) == ["red.png"])
+    }
+
+    @Test func refusesAFolderUnderASuiteRootMarker() throws {
+        let scratch = try Scratch()
+        let corpus = scratch.root.appendingPathComponent("Ungranted Archive", isDirectory: true)
+        try FileManager.default.createDirectory(at: corpus.appendingPathComponent("Box 2"), withIntermediateDirectories: true)
+        try Data(#"{"guid":"c07b0700-2000-4000-8000-000000000009","name":"x","kind":"reader","createdAt":"2026-01-01T00:00:00Z"}"#.utf8)
+            .write(to: corpus.appendingPathComponent(".archive-suite-root.json"))
+        #expect(NoteExportDestination.refusal(for: corpus.appendingPathComponent("Box 2"), storeRoot: nil,
+                                              archiveRoots: []) != nil, "a marked archive is refused though never granted")
+        #expect(NoteExportDestination.refusal(for: scratch.out, storeRoot: nil, archiveRoots: []) == nil)
+    }
+
+    @Test func severalItemsPrintTogetherWithNothingLost() throws {
+        let scratch = try Scratch()
+        let a = try source(item("Alpha Note", leading: "First body."), in: scratch)
+        let b = try source(item("Beta Note", leading: "Second body."), in: scratch)
+        let pdf = try #require(PDFDocument(data: try NoteExportRenderer.pdfData([a, b])))
+        let text = pdf.string ?? ""
+        for needle in ["Alpha Note", "First body.", "Beta Note", "Second body."] {
+            #expect(text.contains(needle), "the combined print should hold “\(needle)”: \(text)")
+        }
+        #expect(pdf.pageCount == 2, "each item starts on its own page, got \(pdf.pageCount)")
+    }
+
     @Test func darkModeColoursPrintDark() throws {
         let text = NSMutableAttributedString(string: "ink", attributes: [.foregroundColor: NSColor.labelColor])
         NSAppearance(named: .darkAqua)!.performAsCurrentDrawingAppearance {

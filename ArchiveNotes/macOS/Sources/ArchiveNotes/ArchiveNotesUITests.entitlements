@@ -8,6 +8,8 @@
 	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
 	<array>
 		<string>/Users/admin/Library/Application Support/ArchiveNotes/AN-GUI-Fixture/</string>
+		<!-- The folder ExportPrintUITests empties and reads back (W49.notes-export-print). -->
+		<string>/Users/admin/Library/Application Support/ArchiveNotes/AN-GUI-Export/</string>
 	</array>
 	<!-- The pristine snapshot the runner restores the fixture from before each test (W35.vm-mem-fu1). Read only. -->
 	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>

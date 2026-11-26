@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCore
 
 // NoteExport.swift — File ▸ Export… and File ▸ Print… for notes and extracts (W49.notes-export-print).
 //
@@ -79,12 +80,17 @@ enum NoteExportComposer {
         if !meta.isEmpty { head += "\n\n" + meta.joined(separator: "  \n") }
 
         var parts = [head]
-        if let leading = trimmedTrailingNewlines(item.trailingBodyRaw ?? ""), !leading.isEmpty {
+        // A typed line shaped like a block header is held unescaped in memory; escaped again here, as the file
+        // writes it, so it stays text instead of becoming a source chip (or a hidden comment in other readers).
+        if let leading = trimmedTrailingNewlines(BlockParser.escapingHeaderLines(item.trailingBodyRaw ?? "")),
+           !leading.isEmpty {
             parts.append(leading)
         }
         for block in item.blocks {
             if let line = sourceLine(block) { parts.append(line) }
-            if let body = trimmedTrailingNewlines(block.markdown), !body.isEmpty { parts.append(body) }
+            if let body = trimmedTrailingNewlines(BlockParser.escapingHeaderLines(block.markdown)), !body.isEmpty {
+                parts.append(body)
+            }
         }
         return parts.joined(separator: "\n\n") + "\n"
     }
@@ -158,17 +164,21 @@ enum NoteExportRenderer {
     /// Body size for printed and exported text; the editor's 14 pt reads large on paper.
     static let fontSize: CGFloat = 12
 
-    /// Every source, in order, separated by a page break. With `embedImages`, each image the item owns is drawn
+    /// Every source, in order, each after the first marked `.exportPageBreak` so print starts it on a new page. With `embedImages`, each image the item owns is drawn
     /// at up to `imageWidth`; without (RTF, Word, plain text, which cannot carry them), and for an image that is
     /// missing or outside the item's `assets/`, an "[Image: alt]" line keeps its place.
     static func attributed(_ sources: [NoteExportSource], embedImages: Bool,
                            imageWidth: CGFloat = 468) -> NSAttributedString {
         let out = NSMutableAttributedString()
         for (index, source) in sources.enumerated() {
-            if index > 0 { out.append(NSAttributedString(string: "\n\u{0C}")) }
+            if index > 0 { out.append(NSAttributedString(string: "\n\n")) }
             let parsed = MarkdownBridge.parse(markdown: NoteExportComposer.markdown(source), fontSize: fontSize)
             let text = NSMutableAttributedString(attributedString: parsed)
             replaceAttachments(in: text, source: source, embedImages: embedImages, imageWidth: imageWidth)
+            insertListMarkers(in: text)
+            if index > 0, text.length > 0 {
+                text.addAttribute(.exportPageBreak, value: true, range: NSRange(location: 0, length: 1))
+            }
             out.append(text)
         }
         resolveColorsForPaper(out)
@@ -202,9 +212,40 @@ enum NoteExportRenderer {
                 let label = alt.isEmpty ? "[Image]" : "[Image: \(alt)]"
                 text.replaceCharacters(in: range, with: NSAttributedString(string: label, attributes: plain))
             } else {
-                text.replaceCharacters(in: range, with: NSAttributedString(string: "", attributes: plain))
+                // Not an image (a source chip, should one survive the composer's escaping): its label, never nothing.
+                let anchor = (attrs[.noteBlockSource] as? SourceAnchorBox)?.anchor
+                let label = [anchor?.display, anchor?.link].compactMap { $0 }.first { !$0.isEmpty }
+                text.replaceCharacters(in: range, with: NSAttributedString(string: label.map { "[\($0)]" } ?? "[Attachment]",
+                                                                           attributes: plain))
             }
         }
+    }
+
+    /// The editor draws list bullets and numbers itself (`EditorTextView`, `ListMarkers`); the text holds only the
+    /// items. Paper, RTF, Word and plain text get them as characters, numbered as the editor shows them.
+    static func insertListMarkers(in text: NSMutableAttributedString) {
+        let markers = ListMarkers.markers(in: text, range: NSRange(location: 0, length: text.length))
+        for marker in markers.reversed() {
+            let attrs = text.attributes(at: marker.location, effectiveRange: nil)
+            text.insert(NSAttributedString(string: marker.text + " ", attributes: attrs), at: marker.location)
+        }
+    }
+
+    /// Plain text: the attributed text's characters, with each link's address after its label when they differ,
+    /// since plain text cannot hold the link itself.
+    static func plainText(_ sources: [NoteExportSource]) -> String {
+        let text = NSMutableAttributedString(attributedString: attributed(sources, embedImages: false))
+        var links: [(NSRange, String)] = []
+        text.enumerateAttribute(.link, in: NSRange(location: 0, length: text.length)) { value, range, _ in
+            let address = (value as? URL)?.absoluteString ?? (value as? String)
+            guard let address, !address.isEmpty,
+                  (text.string as NSString).substring(with: range) != address else { return }
+            links.append((range, address))
+        }
+        for (range, address) in links.reversed() {
+            text.insert(NSAttributedString(string: " (\(address))"), at: NSMaxRange(range))
+        }
+        return text.string
     }
 
     /// The editor's colours follow Dark Mode; paper is white. Each colour becomes its fixed light-appearance value,
@@ -249,6 +290,13 @@ enum NoteExportRenderer {
         layout.ensureLayout(for: container)
         let height = ceil(layout.usedRect(for: container).height) + 1
         view.setFrameSize(NSSize(width: width, height: max(height, 1)))
+        var breaks: [CGFloat] = []
+        text.enumerateAttribute(.exportPageBreak, in: NSRange(location: 0, length: text.length)) { value, range, _ in
+            guard value as? Bool == true else { return }
+            let glyph = layout.glyphIndexForCharacter(at: range.location)
+            breaks.append(layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).minY)
+        }
+        view.pageBreaks = breaks
         return view
     }
 
@@ -286,9 +334,25 @@ enum NoteExportRenderer {
     }
 }
 
-/// Keeps its text storage alive: a TextKit 1 text view does not own the storage behind its container.
+/// Keeps its text storage alive (a TextKit 1 text view does not own the storage behind its container), and ends a
+/// printed page where the next item starts, so each item of a combined print begins on a new page.
 final class ExportTextView: NSTextView {
     var ownedStorage: NSTextStorage?
+    /// The tops, in view coordinates, of the items after the first.
+    var pageBreaks: [CGFloat] = []
+
+    override func adjustPageHeightNew(_ newBottom: UnsafeMutablePointer<CGFloat>, top oldTop: CGFloat,
+                                      bottom oldBottom: CGFloat, limit bottomLimit: CGFloat) {
+        super.adjustPageHeightNew(newBottom, top: oldTop, bottom: oldBottom, limit: bottomLimit)
+        if let next = pageBreaks.first(where: { $0 > oldTop + 0.5 && $0 < newBottom.pointee }) {
+            newBottom.pointee = next
+        }
+    }
+}
+
+extension NSAttributedString.Key {
+    /// Export's mark on the first character of each item after the first (`NoteExportRenderer.attributed`).
+    static let exportPageBreak = NSAttributedString.Key("an.exportPageBreak")
 }
 
 /// Where Export may write.
@@ -300,13 +364,27 @@ enum NoteExportDestination {
     static func refusal(for folder: URL, storeRoot: URL?, archiveRoots: [URL]) -> String? {
         let target = canonicalComponents(folder)
         if let storeRoot, isWithin(target, canonicalComponents(storeRoot)) {
-            return "That folder is inside this library. Choose a folder outside it, such as Documents."
+            return libraryRefusal
         }
         if archiveRoots.contains(where: { isWithin(target, canonicalComponents($0)) }) {
-            return "That folder is inside an archive folder, which Archive Notes never writes to. Choose another folder."
+            return archiveRefusal
+        }
+        // An archive or library this app was never given still carries the suite's root marker: refuse a folder at
+        // or below one. Best effort (a folder the sandbox will not show reads as unmarked); the list above is the rule.
+        var folderURL = folder.standardizedFileURL.resolvingSymlinksInPath()
+        while folderURL.pathComponents.count > 1 {
+            let marker = folderURL.appendingPathComponent(RootMarker.filename)
+            if FileManager.default.fileExists(atPath: marker.path) {
+                return (try? RootMarker.read(at: folderURL))?.kind == .notes ? libraryRefusal : archiveRefusal
+            }
+            folderURL.deleteLastPathComponent()
         }
         return nil
     }
+
+    private static let libraryRefusal = "That folder is inside a library. Choose a folder outside it, such as Documents."
+    private static let archiveRefusal =
+        "That folder is inside an archive folder, which Archive Notes never writes to. Choose another folder."
 
     private static func canonicalComponents(_ url: URL) -> [String] {
         url.standardizedFileURL.resolvingSymlinksInPath().pathComponents.filter { $0 != "/" }
@@ -351,7 +429,7 @@ enum NoteExportWriter {
             case .pdf:
                 written.append(try writeNew(try NoteExportRenderer.pdfData([source]), base: base, ext: "pdf", into: folder))
             case .plainText:
-                let text = NoteExportRenderer.attributed([source], embedImages: false).string
+                let text = NoteExportRenderer.plainText([source])
                 written.append(try writeNew(Data(text.utf8), base: base, ext: "txt", into: folder))
             case .richText, .word:
                 let text = NoteExportRenderer.attributed([source], embedImages: false)
@@ -406,11 +484,16 @@ enum NoteExportWriter {
                                       fileManager: FileManager) throws -> URL {
         let markdown = NoteExportComposer.markdown(source)
         // Only the images this item owns: a reference outside its `assets/` (or a missing file) is left as written.
+        // Two spellings of one file (`assets/x.png`, `assets/./x.png`) are copied once, under each spelling's own
+        // path only when that path is new, so a second copy never meets the first.
         var assets: [(path: String, url: URL)] = []
-        for ref in NoteExportComposer.imageReferences(in: markdown) where !assets.contains(where: { $0.path == ref.path }) {
-            if case .resolved(let url) = AssetPathResolver.resolve(ref.path, inItemDirectory: source.itemDirectory) {
-                assets.append((ref.path, url))
-            }
+        var targets: Set<String> = []
+        for ref in NoteExportComposer.imageReferences(in: markdown) {
+            guard case .resolved(let url) = AssetPathResolver.resolve(ref.path, inItemDirectory: source.itemDirectory)
+            else { continue }
+            let target = ref.path.split(separator: "/").filter { $0 != "." }.joined(separator: "/").lowercased()
+            guard targets.insert(target).inserted else { continue }
+            assets.append((ref.path, url))
         }
         guard !assets.isEmpty else {
             return try writeNew(Data(markdown.utf8), base: base, ext: "md", into: folder)
@@ -420,7 +503,9 @@ enum NoteExportWriter {
         for asset in assets {
             // The path passed the resolver's syntactic gate: `assets/`-rooted, no `..`, not absolute.
             var target = noteFolder
-            for component in asset.path.split(separator: "/") { target.appendPathComponent(String(component)) }
+            for component in asset.path.split(separator: "/") where component != "." {
+                target.appendPathComponent(String(component))
+            }
             try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             try fileManager.copyItem(at: asset.url, to: target)
         }
