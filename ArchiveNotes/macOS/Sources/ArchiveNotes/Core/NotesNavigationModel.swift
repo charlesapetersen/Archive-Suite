@@ -704,6 +704,19 @@ final class NotesNavigationModel: ObservableObject {
         return selection.first
     }
 
+    /// What File ▸ Export… and Print… act on (W49.notes-export-print): the selected rows, in list order. Empty
+    /// while the list is not showing (templates, the Trash).
+    var exportableSelection: [UUID] {
+        guard paneMode == .notes, !selection.isEmpty else { return [] }
+        return displayed.lazy.filter { self.selection.contains($0.id) }.map(\.id)
+    }
+
+    /// What File ▸ Export Listed… acts on: every row the list shows, which is the selected folder after the filters.
+    var exportableListed: [UUID] {
+        guard paneMode == .notes else { return [] }
+        return displayed.map(\.id)
+    }
+
     // MARK: Undo and Redo of a delete (W40.fix-notes-delete-undo, W40.fix-notes-delete-redo)
 
     /// Edit ▸ Undo after a delete that reached the Trash: Put Back. Each step registers its opposite while

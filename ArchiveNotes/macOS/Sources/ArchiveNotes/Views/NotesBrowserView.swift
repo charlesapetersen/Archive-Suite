@@ -134,6 +134,10 @@ struct NotesBrowserView: View {
         .focusedSceneValue(\.newItemAction, NewItemAction(perform: { newItem(kind: $0, from: .folderDefault) },
                                                            newTemplate: { showNewTemplate() }))
         .focusedSceneValue(\.advancedSearchAction, AdvancedSearchAction(open: { openAdvancedSearch() }))
+        .focusedSceneValue(\.exportTarget, ExportTarget(
+            selectedCount: nav.paneMode == .notes ? nav.selection.count : 0,
+            listedCount: nav.paneMode == .notes ? nav.displayed.count : 0,
+            selected: { nav.exportableSelection }, listed: { nav.exportableListed }))
         .focusedSceneValue(\.deleteItemAction, nav.deletableSelection.map { id in
             DeleteItemAction(perform: { nav.requestDeleteItem(id) })
         })
@@ -486,6 +490,7 @@ private struct ItemListPane: View {
     @ObservedObject var model: NotesModel
     @ObservedObject var nav: NotesNavigationModel
     @EnvironmentObject private var flushRegistry: EditorFlushRegistry
+    @EnvironmentObject private var previewState: SourceBlockPreviewState
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
     @AppStorage(NotesLayoutSettingsKey.showNoteHeader) private var showingHeader = true
     @AppStorage(NotesLayoutSettingsKey.showTagBar) private var showingTagBar = true
@@ -506,7 +511,8 @@ private struct ItemListPane: View {
                         selection: $nav.selection,
                         onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
                         buildContextMenu: { selection in
-                            NotesItemContextMenu.make(nav: nav, selection: selection, flushing: flushRegistry)
+                            NotesItemContextMenu.make(nav: nav, selection: selection, flushing: flushRegistry,
+                                                      archiveRoots: { [previewState] in previewState.grantedArchiveFolders })
                         },
                         calendarsEnabled: calendarsEnabled
                     )

@@ -58,6 +58,9 @@ struct MenuShortcutTests {
         #expect(key(of: "File ▸ Choose Archive Folder…") == shortcut("o", [.command, .shift]))
         #expect(key(of: "Note ▸ Copy Link") == shortcut("c", [.command, .shift]))
         #expect(key(of: "File ▸ New Note") == shortcut("n", [.command]))
+        // W49.notes-export-print: Print… is ⌘P, as in every Mac app; Export… is ⇧⌘E.
+        #expect(key(of: "File ▸ Print…") == shortcut("p", [.command]))
+        #expect(key(of: "File ▸ Export…") == shortcut("e", [.command, .shift]))
         // W40.fix-notes-zotero-paste (notes-2 row 27): both Zotero commands have a key, Z for Zotero.
         #expect(key(of: "Note ▸ Attach Zotero Link…") == shortcut("z", [.command, .control]))
         #expect(key(of: "Note ▸ Auto-fill from Zotero…") == shortcut("z", [.command, .control, .option]))

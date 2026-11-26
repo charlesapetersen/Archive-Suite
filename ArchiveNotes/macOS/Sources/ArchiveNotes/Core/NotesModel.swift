@@ -1373,6 +1373,33 @@ final class NotesModel: ObservableObject {
         } catch { report(error, "load the note body"); return nil }
     }
 
+    /// The items File ▸ Export… and Print… read, in `ids` order (W49.notes-export-print). Read-only: each is loaded
+    /// fresh from its `.md`, with its folder (the base of its `assets/` references) and the list's date text. An
+    /// item that cannot be read is left out and named in `failed`.
+    func exportSources(for ids: [UUID]) async -> (sources: [NoteExportSource], failed: [String]) {
+        guard let noteStore else { return ([], []) }
+        let root = noteStore.rootURL
+        var sources: [NoteExportSource] = []
+        var failed: [String] = []
+        let wanted = Set(ids)
+        let summaries = Dictionary(allItems.lazy.filter { wanted.contains($0.id) }.map { ($0.id, $0) },
+                                   uniquingKeysWith: { first, _ in first })
+        for id in ids {
+            let summary = summaries[id]
+            do {
+                let item = try await noteStore.load(id)
+                sources.append(NoteExportSource(item: item, itemDirectory: NoteStore.itemDir(root: root, id: id),
+                                                dateText: summary?.dateColumnText))
+            } catch {
+                failed.append(summary?.title ?? id.uuidString)
+            }
+        }
+        return (sources, failed)
+    }
+
+    /// The open library's folder, which Export never writes into.
+    var storeRootURL: URL? { noteStore?.rootURL }
+
     /// Read-only extract provenance for the detail inspector. Loading the stored blocks preserves
     /// their saved source labels and never touches a source note or the archive corpus.
     func loadExtractSources(for id: UUID) async -> [ExtractSourceUsage]? {

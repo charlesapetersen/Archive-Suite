@@ -72,6 +72,8 @@ struct ArchiveNotesApp: App {
         .commands {
             NewItemCommands(notesModel: notesModel, flushRegistry: appDelegate.flushRegistry)
             ReaderRootCommands(previewState: previewState, notesModel: notesModel, appDelegate: appDelegate)
+            ExportPrintCommands(notesModel: notesModel, flushRegistry: appDelegate.flushRegistry,
+                                previewState: previewState)
             FormatCommands()
             SourceBlockCommands()
             ZoteroCommands()

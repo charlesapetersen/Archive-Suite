@@ -190,6 +190,65 @@ enum NewItemFlow {
     }
 }
 
+/// File ▸ Export…, Export Listed…, Page Setup… and Print… (⌘P) (W49.notes-export-print). Export and Print act on
+/// the focused window's selected rows; Export Listed on every row its list shows, which is the selected folder
+/// after the filters. `NoteExportFlow` asks where and how, and writes only new files outside the library.
+struct ExportPrintCommands: Commands {
+    let notesModel: NotesModel
+    let flushRegistry: EditorFlushRegistry
+    let previewState: SourceBlockPreviewState
+    @FocusedValue(\.exportTarget) private var target
+
+    var body: some Commands {
+        CommandGroup(replacing: .printItem) {
+            Button(exportTitle) { export(target?.selected() ?? []) }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled((target?.selectedCount ?? 0) == 0)
+            Button("Export Listed\u{2026}") { export(target?.listed() ?? []) }
+                .disabled((target?.listedCount ?? 0) == 0)
+            Divider()
+            Button("Page Setup\u{2026}") { NSApp.runPageLayout(nil) }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+            Button("Print\u{2026}") {
+                let ids = target?.selected() ?? [], model = notesModel, registry = flushRegistry
+                Task { await NoteExportFlow.print(ids, model: model, registry: registry) }
+            }
+            .keyboardShortcut("p", modifiers: .command)
+            .disabled((target?.selectedCount ?? 0) == 0)
+        }
+    }
+
+    private var exportTitle: String {
+        let count = target?.selectedCount ?? 0
+        return count > 1 ? "Export \(count) Items\u{2026}" : "Export\u{2026}"
+    }
+
+    private func export(_ ids: [UUID]) {
+        let model = notesModel, registry = flushRegistry, roots = previewState.grantedArchiveFolders
+        Task { await NoteExportFlow.export(ids, model: model, registry: registry, archiveRoots: roots) }
+    }
+}
+
+/// The rows Export and Print act on in the focused window: the selection and the whole list, each in list order.
+/// The lists are read only when a command runs; the menu needs only the counts.
+struct ExportTarget {
+    let selectedCount: Int
+    let listedCount: Int
+    let selected: @MainActor () -> [UUID]
+    let listed: @MainActor () -> [UUID]
+}
+
+struct ExportTargetKey: FocusedValueKey {
+    typealias Value = ExportTarget
+}
+
+extension FocusedValues {
+    var exportTarget: ExportTarget? {
+        get { self[ExportTargetKey.self] }
+        set { self[ExportTargetKey.self] = newValue }
+    }
+}
+
 /// Edit ▸ Advanced Search… (⇧⌥⌘F, as in the Reader; W40.notes-advanced-search): the focused window's form.
 struct AdvancedSearchCommands: Commands {
     @FocusedValue(\.advancedSearchAction) private var advancedSearch

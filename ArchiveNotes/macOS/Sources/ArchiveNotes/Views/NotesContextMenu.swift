@@ -16,7 +16,8 @@ final class NotesMenuAction: NSObject {
 enum NotesItemContextMenu {
 
     @MainActor
-    static func make(nav: NotesNavigationModel, selection: Set<UUID>, flushing registry: EditorFlushRegistry) -> NSMenu? {
+    static func make(nav: NotesNavigationModel, selection: Set<UUID>, flushing registry: EditorFlushRegistry,
+                     archiveRoots: @escaping @MainActor () -> [URL] = { [] }) -> NSMenu? {
         guard !selection.isEmpty else { return nil }
         let ids = Array(selection)
         let model = nav.model
@@ -99,6 +100,26 @@ enum NotesItemContextMenu {
             menu.addItem(delete)
             menu.addItem(.separator())
         }
+
+        // Export… and Print… of the clicked rows, in list order (W49.notes-export-print; File ▸ Export… and ⌘P).
+        let ordered = nav.displayed.lazy.filter { selection.contains($0.id) }.map(\.id)
+        let exportIDs = ordered.isEmpty ? ids : Array(ordered)
+        let exportItem = NSMenuItem(title: selection.count > 1 ? "Export \(selection.count) Items…" : "Export…",
+                                action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+        let exportAction = NotesMenuAction {
+            Task { await NoteExportFlow.export(exportIDs, model: model, registry: registry, archiveRoots: archiveRoots()) }
+        }
+        exportItem.target = exportAction
+        exportItem.representedObject = exportAction
+        menu.addItem(exportItem)
+        let printItem = NSMenuItem(title: "Print…", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+        let printAction = NotesMenuAction {
+            Task { await NoteExportFlow.print(exportIDs, model: model, registry: registry) }
+        }
+        printItem.target = printAction
+        printItem.representedObject = printAction
+        menu.addItem(printItem)
+        menu.addItem(.separator())
 
         func folderSubmenu(_ action: @escaping (UUID) -> Void) -> NSMenu {
             let sub = NSMenu()
