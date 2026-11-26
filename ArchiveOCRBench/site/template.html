@@ -1203,7 +1203,7 @@ if (SC) {
   const p0 = v => v === null || v === undefined ? '—' : (100 * v).toFixed(0) + '%';
   const head = r => '<td>' + r.route + ' <span class="meta">' + r.family + '</span></td><td>' + r.ok + ' of ' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.added_rate) + '</td><td>' + p1(r.rewritten_rate) + '</td><td>' + p1(r.cmer) + '</td><td>' + p1(r.nb_bowF1) + '</td><td>' + p1(r.nb_gap) + '</td>';
   document.getElementById('sc-own').innerHTML = SC.owner96.map(r => '<tr>' + head(r) + '<td>' + p1(r.suspect_rate) + '</td><td>' + p0(r.suspect_precision) + '</td><td>' + p0(r.suspect_recall) + '</td></tr>').join('');
-  document.getElementById('sc-pub').innerHTML = SC.public895.map(r => '<tr>' + head(r) + '<td>' + (r.order_edit === null ? '—' : r.order_edit.toFixed(3) + ' (' + r.order_pages + ')') + '</td></tr>').join('');
+  document.getElementById('sc-pub').innerHTML = SC.public895.map(r => '<tr>' + head(r).replace('</span></td>', '</span>' + (r.note ? ' <span class="meta">(' + r.note + ')</span>' : '') + '</td>') + '<td>' + (r.order_edit === null ? '—' : r.order_edit.toFixed(3) + ' (' + r.order_pages + ')') + '</td></tr>').join('');
   const CH = SC.chaos;
   if (CH) {
     document.getElementById('sc-chaos-note').textContent = 'The altered-word probe (CHAOS-Bench\'s idea): ' + CH.altered_words + ' words on ' + CH.pages + ' typewritten owner pages had one letter replaced by another of the same page\'s type (' + CH.made + ' made, ' + CH.rejected_by_eye + ' left out after an eye check). A reader that copies is reading the page; one that corrects writes the word it expects.';

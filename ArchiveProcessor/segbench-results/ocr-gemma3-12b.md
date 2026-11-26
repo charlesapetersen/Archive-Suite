@@ -13,7 +13,7 @@ Reproduce: `ocr_mac_local.py collect --model gemma3-12b-mlx4` (the 96) and `ocr_
 
 **Loop stop.** A greedy reading that falls into a loop runs to the 8,192-token cap, about nine minutes a page here, which made the full run impractical (the pilot's third page did exactly that). So a reading stops once its last 1,024 tokens repeat, token for token, a cycle of at most 256 tokens (`ocr_mac_local.loop_period`), and counts as failed, as it would at the cap. Over the 907 finished readings of the other Mac-local readers (granite-docling apart) the rule never fires, so it does not end a reading that would have finished. **Lenient** scores a looped page on what it read before the loop and a format-broken reply on its text after `TEXT:`, which is what an app with this stop would keep; **strict** counts both as 0, as every other route on the bench is counted.
 
-**Incomplete on the 895 public pages: 280 of 895 pages read.** Figures cover those only.
+**Partial sample on the 895 public pages: 280 of 895 pages read.** Figures cover those only. The run read in the corpus's run order, which interleaves the strata, so the pages read cover every stratum and all 18 sources; collection stopped there by the owner's call (2026-11-26) after the memory guard refused or killed seven resumes while the 9 GB model loaded. The pairs below are on those pages.
 
 ## Paired with other routes on the owner's 96
 
@@ -108,6 +108,9 @@ Memory guard whole-process rows for these runs (date, exit, seconds, peak RSS MB
 
 - 2026-11-25T06:33:54 · 0 · 13979 · 1072 · 9388 · 456 · 2
 - 2026-11-25T06:41:22 · 137 · 13 · 1485 · 7586 · 1929 · 4
+- 2026-11-25T09:59:02 · 137 · 13 · 848 · 7825 · 1798 · 4
+- 2026-11-26T03:13:57 · 137 · 14 · 3072 · 7717 · 1504 · 4
+- 2026-11-26T07:06:49 · 137 · 12 · 815 · 7945 · 2166 · 2
 
 
 ## Is it a candidate for the app's on-computer page OCR?
@@ -116,11 +119,12 @@ Memory guard whole-process rows for these runs (date, exit, seconds, peak RSS MB
 - Against Apple Vision on the 895 public pages (91 pages): Gemma 20.1 against 46.1, -25.97 points (worse).
 - Against the best Mac-local reader on the 96, Qwen3.5-9B 4-bit (Mac): Gemma 52.5 against 91.9, -39.43 points.
 - Speed: a median 24 s a page on the 96, so 102k pages would be about 28 days of continuous reading; Apple Vision reads a page in about a second.
+- Verdict: not a candidate. It loses to Apple Vision by a wide margin on both sets, fails 23 of the 96 and 133 of 280 public pages (mostly loops), and is slower; the public figures are a partial sample, but a gap this size would not close on the rest.
 
 ## Measurement card
 
 - **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake. The 895: each public dataset's own ground truth, frozen with the set (W43.corpus-build); not drafted by any scored route, not checked by the owner.
-- **Selection.** All 96 accuracy pages and all 895 frozen public pages, one reading each; none chosen by a route's reading or by ABBYY text. Every page where Apple Vision (26.6) read fewer than 20 words was replaced at the draw (19 of them, 4 tagged Handwritten; `ocr-truth.md`), so the 96 hold no page Vision reads as empty, and every comparison with Vision on them is on pages Vision could read. By the owner's answers, 15 of the 19 replaced pages were few-word pages, and 19 of 200 drawn owner pages (about 10%) hold only a few words (`ocr-vision-unfiltered.md`).
+- **Selection.** All 96 accuracy pages and 280 of the 895 frozen public pages, one reading each; none chosen by a route's reading or by ABBYY text. The public pages are the first read in the corpus's run order, which interleaves the strata, so every stratum and source is present but at uneven shares of its full count; the rest were not read (owner, 2026-11-26), so the public figures are a partial sample, not the 895. Every page where Apple Vision (26.6) read fewer than 20 words was replaced at the draw (19 of them, 4 tagged Handwritten; `ocr-truth.md`), so the 96 hold no page Vision reads as empty, and every comparison with Vision on them is on pages Vision could read. By the owner's answers, 15 of the 19 replaced pages were few-word pages, and 19 of 200 drawn owner pages (about 10%) hold only a few words (`ocr-vision-unfiltered.md`).
 - **Comparison.** The same request on both sets: the pinned build, the panel prompt, 8,192 tokens, temperature 0, the loop stop above and the same 2,400 px JPEGs every route on the bench read (the 455 public images remade by the same encoder). Every route is scored by the one scorer; failures count 0 on both sides of a pair. Apple Vision has 320 of the 895 (its Latin strata), so its pairs there are on those. Speed and memory are one M3 Pro with 18 GB, one page at a time, with the owner's usual apps open.
-- **Noise.** n = 96 and 895, paired per page with a bootstrap interval. Greedy local decoding is deterministic on one machine (`ocr-rerun-noise.md`). The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired interval across 0, is a tie. Speed and memory are one run of each page.
+- **Noise.** n = 96 and 280 (of 895), paired per page with a bootstrap interval. Greedy local decoding is deterministic on one machine (`ocr-rerun-noise.md`). The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired interval across 0, is a tie. Speed and memory are one run of each page.
 - **Scope.** One model at one quantisation and one prompt, on this Mac. Gemma 3's vision encoder sees each page at its fixed 896 px square, whatever the input size, so this measures that build as the Processor ships it, not Gemma 3 with tiled input. It does not settle a route for labels, which `ct-gemma-route-fields.md` measured.

@@ -937,6 +937,11 @@ SCORER_FIELDS = ("route", "family", "n", "ok", "nes", "nes_answered", "added_rat
                  "order_edit", "order_pages", "markup_pages", "markup_mean_lift")
 
 
+# A route whose public run stopped short of the 895 by an owner call: its row there is a partial sample.
+PARTIAL_PUBLIC = {"gemma3-12b-mlx4": "a partial sample: 280 of the 895, every stratum and source; collection stopped "
+                                     "by the owner on 2026-11-26 (segbench-results/ocr-gemma3-12b.md)"}
+
+
 def ocr_scorers():
     """The review's scorer additions per route on the 96 and on the 895 (whole sets only; the strata stay in the
     report), and the altered-word probe. None until ocr_rescore.py has run."""
@@ -946,6 +951,8 @@ def ocr_scorers():
     out = {s: sorted(({k: r.get(k) for k in SCORER_FIELDS} for r in d["summary"]
                       if r["set"] == s and r["stratum"] == "all" and r["ok"]), key=lambda r: -r["nes"])
            for s in ("owner96", "public895")}
+    for r in out["public895"]:
+        r["note"] = PARTIAL_PUBLIC.get(r["route"])
     out["chaos"] = json.loads(CHAOS.read_text()) if CHAOS.exists() else None
     if TRUTH_BIAS.exists():
         tb = json.loads(TRUTH_BIAS.read_text())

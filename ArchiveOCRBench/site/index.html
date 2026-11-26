@@ -934,6 +934,21 @@ const DATA = {
 }
 },
 {
+"id":"gemma3-12b-mlx4",
+"name":"Gemma 3 12B 4-bit (Mac; the Processor's label reader)",
+"panel":"mac",
+"pair":null,
+"std":0.0,
+"batch":null,
+"free_cluster":false,
+"machine":"Apple M3 Pro, 18 GB",
+"hw":{
+"seconds":24.0,
+"peak_gb":7.86,
+"peak_max_gb":7.86
+}
+},
+{
 "id":"qwen3.6-27b-farmshare",
 "name":"Qwen3.6 27B fp8 (FarmShare)",
 "panel":"farmshare",
@@ -2356,6 +2371,11 @@ const DATA = {
 51,
 96
 ],
+"gemma3-12b-mlx4":[
+52.5,
+73,
+96
+],
 "qwen3.6-27b-farmshare":[
 95.25,
 96,
@@ -2992,6 +3012,11 @@ const DATA = {
 "fastvlm-0.5b-bf16":[
 35.45,
 28,
+50
+],
+"gemma3-12b-mlx4":[
+58.23,
+39,
 50
 ],
 "qwen3.6-27b-farmshare":[
@@ -3854,6 +3879,11 @@ const DATA = {
 14,
 28
 ],
+"gemma3-12b-mlx4":[
+37.89,
+17,
+28
+],
 "qwen3.6-27b-farmshare":[
 94.93,
 28,
@@ -4712,6 +4742,11 @@ const DATA = {
 "fastvlm-0.5b-bf16":[
 23.14,
 8,
+16
+],
+"gemma3-12b-mlx4":[
+59.47,
+15,
 16
 ],
 "qwen3.6-27b-farmshare":[
@@ -46691,6 +46726,27 @@ true,
 "order_pages":0,
 "markup_pages":33,
 "markup_mean_lift":0.007888168203335792
+},
+{
+"route":"gemma3-12b-mlx4",
+"family":"Mac local",
+"n":96,
+"ok":73,
+"nes":0.5249565501290617,
+"nes_answered":0.6903538193478073,
+"added_rate":0.1047789993269015,
+"rewritten_rate":0.09255104330266996,
+"cmer":0.27012467001163415,
+"nb_overall":0.49244842076329365,
+"nb_bowF1":0.6195359176821359,
+"nb_gap":0.12708749691884225,
+"suspect_rate":0.12321741305979485,
+"suspect_precision":0.6908629441624365,
+"suspect_recall":0.9386206896551724,
+"order_edit":null,
+"order_pages":0,
+"markup_pages":4,
+"markup_mean_lift":0.0007057571681374069
 }
 ],
 "public895":[
@@ -46713,7 +46769,8 @@ true,
 "order_edit":0.06963089009165957,
 "order_pages":619,
 "markup_pages":12,
-"markup_mean_lift":9.652342256310239e-05
+"markup_mean_lift":9.652342256310239e-05,
+"note":null
 },
 {
 "route":"german-handwriting",
@@ -46734,7 +46791,8 @@ true,
 "order_edit":0.08162041156759395,
 "order_pages":63,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"gemini3.8-flash",
@@ -46755,7 +46813,8 @@ true,
 "order_edit":0.07939756291725442,
 "order_pages":278,
 "markup_pages":3,
-"markup_mean_lift":-1.2199287561606456e-06
+"markup_mean_lift":-1.2199287561606456e-06,
+"note":null
 },
 {
 "route":"fs-churro",
@@ -46776,7 +46835,8 @@ true,
 "order_edit":0.09672267346533128,
 "order_pages":269,
 "markup_pages":5,
-"markup_mean_lift":-1.2199287561606456e-06
+"markup_mean_lift":-1.2199287561606456e-06,
+"note":null
 },
 {
 "route":"trocr-kurrent",
@@ -46797,7 +46857,8 @@ true,
 "order_edit":0.08388734861165939,
 "order_pages":63,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"kurrent-v3",
@@ -46818,7 +46879,8 @@ true,
 "order_edit":0.07536137405122874,
 "order_pages":61,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"infinity-parser2-pro",
@@ -46839,7 +46901,8 @@ true,
 "order_edit":0.08884785738463415,
 "order_pages":547,
 "markup_pages":22,
-"markup_mean_lift":0.00015018778478436787
+"markup_mean_lift":0.00015018778478436787,
+"note":null
 },
 {
 "route":"qwen3.6-35b-a3b",
@@ -46860,7 +46923,8 @@ true,
 "order_edit":0.09504159711359143,
 "order_pages":560,
 "markup_pages":7,
-"markup_mean_lift":1.3933277909976338e-06
+"markup_mean_lift":1.3933277909976338e-06,
+"note":null
 },
 {
 "route":"qwen3.6-27b",
@@ -46881,7 +46945,8 @@ true,
 "order_edit":0.06615253597683622,
 "order_pages":538,
 "markup_pages":4,
-"markup_mean_lift":-5.080416006046446e-06
+"markup_mean_lift":-5.080416006046446e-06,
+"note":null
 },
 {
 "route":"greek-minuscule",
@@ -46902,7 +46967,8 @@ true,
 "order_edit":null,
 "order_pages":0,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"lightonocr3-4b",
@@ -46923,7 +46989,8 @@ true,
 "order_edit":0.0849267249752787,
 "order_pages":567,
 "markup_pages":96,
-"markup_mean_lift":0.014350827484666111
+"markup_mean_lift":0.014350827484666111,
+"note":null
 },
 {
 "route":"xiaomi-ocr-0",
@@ -46944,7 +47011,8 @@ true,
 "order_edit":0.08842586519320897,
 "order_pages":550,
 "markup_pages":192,
-"markup_mean_lift":0.010839896122371954
+"markup_mean_lift":0.010839896122371954,
+"note":null
 },
 {
 "route":"qwen3.5-27b",
@@ -46965,7 +47033,8 @@ true,
 "order_edit":0.0747683745377181,
 "order_pages":534,
 "markup_pages":6,
-"markup_mean_lift":1.6259924243567311e-06
+"markup_mean_lift":1.6259924243567311e-06,
+"note":null
 },
 {
 "route":"ling3-flash-vl-fp8",
@@ -46986,7 +47055,8 @@ true,
 "order_edit":0.09419635074214164,
 "order_pages":555,
 "markup_pages":3,
-"markup_mean_lift":1.6259924243567311e-06
+"markup_mean_lift":1.6259924243567311e-06,
+"note":null
 },
 {
 "route":"lightonocr3-0.8b",
@@ -47007,7 +47077,8 @@ true,
 "order_edit":0.08873361967922394,
 "order_pages":535,
 "markup_pages":122,
-"markup_mean_lift":0.015268049837473301
+"markup_mean_lift":0.015268049837473301,
+"note":null
 },
 {
 "route":"qwen3.8-27b",
@@ -47028,7 +47099,8 @@ true,
 "order_edit":0.09199402291766007,
 "order_pages":494,
 "markup_pages":5,
-"markup_mean_lift":1.4385196269299135e-06
+"markup_mean_lift":1.4385196269299135e-06,
+"note":null
 },
 {
 "route":"qwen3-vl-8b",
@@ -47049,7 +47121,8 @@ true,
 "order_edit":0.09587459036621761,
 "order_pages":479,
 "markup_pages":5,
-"markup_mean_lift":-5.978266531880083e-06
+"markup_mean_lift":-5.978266531880083e-06,
+"note":null
 },
 {
 "route":"tridis",
@@ -47070,7 +47143,8 @@ true,
 "order_edit":0.14480304718376943,
 "order_pages":121,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"catmus-medieval",
@@ -47091,7 +47165,8 @@ true,
 "order_edit":0.1560283299610487,
 "order_pages":106,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"qwen3-vl-235b",
@@ -47112,7 +47187,8 @@ true,
 "order_edit":0.07593658143199072,
 "order_pages":246,
 "markup_pages":5,
-"markup_mean_lift":-1.2793376827083007e-06
+"markup_mean_lift":-1.2793376827083007e-06,
+"note":null
 },
 {
 "route":"qwen3.5-4b",
@@ -47133,7 +47209,8 @@ true,
 "order_edit":0.10638762612160019,
 "order_pages":486,
 "markup_pages":5,
-"markup_mean_lift":-5.997415114085856e-07
+"markup_mean_lift":-5.997415114085856e-07,
+"note":null
 },
 {
 "route":"biblia",
@@ -47154,7 +47231,8 @@ true,
 "order_edit":null,
 "order_pages":0,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"glm-ocr",
@@ -47175,7 +47253,8 @@ true,
 "order_edit":0.07532670015511121,
 "order_pages":459,
 "markup_pages":9,
-"markup_mean_lift":6.39179513384669e-05
+"markup_mean_lift":6.39179513384669e-05,
+"note":null
 },
 {
 "route":"paddleocr-vl1.6",
@@ -47196,7 +47275,8 @@ true,
 "order_edit":0.0730623936264291,
 "order_pages":387,
 "markup_pages":12,
-"markup_mean_lift":5.052407839600132e-05
+"markup_mean_lift":5.052407839600132e-05,
+"note":null
 },
 {
 "route":"mccatmus",
@@ -47217,7 +47297,8 @@ true,
 "order_edit":0.14433887808090404,
 "order_pages":93,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"unlimited-ocr",
@@ -47238,7 +47319,8 @@ true,
 "order_edit":0.058306218093232706,
 "order_pages":367,
 "markup_pages":101,
-"markup_mean_lift":0.009384251380096032
+"markup_mean_lift":0.009384251380096032,
+"note":null
 },
 {
 "route":"apple-vision",
@@ -47259,7 +47341,8 @@ true,
 "order_edit":0.13833182889786663,
 "order_pages":159,
 "markup_pages":2,
-"markup_mean_lift":-1.6774020397208878e-06
+"markup_mean_lift":-1.6774020397208878e-06,
+"note":null
 },
 {
 "route":"paddleocr-vl1.5",
@@ -47280,7 +47363,8 @@ true,
 "order_edit":0.06724119319576252,
 "order_pages":320,
 "markup_pages":8,
-"markup_mean_lift":4.0725183397786026e-05
+"markup_mean_lift":4.0725183397786026e-05,
+"note":null
 },
 {
 "route":"ppocrv6-medium",
@@ -47301,7 +47385,8 @@ true,
 "order_edit":0.13519464599321437,
 "order_pages":403,
 "markup_pages":8,
-"markup_mean_lift":-9.042148801922441e-06
+"markup_mean_lift":-9.042148801922441e-06,
+"note":null
 },
 {
 "route":"fs-fanar",
@@ -47322,7 +47407,8 @@ true,
 "order_edit":0.4,
 "order_pages":1,
 "markup_pages":0,
-"markup_mean_lift":null
+"markup_mean_lift":null,
+"note":null
 },
 {
 "route":"nemotron-parse-2",
@@ -47343,7 +47429,30 @@ true,
 "order_edit":0.10185851761147627,
 "order_pages":296,
 "markup_pages":361,
-"markup_mean_lift":0.0024573976178325807
+"markup_mean_lift":0.0024573976178325807,
+"note":null
+},
+{
+"route":"gemma3-12b-mlx4",
+"family":"Mac local",
+"n":280,
+"ok":147,
+"nes":0.30340745669061986,
+"nes_answered":0.5779189651249903,
+"added_rate":0.08059701492537313,
+"rewritten_rate":0.19688323090430201,
+"cmer":0.3638163261942248,
+"nb_overall":0.37949074985778364,
+"nb_bowF1":0.3723835416030352,
+"nb_gap":-0.0071072082547484206,
+"suspect_rate":0.5010055304172951,
+"suspect_precision":0.57451078775715,
+"suspect_recall":0.8841698841698842,
+"order_edit":0.11796344680960065,
+"order_pages":91,
+"markup_pages":4,
+"markup_mean_lift":3.555700873536873e-05,
+"note":"a partial sample: 280 of the 895, every stratum and source; collection stopped by the owner on 2026-11-26 (segbench-results/ocr-gemma3-12b.md)"
 },
 {
 "route":"fs-qari",
@@ -47364,7 +47473,8 @@ true,
 "order_edit":0.0,
 "order_pages":1,
 "markup_pages":1,
-"markup_mean_lift":0.0
+"markup_mean_lift":0.0,
+"note":null
 }
 ],
 "chaos":{
@@ -74528,7 +74638,7 @@ if (SC) {
   const p0 = v => v === null || v === undefined ? '—' : (100 * v).toFixed(0) + '%';
   const head = r => '<td>' + r.route + ' <span class="meta">' + r.family + '</span></td><td>' + r.ok + ' of ' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.added_rate) + '</td><td>' + p1(r.rewritten_rate) + '</td><td>' + p1(r.cmer) + '</td><td>' + p1(r.nb_bowF1) + '</td><td>' + p1(r.nb_gap) + '</td>';
   document.getElementById('sc-own').innerHTML = SC.owner96.map(r => '<tr>' + head(r) + '<td>' + p1(r.suspect_rate) + '</td><td>' + p0(r.suspect_precision) + '</td><td>' + p0(r.suspect_recall) + '</td></tr>').join('');
-  document.getElementById('sc-pub').innerHTML = SC.public895.map(r => '<tr>' + head(r) + '<td>' + (r.order_edit === null ? '—' : r.order_edit.toFixed(3) + ' (' + r.order_pages + ')') + '</td></tr>').join('');
+  document.getElementById('sc-pub').innerHTML = SC.public895.map(r => '<tr>' + head(r).replace('</span></td>', '</span>' + (r.note ? ' <span class="meta">(' + r.note + ')</span>' : '') + '</td>') + '<td>' + (r.order_edit === null ? '—' : r.order_edit.toFixed(3) + ' (' + r.order_pages + ')') + '</td></tr>').join('');
   const CH = SC.chaos;
   if (CH) {
     document.getElementById('sc-chaos-note').textContent = 'The altered-word probe (CHAOS-Bench\'s idea): ' + CH.altered_words + ' words on ' + CH.pages + ' typewritten owner pages had one letter replaced by another of the same page\'s type (' + CH.made + ' made, ' + CH.rejected_by_eye + ' left out after an eye check). A reader that copies is reading the page; one that corrects writes the word it expects.';

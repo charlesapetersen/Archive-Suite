@@ -43,6 +43,11 @@ COMPARE = {
                   ('lightonocr3-4b', 'LightOnOCR-3 4B bf16 (FarmShare)'), ('paddleocr-vl1.6', 'PaddleOCR-VL 1.6 (Sherlock)'),
                   ('xiaomi-ocr-0', 'Xiaomi-OCR-0 (Sherlock)'), ('gemini3.7-flash-gw', 'Gemini 3.7 Flash (gateway, cloud)')],
 }
+# Owner, 2026-11-26 walkthrough (option a): collection stopped at the pages already read, since the memory guard
+# refused or killed seven resumes while the 9 GB model loaded beside the owner's apps.
+PARTIAL_895 = ('The run read in the corpus\'s run order, which interleaves the strata, so the pages read cover every '
+               'stratum and all 18 sources; collection stopped there by the owner\'s call (2026-11-26) after the memory '
+               'guard refused or killed seven resumes while the 9 GB model loaded. The pairs below are on those pages.')
 SET_NAME = {'owner96': "the owner's 96", 'public895': 'the 895 public pages'}
 
 
@@ -226,7 +231,8 @@ def main():
           '**strict** counts both as 0, as every other route on the bench is counted.']
     for w, s in (('owner96', o), ('public895', u)):
         if s['read'] < s['pages']:
-            L += ['', f"**Incomplete on {SET_NAME[w]}: {s['read']} of {s['pages']} pages read.** Figures cover those only."]
+            L += ['', f"**Partial sample on {SET_NAME[w]}: {s['read']} of {s['pages']} pages read.** Figures cover those "
+                  'only. ' + (PARTIAL_895 if w == 'public895' else '')]
     for w, s in (('owner96', o), ('public895', u)):
         L += ['', f"## Paired with other routes on {SET_NAME[w]}", '',
               'Gemma less the other route, NES points on the pages both have; failures count 0 on both sides.', '',
@@ -255,16 +261,18 @@ def main():
     L += ['', *card(
         TRUTH_96 + ' The 895: each public dataset\'s own ground truth, frozen with the set (W43.corpus-build); not '
         'drafted by any scored route, not checked by the owner.',
-        'All 96 accuracy pages and all 895 frozen public pages, one reading each; none chosen by a route\'s reading or '
-        'by ABBYY text. ' + DRAW_96,
+        f"All 96 accuracy pages and {u['read']} of the 895 frozen public pages, one reading each; none chosen by a "
+        "route's reading or by ABBYY text. The public pages are the first read in the corpus's run order, which "
+        "interleaves the strata, so every stratum and source is present but at uneven shares of its full count; the "
+        "rest were not read (owner, 2026-11-26), so the public figures are a partial sample, not the 895. " + DRAW_96,
         'The same request on both sets: the pinned build, the panel prompt, 8,192 tokens, temperature 0, the loop stop '
         'above and the same '
         '2,400 px JPEGs every route on the bench read (the 455 public images remade by the same encoder). Every route '
         'is scored by the one scorer; failures count 0 on both sides of a pair. Apple Vision has 320 of the 895 '
         '(its Latin strata), so its pairs there are on those. Speed and memory are one M3 Pro with 18 GB, one page '
         'at a time, with the owner\'s usual apps open.',
-        'n = 96 and 895, paired per page with a bootstrap interval. Greedy local decoding is deterministic on one '
-        'machine (`ocr-rerun-noise.md`). ' + NOISE_96 + ' Speed and memory are one run of each page.',
+        f"n = 96 and {u['read']} (of 895), paired per page with a bootstrap interval. Greedy local decoding is deterministic on one "
+        "machine (`ocr-rerun-noise.md`). " + NOISE_96 + ' Speed and memory are one run of each page.',
         'One model at one quantisation and one prompt, on this Mac. Gemma 3\'s vision encoder sees each page at its '
         'fixed 896 px square, whatever the input size, so this measures that build as the Processor ships it, not '
         'Gemma 3 with tiled input. It does not settle a route for labels, which `ct-gemma-route-fields.md` measured.')]
@@ -291,6 +299,9 @@ def assessment(o, u):
         L.append(f"- Speed: a median {o['speed']['wall_median']:.0f} s a page on the 96, so 102k pages would be about "
                  f"{102000 * o['speed']['wall_median'] / 86400:.0f} days of continuous reading; Apple Vision reads a page "
                  "in about a second.")
+    L.append(f"- Verdict: not a candidate. It loses to Apple Vision by a wide margin on both sets, fails "
+             f"{o['pages'] - o['ok']} of the 96 and {u['read'] - u['ok']} of {u['read']} public pages (mostly loops), "
+             "and is slower; the public figures are a partial sample, but a gap this size would not close on the rest.")
     return L
 
 
