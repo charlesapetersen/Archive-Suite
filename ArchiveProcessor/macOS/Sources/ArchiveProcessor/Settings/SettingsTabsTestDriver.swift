@@ -85,9 +85,6 @@ enum SettingsTabsTestDriver {
             let note = SettingsTabOwnership.shortcutNote(key)
             check("3 \(control) names its home", note?.contains(seen[key]?.home ?? "?") == true, note ?? "nil")
         }
-        for stage in SettingsSheetModel.cardStages + SettingsSheetModel.ruleStageIDs {
-            check("3 sheet stage \(stage) names a tab", SettingsSheetPage.stageNote(stage) != nil)
-        }
     }
 
     // 4. The Advanced groups: a reason each, a default each key, and a count and a reset that mean what they say.

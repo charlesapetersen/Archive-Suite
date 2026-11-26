@@ -291,7 +291,7 @@ enum SettingsSheetTestDriver {
             check("3a \(name): the plan in use", planSheet.totals.contains { $0.id == "plan" && $0.value == "In use" },
                   planSheet.totals.map { "\($0.id)=\($0.value)" }.joined(separator: ", "))
         }
-        let onStoredKey = SettingsSheetView.running(
+        let onStoredKey = SettingsAdvisor.running(
             segmentation: .manual, useAppleVision: false, useGateway: false, useLocalAgent: true,
             provider: .gemini, model: LLMProvider.gemini.models[0], table: table,
             localAgentModel: "claude-sonnet-5-5", claudeBilling: .apiKey)
@@ -302,12 +302,12 @@ enum SettingsSheetTestDriver {
               !storedKeySheet.resources.plans.contains("claude") && !onStoredKey.onPlan
               && onStoredKey.readingName.contains("API key"))
         // Reading through the plan already: the sheet finds the row and offers no switch.
-        let onPlan = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false, useLocalAgent: true,
+        let onPlan = SettingsAdvisor.running(segmentation: .manual, useAppleVision: false, useGateway: false, useLocalAgent: true,
                                                provider: .gemini, model: LLMProvider.gemini.models[0], table: table,
                                                localAgentTool: .claude, localAgentModel: "claude-sonnet-5-5",
                                                claudeBilling: .subscription)
         check("3a the plan's run is the Claude reading row", onPlan.readingRouteID == "claude-sonnet5.5", onPlan.readingRouteID ?? "nil")
-        let onCLIDefault = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false,
+        let onCLIDefault = SettingsAdvisor.running(segmentation: .manual, useAppleVision: false, useGateway: false,
                                                      useLocalAgent: true, provider: .gemini, model: LLMProvider.gemini.models[0],
                                                      table: table, localAgentTool: .claude, localAgentModel: "")
         check("3a the CLI's own default model is no measured row", onCLIDefault.readingRouteID == nil)
@@ -324,7 +324,7 @@ enum SettingsSheetTestDriver {
         for (name, provider, model) in [("Anthropic", LLMProvider.anthropic, sonnet),
                                         ("OpenRouter", .openrouter, LLMProvider.openrouter.models.first {
                                             OpenRouterRoute.forModel($0.id)?.makerAppRoute == "anthropic|claude-sonnet-5-5" } ?? sonnet)] {
-            let onKey = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false,
+            let onKey = SettingsAdvisor.running(segmentation: .manual, useAppleVision: false, useGateway: false,
                                                   useLocalAgent: false, provider: provider, model: model, table: table)
             check("3a \(name) key run: the Claude row, not on the plan",
                   onKey.readingRouteID == "claude-sonnet5.5" && !onKey.onPlan, onKey.readingRouteID ?? "nil")
@@ -366,12 +366,12 @@ enum SettingsSheetTestDriver {
                   r.apply == nil && r.runsNow?.contains("needs macOS 27") == true, r.runsNow ?? "nil")
         }
         SettingsSheetModel.onDeviceUnavailable = wasUnavailable
-        let fmRunning = SettingsSheetView.running(segmentation: .manual, useAppleVision: true, useGateway: false, useLocalAgent: false,
+        let fmRunning = SettingsAdvisor.running(segmentation: .manual, useAppleVision: true, useGateway: false, useLocalAgent: false,
                                                   provider: .gemini, model: LLMProvider.gemini.models[0], table: table,
                                                   appleVisionModelID: OnDeviceModelClient.modelID)
         check("3c reading with the on-device model is its row", fmRunning.readingRouteID == "apple-fm-27",
               fmRunning.readingRouteID ?? "nil")
-        check("3c reading with Vision is Vision's row", SettingsSheetView.running(
+        check("3c reading with Vision is Vision's row", SettingsAdvisor.running(
             segmentation: .manual, useAppleVision: true, useGateway: false, useLocalAgent: false, provider: .gemini,
             model: LLMProvider.gemini.models[0], table: table).readingRouteID == "apple-vision")
         if let r = card(sheet("on-device-running", general: chooseFM, running: fmRunning), "reading") {
@@ -457,6 +457,7 @@ enum SettingsSheetTestDriver {
         // 4b. The writes, on a scratch store and a scratch output folder: an override into the collection, the way back
         // from every layer, a switch, and the general settings when there is no folder.
         writes(table: table, pairs: pairs)
+        advisor(table: table, pairs: pairs)
 
         // 5. An unmeasured kind in the mix.
         let mixed = sheet("clippings", general: SettingsLayer(kind: .general, name: "General"),
@@ -598,14 +599,14 @@ enum SettingsSheetTestDriver {
         check("7 an 8 GB Mac: the overall figure says what counts as 0",
               small.totals.first { $0.id == "accuracy" }?.detail?.contains("count as 0") == true)
         for (name, m) in [("free", free), ("gemini", paid), ("custom", custom), ("small", small)] {
-            for tab in SettingsSheetView.Tab.allCases {
-                let ink = renderedInk(SettingsSheetPage(model: m, tab: tab), saveAs: "\(name)-\(tab.rawValue.lowercased())")
+            for tab in SettingsAdvisorSheet.Tab.allCases {
+                let ink = renderedInk(SettingsAdvisorPage(model: m, tab: tab), saveAs: "\(name)-\(tab.rawValue.lowercased())")
                 check("7 \(name) \(tab.rawValue) renders (\(ink) dark px)", ink > 20_000)
             }
         }
-        let kitInk = renderedInk(SettingsSheetPage(model: clusterKit, tab: .range), saveAs: "kit-cluster-range")
+        let kitInk = renderedInk(SettingsAdvisorPage(model: clusterKit, tab: .range), saveAs: "kit-cluster-range")
         check("7 the after-training points render (\(kitInk) dark px)", kitInk > 20_000)
-        let dark = renderedInk(SettingsSheetPage(model: free, tab: .choices), saveAs: "free-choices-dark", dark: true)
+        let dark = renderedInk(SettingsAdvisorPage(model: free, tab: .advisor), saveAs: "free-advisor-dark", dark: true)
         check("7 dark appearance renders (\(dark) light px)", dark > 20_000)
     }
 
@@ -642,6 +643,125 @@ enum SettingsSheetTestDriver {
         check("4b with no folder the general settings take it", none.ok && store.general.entry(SettingsSheetModel.overrideKey("dating")) != nil)
         _ = g.clear(SettingsSheetModel.overrideKey("dating"), doc: nil)
         check("4b and give it back", store.general.entry(SettingsSheetModel.overrideKey("dating")) == nil)
+    }
+
+    /// 9. The Advisor sheet (W49.proc-settings-advisor-advanced): the figures follow the draft before anything is
+    /// written; Save answers writes the answers alone; Apply writes the stage choices too, into the edited layer only,
+    /// and the app's pick again clears a choice everywhere; the run settings Apply switches are the ones a card offers.
+    private static func advisor(table: SettingsRouteTable, pairs: OCRPairMatrix?) {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("settings-advisor-\(UUID().uuidString)", isDirectory: true)
+        let letters = root.appendingPathComponent("Letters", isDirectory: true)
+        let other = root.appendingPathComponent("Other", isDirectory: true)
+        for f in [letters, other] { try? fm.createDirectory(at: f, withIntermediateDirectories: true) }
+        defer { try? fm.removeItem(at: root) }
+        let store = SettingsLayerStore(directory: root.appendingPathComponent("store", isDirectory: true))
+        let target = SettingsAdvisor.Target.collection(letters)
+        func doc(_ folder: URL) -> CollectionSettingsDocument? {
+            if case .document(let d) = CollectionSettingsFile.read(in: folder) { return d }
+            return nil
+        }
+        func model(_ r: SettingsResolver, pages: Int = 100) -> SettingsSheetModel {
+            SettingsSheetModel(table: table, pairs: pairs, resolver: r, macMemoryGB: 16, pages: pages, running: running,
+                               claudeBilling: .unknown)
+        }
+        let readingKey = SettingsSheetModel.overrideKey("reading")
+        let base = SettingsAdvisor.baseResolver(target, store: store, doc: nil)
+        var draft = SettingsAdvisor.draft(target, base: base, pages: 250)
+        check("9a a fresh collection's draft answers nothing", draft.answers.answered.isEmpty && draft.choices.isEmpty
+              && draft.pages == 250, draft.answers.answered.sorted().joined(separator: ","))
+        draft.answers.hours = 2
+        draft.answers.touch(.hours)
+        draft.choices["reading"] = .route("qwen3.5-9b-mlx4")
+        let preview = SettingsAdvisor.resolver(base, target: target, draft: draft)
+        let previewModel = model(preview, pages: draft.pages)
+        check("9a the figures follow the draft's hours", previewModel.answers.hours == 2, "\(previewModel.answers.hours)")
+        check("9a the reading row follows the draft's choice",
+              previewModel.cards.first { $0.id == "reading" }.map { $0.isCustom && $0.routeID == "qwen3.5-9b-mlx4" } == true)
+        check("9a the batch size is the draft's", previewModel.answers.pages == 250)
+        check("9a nothing is written before Save answers or Apply",
+              CollectionSettingsFile.read(in: letters) == .missing && store.general.entry(.hours) == nil)
+
+        var out = SettingsAdvisor.save(draft, to: target, store: store, doc: nil, choices: false)
+        check("9b Save answers writes the answers into the collection", out.ok
+              && doc(letters)?.collection.entry(.hours)?.value == .double(2))
+        check("9b Save answers leaves the stage choice unwritten", doc(letters)?.collection.entry(readingKey) == nil)
+        out = SettingsAdvisor.save(draft, to: target, store: store, doc: out.doc, choices: true)
+        check("9b Apply writes the stage choice into the collection", out.ok
+              && doc(letters)?.collection.entry(readingKey)?.value == .string("qwen3.5-9b-mlx4"))
+        check("9b another collection and the general layer are untouched",
+              CollectionSettingsFile.read(in: other) == .missing && store.general.entry(.hours) == nil
+                && store.general.entry(readingKey) == nil)
+
+        // The app's pick again clears the stage's choice wherever it was set.
+        _ = store.setGeneral(readingKey, .string("lightonocr-3-4b-mlx8"), source: .setByUser(date))
+        var back = SettingsAdvisor.draft(target, base: SettingsAdvisor.baseResolver(target, store: store, doc: out.doc), pages: 100)
+        check("9c reopening reads the saved answers", back.answers.isAnswered(.hours) && back.answers.hours == 2)
+        back.choices["reading"] = .appPick
+        let backPreview = SettingsAdvisor.resolver(SettingsAdvisor.baseResolver(target, store: store, doc: out.doc),
+                                                   target: target, draft: back)
+        check("9c the preview drops the choice in every layer", backPreview.resolve(readingKey).layer == nil
+              && model(backPreview).cards.first { $0.id == "reading" }.map { !$0.isCustom && !$0.hasOverride } == true)
+        check("9c and the store still holds both until Apply", store.general.entry(readingKey) != nil
+              && doc(letters)?.collection.entry(readingKey) != nil)
+        out = SettingsAdvisor.save(back, to: target, store: store, doc: out.doc, choices: true)
+        check("9c Apply clears it in the collection and the general layer", out.ok
+              && doc(letters)?.collection.entry(readingKey) == nil && store.general.entry(readingKey) == nil)
+        check("9c and keeps the answers", doc(letters)?.collection.entry(.hours)?.value == .double(2))
+
+        // General and project targets write their own layer.
+        var g = SettingsAdvisor.draft(.general, base: SettingsAdvisor.baseResolver(.general, store: store, doc: nil), pages: 10)
+        g.answers.preference = .cheapestWithinPoint
+        g.answers.touch(.preference)
+        out = SettingsAdvisor.save(g, to: .general, store: store, doc: nil, choices: true)
+        check("9d the general target writes the general layer", out.ok
+              && store.general.entry(.preference)?.value == .string(SettingsPreference.cheapestWithinPoint.rawValue))
+        check("9d and no collection", doc(other) == nil)
+        if let project = store.addProject(named: "Letters project") {
+            var pd = SettingsAdvisor.draft(.project(project.id),
+                                           base: SettingsAdvisor.baseResolver(.project(project.id), store: store, doc: nil), pages: 10)
+            pd.answers.hours = 30
+            pd.answers.touch(.hours)
+            out = SettingsAdvisor.save(pd, to: .project(project.id), store: store, doc: nil, choices: false)
+            check("9d the project target writes the project", out.ok && store.project(project.id)?.entry(.hours)?.value == .double(30))
+        } else {
+            check("9d a scratch project", false)
+        }
+        check("9d titles name the target",
+              SettingsAdvisor.title(target, projectName: nil).contains("“Letters”")
+                && SettingsAdvisor.applyTitle(.general) == "Apply to General defaults")
+
+        // 9e. The run settings Apply switches, on a scratch defaults domain. The paths that pick a provider's model go
+        // through `ModelSelectionStore.shared`, which writes this app's own defaults, so only the ones that do not are
+        // run here; those share `ReaderChoice.apply` with the Reader menu (test-settings-tabs.sh section 6).
+        let suite = "settings-advisor-\(UUID().uuidString)"
+        if let d = UserDefaults(suiteName: suite) {
+            defer { d.removePersistentDomain(forName: suite) }
+            SettingsAdvisor.applyRun(.segmentation(.gemini), defaults: d)
+            check("9e a segmentation pick sets Process Files' approach", d.string(forKey: DefaultsKeys.segmentationApproach) == "gemini")
+            d.set(true, forKey: DefaultsKeys.useGateway)
+            d.set(LocalAgentTool.codex.rawValue, forKey: DefaultsKeys.localAgentTool)
+            d.set("/opt/codex", forKey: DefaultsKeys.localAgentBinaryPath)
+            SettingsAdvisor.applyRun(.readingByPlan(model: "claude-sonnet-5-5"), defaults: d)
+            check("9e the Claude plan is the Local Agent's claude at the row's model, alone",
+                  ReaderChoice.current(d) == .localAgent && !d.bool(forKey: DefaultsKeys.useGateway)
+                    && d.string(forKey: DefaultsKeys.localAgentModel) == "claude-sonnet-5-5"
+                    && d.string(forKey: DefaultsKeys.localAgentTool) == LocalAgentTool.claude.rawValue
+                    && d.string(forKey: DefaultsKeys.localAgentBinaryPath) == "")
+            SettingsAdvisor.applyRun(.reading(appRoute: "gemini|no-such-model"), defaults: d)
+            check("9e a reading row the app has no model for changes nothing", ReaderChoice.current(d) == .localAgent)
+        } else {
+            check("9e a scratch defaults domain", false)
+        }
+        let quiet = model(SettingsResolver(general: store.general))
+        check("9f Apply names what it switches, and only that",
+              SettingsAdvisor.runChanges(quiet).count == quiet.cards.filter { $0.apply != nil }.count
+                && (SettingsAdvisor.runChangeWords(quiet) == nil) == SettingsAdvisor.runChanges(quiet).isEmpty)
+        var mixed = CollectionInterviewAnswers()
+        check("9g an unanswered mix says the test-page mix is used", SettingsAdvisor.mixSummary(mixed).hasPrefix("Not given"))
+        mixed.measuredShares = ["typewritten": 60, "handwritten": 40]
+        check("9g the mix in one line", SettingsAdvisor.mixSummary(mixed).contains("60%")
+              && SettingsAdvisor.mixSummary(mixed).contains("40%"), SettingsAdvisor.mixSummary(mixed))
     }
 
     /// The range tab's checks for one profile.

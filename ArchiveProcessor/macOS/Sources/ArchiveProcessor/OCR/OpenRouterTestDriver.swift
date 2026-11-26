@@ -724,7 +724,7 @@ enum OpenRouterTestDriver {
             eq("8 an open model's row is unchanged", open.appRoute(keys: ["openrouter"]), "openrouter|qwen/qwen3.6-27b")
         }
         // The sheet sees the run's mapped model as its maker's measured row.
-        let running = SettingsSheetView.running(segmentation: .defaultApproach, useAppleVision: false, useGateway: false,
+        let running = SettingsAdvisor.running(segmentation: .defaultApproach, useAppleVision: false, useGateway: false,
                                                 useLocalAgent: false, provider: .openrouter, model: makers[0].model, table: table)
         eq("8 the sheet finds the mapped model's row", running.readingRouteID, "gemini3.8-flash")
 

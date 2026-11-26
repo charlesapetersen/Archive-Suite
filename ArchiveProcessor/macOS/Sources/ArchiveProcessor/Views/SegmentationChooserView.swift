@@ -129,7 +129,7 @@ struct SegmentationChooserView: View {
                 Text("The segmentation figures are missing from this build; only Full manual is offered.")
                     .font(.caption2).foregroundStyle(.primary)
             }
-            SettingsSheetButton(title: "Figures and other choices…", pages: pageCount, pagesCaption: scaleCaption)
+            SettingsAdvisorButton(title: "Compare routes & trade-offs…", pages: pageCount)
                 .controlSize(.small)
                 .accessibilityIdentifier("ap.segmentation.openSettingsSheet")
         }

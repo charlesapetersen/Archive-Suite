@@ -40,25 +40,18 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-default-drop-zone")
     }
 
+    /// The old sheet's Rules tab is gone (W49.proc-settings-advisor-advanced): the scanned-newspaper detector is a switch
+    /// in Settings › Advanced, and the newspaper layout helper's download is in Settings › Accounts' local models.
     func testNewspaperLayoutRuleOffersItsHelper() throws {
-        let button = element("ap.segmentation.openSettingsSheet")
-        XCTAssertTrue(button.waitForExistence(timeout: 10))
-        button.click()
-        let rules = app.sheets.firstMatch.radioButtons["Rules"]
-        XCTAssertTrue(rules.waitForExistence(timeout: 10))
-        rules.click()
-        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
-        let scan = element("ap.sheet.switch.layout.scan_newspapers_yolo")
-        for _ in 0..<15 where !scroll.frame.contains(scan.frame) {
-            scroll.scroll(byDeltaX: 0, deltaY: -110)
-        }
-        XCTAssertTrue(scan.exists && scroll.frame.contains(scan.frame), "the scan rule and its note fit in the sheet")
+        openSettings("Advanced")
+        let scan = element("ap.settings.scanNewspapersDocLayoutYOLO")
+        XCTAssertTrue(scan.waitForExistence(timeout: 10), "Advanced offers the scanned-newspaper detector")
         attachScreenshot("processor-newspaper-scan-evidence")
-
+        openSettings("Accounts")
         let download = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Download the newspaper layout helper")).firstMatch
-        XCTAssertTrue(download.waitForExistence(timeout: 5), "the rule offers the checked helper download")
-        for _ in 0..<15 where !download.isHittable { scroll.scroll(byDeltaX: 0, deltaY: -180) }
-        XCTAssertTrue(download.isHittable)
+        let row = element("ap.sheet.newspaperLayoutDownload")
+        XCTAssertTrue(download.waitForExistence(timeout: 10) || row.waitForExistence(timeout: 2),
+                      "Accounts offers the checked layout helper download")
         attachScreenshot("processor-newspaper-layout-rule")
     }
 
@@ -445,9 +438,9 @@ final class ProcessorUITests: XCTestCase {
                       "the saved strings are the tag format's: \(renderedText(of: result))")
     }
 
-    /// W36.seg-opt-proof, moved by W46.settings-sheet: the Segmentation chooser in Process Files offers every
-    /// approach, and its figures, cost and the other choices are on the settings sheet it opens: one card per stage
-    /// with what a better figure would need and an override, and a tab of the stages that are rules.
+    /// W36.seg-opt-proof, moved by W46.settings-sheet and W49.proc-settings-advisor-advanced: the Segmentation chooser in
+    /// Process Files offers every approach, and its figures, cost and the other choices are on the Advisor sheet it
+    /// opens: the batch's answers, one row per stage with its next step up and an override, and the Range charts.
     func testSegmentationChooserOffersEachApproachAndTheSheetShowsTheFigures() throws {
         let picker = element("ap.segmentation.picker")
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "Process Files must show the Segmentation chooser")
@@ -459,70 +452,32 @@ final class ProcessorUITests: XCTestCase {
         }
 
         let sheetButton = element("ap.segmentation.openSettingsSheet")
-        XCTAssertTrue(sheetButton.waitForExistence(timeout: 5), "the chooser opens the settings sheet for its figures")
+        XCTAssertTrue(sheetButton.waitForExistence(timeout: 5), "the chooser opens the Advisor for its figures")
         sheetButton.click()
-        XCTAssertTrue(element("ap.sheet").waitForExistence(timeout: 10), "the settings sheet appears")
-        for stage in ["reading", "segmentation", "dating", "entities"] {
-            XCTAssertTrue(element("ap.sheet.card.\(stage)").waitForExistence(timeout: 5), "the sheet has the \(stage) card")
-            XCTAssertTrue(element("ap.sheet.override.\(stage)").exists, "the \(stage) card has its override menu")
+        XCTAssertTrue(element("ap.advisor").waitForExistence(timeout: 10), "the Advisor sheet appears")
+        for id in ["ap.advisor.pages", "ap.advisor.batchLimit", "ap.advisor.hours", "ap.advisor.measure", "ap.advisor.preference"] {
+            XCTAssertTrue(element(id).exists, "the Advisor asks \(id)")
         }
-        XCTAssertTrue(app.sheets.firstMatch.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
-                                                                          "What a better figure would need",
-                                                                          "What a better figure would need")).firstMatch.exists,
-                      "each card says what a better figure would need")
-        attachScreenshot("processor-settings-sheet-choices")
+        for stage in ["reading", "segmentation", "dating", "entities"] {
+            XCTAssertTrue(element("ap.advisor.stage.\(stage)").waitForExistence(timeout: 5), "the Advisor has the \(stage) row")
+            XCTAssertTrue(element("ap.advisor.override.\(stage)").exists, "the \(stage) row has its override menu")
+            XCTAssertTrue(renderedText(of: element("ap.advisor.next.\(stage)")).hasPrefix("Next step up"),
+                          "the \(stage) row says its next step up")
+        }
+        attachScreenshot("processor-advisor")
 
         // W46.settings-range-view: the Range tab, one chart per stage (choosing from it:
         // testRangeChoosingSetsTheCardsOverrideAndTheWayBack).
         let range = app.sheets.firstMatch.radioButtons["Range"]
-        XCTAssertTrue(range.waitForExistence(timeout: 5), "the sheet has a Range tab")
+        XCTAssertTrue(range.waitForExistence(timeout: 5), "the Advisor has a Range tab")
         range.click()
         for stage in ["reading", "segmentation", "dating", "entities"] {
             XCTAssertTrue(element("ap.sheet.range.\(stage)").waitForExistence(timeout: 5), "the Range tab charts \(stage)")
         }
         XCTAssertTrue(element("ap.sheet.range.reading.chart").exists, "the reading chart is drawn")
-        attachScreenshot("processor-settings-sheet-range")
-
-        let rules = app.sheets.firstMatch.radioButtons["Rules"]
-        XCTAssertTrue(rules.waitForExistence(timeout: 5), "the sheet has a Rules tab")
-        rules.click()
-        for stage in ["reading-copy", "ocr-input", "layout", "placement", "marks", "capture"] {
-            XCTAssertTrue(element("ap.sheet.rule.\(stage)").waitForExistence(timeout: 5), "the Rules tab shows \(stage)")
-        }
-        XCTAssertTrue(element("ap.sheet.switch.place.hand_on_image").exists, "placement's switch is visible")
-        // W42.int-s5-compress: changing a kind writes and refreshes the sheet; Every page includes unknown kinds.
-        let allForms = element("ap.sheet.forms.all")
-        let printed = element("ap.sheet.forms.printed")
-        XCTAssertTrue(allForms.waitForExistence(timeout: 5))
-        XCTAssertTrue(printed.exists)
-        let sheet = app.sheets.firstMatch
-        let scroll = sheet.scrollViews.firstMatch
-        // SwiftUI can report an offscreen checkbox as hittable. Put its actual frame inside the viewport,
-        // leaving room above it for Every page too, before synthesizing the click.
-        for _ in 0..<12 {
-            if scroll.frame.insetBy(dx: 0, dy: 90).contains(printed.frame) { break }
-            scroll.scroll(byDeltaX: 0, deltaY: printed.frame.midY > scroll.frame.midY ? -180 : 180)
-        }
-        XCTAssertTrue(scroll.frame.insetBy(dx: 0, dy: 40).contains(printed.frame),
-                      "printed \(printed.frame), viewport \(scroll.frame)")
-        if (allForms.value as? Int) == 1 { allForms.click() }
-        if (printed.value as? Int) == 1 { printed.click() }
-        printed.click()
-        attachScreenshot("processor-settings-sheet-searchable")
-        XCTAssertTrue(waitUntil { (printed.value as? Int) == 1 }, "checkbox value: \(String(describing: printed.value))")
-        XCTAssertEqual(allForms.value as? Int, 0)
-        allForms.click()
-        XCTAssertTrue(waitUntil { (allForms.value as? Int) == 1 })
-        XCTAssertEqual(printed.value as? Int, 1)
-        printed.click()
-        XCTAssertTrue(waitUntil { (printed.value as? Int) == 0 && (allForms.value as? Int) == 0 })
-        XCTAssertEqual(element("ap.sheet.forms.typewritten").value as? Int, 1)
-        XCTAssertFalse(element("ap.sheet.forms.handwritten").exists, "handwritten pages always keep their text page")
-        allForms.click()
-        allForms.click() // restore the empty choice in this guest's scratch settings
-        attachScreenshot("processor-settings-sheet-rules")
-        element("ap.sheet.done").click()
-        XCTAssertTrue(waitUntil { !self.element("ap.sheet").exists }, "Done closes the sheet")
+        attachScreenshot("processor-advisor-range")
+        element("ap.advisor.cancel").click()
+        XCTAssertTrue(waitUntil { !self.element("ap.advisor").exists }, "Cancel closes the sheet")
     }
 
     /// W46.seg-review-rule: with the model on this Mac chosen, Process Files offers "Check it against" an online
@@ -544,18 +499,19 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-segmentation-local-partner")
     }
 
-    /// W46.settings-range-view: choosing on the Range tab writes the card's choice. The scratch collection overrides
-    /// the dating card with a route that cannot run here (no key), so the card is Custom; the range's row for the
-    /// app's own pick goes back to it, and the card is no longer Custom. (With no key and this guest's memory, no
-    /// other route can be chosen, so the way back is the click there is to check.)
+    /// W46.settings-range-view and W49.proc-settings-advisor-advanced: choosing on the Range tab changes the row's
+    /// choice, and Apply writes it. The scratch collection overrides the dating row with a route that cannot run here
+    /// (no key), so the row is Custom; the range's row for the app's own pick goes back to it, the row is no longer
+    /// Custom, and after Apply the reopened Advisor shows it so. (With no key and this guest's memory, no other route can
+    /// be chosen, so the way back is the click there is to check.)
     func testRangeChoosingSetsTheCardsOverrideAndTheWayBack() throws {
         relaunch(extra: ["-APUITestRangeOverride"])
         let sheetButton = element("ap.segmentation.openSettingsSheet")
-        XCTAssertTrue(sheetButton.waitForExistence(timeout: 10), "the chooser opens the settings sheet")
+        XCTAssertTrue(sheetButton.waitForExistence(timeout: 10), "the chooser opens the Advisor")
         sheetButton.click()
-        XCTAssertTrue(element("ap.sheet").waitForExistence(timeout: 10), "the settings sheet appears")
-        let reset = element("ap.sheet.reset.dating")
-        XCTAssertTrue(reset.waitForExistence(timeout: 5), "the overridden dating card is Custom, with a way back")
+        XCTAssertTrue(element("ap.advisor").waitForExistence(timeout: 10), "the Advisor sheet appears")
+        let reset = element("ap.advisor.reset.dating")
+        XCTAssertTrue(reset.waitForExistence(timeout: 5), "the overridden dating row is Custom, with a way back")
         app.sheets.firstMatch.radioButtons["Range"].click()
         // The app's own pick depends on the guest's memory; its row's button is "Go back to it".
         let back = app.descendants(matching: .button)
@@ -566,13 +522,18 @@ final class ProcessorUITests: XCTestCase {
         for _ in 0..<60 where !back.isHittable {
             scroll.scroll(byDeltaX: 0, deltaY: -300)
         }
-        attachScreenshot("processor-settings-sheet-range-way-back")
+        attachScreenshot("processor-advisor-range-way-back")
         back.click()
-        app.sheets.firstMatch.radioButtons["Choices"].click()
-        XCTAssertTrue(element("ap.sheet.card.dating").waitForExistence(timeout: 5), "the Choices tab is back")
-        XCTAssertTrue(waitUntil { !self.element("ap.sheet.reset.dating").exists },
-                      "choosing the app's pick on the range clears the dating card's override")
-        element("ap.sheet.done").click()
+        app.sheets.firstMatch.radioButtons["Advisor"].click()
+        XCTAssertTrue(element("ap.advisor.stage.dating").waitForExistence(timeout: 5), "the Advisor tab is back")
+        XCTAssertTrue(waitUntil { !self.element("ap.advisor.reset.dating").exists },
+                      "choosing the app's pick on the range takes the dating row back to it")
+        element("ap.advisor.apply").click()
+        XCTAssertTrue(waitUntil { !self.element("ap.advisor").exists }, "Apply closes the sheet")
+        sheetButton.click()
+        XCTAssertTrue(element("ap.advisor.stage.dating").waitForExistence(timeout: 10), "the Advisor opens again")
+        XCTAssertFalse(element("ap.advisor.reset.dating").exists, "Apply cleared the collection's dating choice")
+        element("ap.advisor.cancel").click()
     }
 
     private func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
@@ -1033,7 +994,7 @@ final class ProcessorUITests: XCTestCase {
             "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAAD0lEQVR4nGP4jwYYRrYAAID5/wEokJxdAAAAAElFTkSuQmCC"))
         try png.write(to: input)
         relaunch(extra: ["-APUITestCollectionInterview"])
-        let save = element("ap.collectionInterview.save")
+        let save = element("ap.advisor.save")
 
         chooseCollection(first)
         XCTAssertTrue(app.staticTexts[first.lastPathComponent].waitForExistence(timeout: 5))
@@ -1048,16 +1009,16 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertFalse(save.exists, "Cancel must leave the destination eligible for the first successful intake.")
 
         addCollectionInput(input)
-        XCTAssertTrue(app.staticTexts["About the collection “First collection”"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Compare routes & trade-offs: the collection “First collection”"].waitForExistence(timeout: 10))
         attachScreenshot("processor-collection-picker-intake")
-        app.buttons["Skip"].click()
+        element("ap.advisor.cancel").click()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
         XCTAssertFalse(FileManager.default.fileExists(atPath: first.appendingPathComponent(".archivesuite").path))
 
         chooseCollection(second)
-        XCTAssertTrue(app.staticTexts["About the collection “Second collection”"].waitForExistence(timeout: 10),
+        XCTAssertTrue(app.staticTexts["Compare routes & trade-offs: the collection “Second collection”"].waitForExistence(timeout: 10),
                       "The queued files are available to the new destination before Start.")
-        app.buttons["Skip"].click()
+        element("ap.advisor.cancel").click()
         XCTAssertTrue(save.waitForNonExistence(timeout: 5))
 
         chooseCollection(first)
@@ -1071,10 +1032,10 @@ final class ProcessorUITests: XCTestCase {
         let flags = ["-APUITestCollectionInterview", "-APUITestSyntheticMultiPagePDF",
                      "-outputDirectory", outputDirectory.path]
         relaunch(extra: flags)
-        let save = element("ap.collectionInterview.save")
+        let save = element("ap.advisor.save")
         XCTAssertTrue(save.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["About the collection “OUT”"].exists)
-        let limit = element("ap.collectionInterview.batchLimit")
+        XCTAssertTrue(app.staticTexts["Compare routes & trade-offs: the collection “OUT”"].exists)
+        let limit = element("ap.advisor.batchLimit")
         scrollUntilHittable(limit, in: app.sheets.firstMatch)
         limit.click()
         let unlimited = app.menuItems["No limit"]
@@ -1136,12 +1097,12 @@ final class ProcessorUITests: XCTestCase {
         let answer = app.buttons["Answer…"]
         XCTAssertTrue(answer.waitForExistence(timeout: 10), "a collection with no answers must offer the interview")
         answer.click()
-        let save = element("ap.collectionInterview.save")
+        let save = element("ap.advisor.save")
         if !save.waitForExistence(timeout: 10) { attachScreenshot("processor-collection-interview-missing") }
         XCTAssertTrue(save.exists, "the collection interview must open")
         XCTAssertTrue(app.buttons["Measure from files…"].exists, "it must offer to measure the kinds of document")
         attachScreenshot("processor-collection-interview")
-        let limit = element("ap.collectionInterview.batchLimit")
+        let limit = element("ap.advisor.batchLimit")
         scrollUntilHittable(limit, in: app.sheets.firstMatch)
         XCTAssertTrue(limit.isHittable)
         limit.click()
@@ -1150,9 +1111,9 @@ final class ProcessorUITests: XCTestCase {
         unlimited.click()
         XCTAssertEqual(limit.value as? String, "No limit")
         attachScreenshot("processor-collection-interview-no-limit")
-        app.buttons["Skip"].click()
+        element("ap.advisor.cancel").click()
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
-        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Cancel must close the Advisor")
         XCTAssertTrue(app.buttons["Answer…"].exists, "a skipped interview leaves the collection without answers")
     }
 
@@ -1166,14 +1127,14 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 5), "New project must open the name sheet")
         Thread.sleep(forTimeInterval: 0.5)
         app.typeText("Letters\r")
-        let save = element("ap.collectionInterview.save")
+        let save = element("ap.advisor.save")
         if !save.waitForExistence(timeout: 10) { attachScreenshot("processor-project-interview-missing") }
         XCTAssertTrue(save.exists, "the new project's interview must open after the name sheet")
-        XCTAssertTrue(app.staticTexts["About the project “Letters”"].exists, "the interview must name the project")
+        XCTAssertTrue(app.staticTexts["Compare routes & trade-offs: the project “Letters”"].exists, "the interview must name the project")
         attachScreenshot("processor-project-interview")
-        app.buttons["Skip"].click()
+        element("ap.advisor.cancel").click()
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
-        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Cancel must close the Advisor")
     }
 
     /// W40.fix-processor-visual-polish: the Files header with Add Files… stays put when the list scrolls.

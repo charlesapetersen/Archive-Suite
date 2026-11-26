@@ -338,7 +338,7 @@ enum SettingsInterviewsTestDriver {
             context.endPDFPage()
         }
         context.closePDF()
-        let selected = CollectionInterviewView.inputFiles(in: [folder])
+        let selected = KindMeasurement.inputFiles(in: [folder])
         eq("a chosen folder gives its own photos and PDFs", Set(selected.map(\.lastPathComponent)), ["a.jpg", "b.PDF", "c.png"])
         let mixed = KindMeasurement.sample(selected, limit: 4)
         eq("photos and PDF pages share one sample limit", mixed.map { $0.url.lastPathComponent },

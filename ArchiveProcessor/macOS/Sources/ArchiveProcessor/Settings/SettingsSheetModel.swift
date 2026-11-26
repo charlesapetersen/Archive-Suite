@@ -285,7 +285,7 @@ struct SettingsSheetModel {
         let off = cards.filter { $0.apply != nil || $0.runsNow != nil }.map { $0.title.lowercased() }
         notInUse = off.isEmpty ? nil
             : "These totals assume every pick is switched on. Process Files does not use the app's picks yet for "
-                + off.joined(separator: " and ") + "; each card below says what it uses now, and its button switches it on."
+                + off.joined(separator: " and ") + "; each step below says what it uses now, and Apply switches them on."
         ruleStages = Self.ruleStageIDs.compactMap { id in table.stage(id).map { Self.ruleStage($0, resolver: resolver) } }
         var stageSwitches: [String: [SwitchRow]] = [:]
         for stage in Self.cardStages {
@@ -694,7 +694,7 @@ struct SettingsSheetModel {
                 if let approach = r.appRoute.flatMap(SegmentationApproach.init(appRoute:)) {
                     if approach != running.segmentation {
                         runsNow = "Not switched on yet: Process Files now uses \(running.segmentation.sheetLabel). "
-                            + "“Use this in Process Files” switches it on."
+                            + "Apply switches it on."
                         apply = .segmentation(approach)
                     }
                 } else {
@@ -706,24 +706,24 @@ struct SettingsSheetModel {
             let planModel = route.flatMap { Self.claudePlanModel($0, solver: solver) }
             if let r = route, lead?.flag == nil, r.id != running.readingRouteID || (planModel != nil && !running.onPlan) {
                 if r.id == "apple-vision" {
-                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
+                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). Apply switches it on."
                     apply = .appleVision(modelID: LLMModel.appleVisionModels[0].id)
                 } else if r.id == Self.onDeviceRouteID {
                     // W47.wh-readers-lost-clients: offered only where this Mac can run it.
                     if let why = Self.onDeviceUnavailable() {
                         runsNow = why + " Process Files reads with \(running.readingName)."
                     } else {
-                        runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
+                        runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). Apply switches it on."
                         apply = .appleVision(modelID: OnDeviceModelClient.modelID)
                     }
                 } else if let model = planModel {
                     // Priced at no money because the plan reaches it, so it must run on the plan, never on a key.
                     let onKey = r.id == running.readingRouteID ? " on a key, which is money" : ""
-                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName)\(onKey). “Read with this” "
+                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName)\(onKey). Apply "
                         + "switches on your Claude plan, which uses its five-hour and weekly windows, not money."
                     apply = .readingByPlan(model: model)
                 } else if let ar = r.appRoute(keys: words.resources.keys), ar.contains("|") {
-                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
+                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). Apply switches it on."
                     apply = .reading(appRoute: ar)
                 } else {
                     runsNow = "The Processor cannot run this reading program yet; Process Files reads with \(running.readingName)."

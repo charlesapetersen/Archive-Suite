@@ -3,7 +3,7 @@ import ArchiveCore
 
 /// The one estimate in the Settings window (W49.proc-settings-redesign-core, §5.1): the cost and time of 1,000 pages
 /// with exactly the choices the tabs show, as one line under Settings › Processing, with the breakdown one click away
-/// and the settings sheet ("Compare routes & trade-offs…") beside it.
+/// and the Advisor sheet ("Compare routes & trade-offs…", `SettingsAdvisorSheet`) beside it, for the scope edited.
 struct SettingsEstimateFooter: View {
     @EnvironmentObject private var scope: SettingsScopeModel
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
@@ -145,7 +145,10 @@ struct SettingsEstimateFooter: View {
             openRouterPricesRead += 1
         }
         .sheet(isPresented: $showSheet) {
-            SettingsSheetView(outputFolder: scope.folder, pages: 1000, pagesCaption: "for 1,000 pages") { showSheet = false }
+            SettingsAdvisorSheet(target: scope.effectiveScope == .collection ? scope.folder.map(SettingsAdvisor.Target.collection) ?? .general : .general) {
+                showSheet = false
+                scope.reload()
+            }
         }
     }
 

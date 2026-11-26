@@ -34,7 +34,7 @@ struct SettingsProcessingTab: View {
     @State private var showGeneralInterview = false
     @State private var showNewProject = false
     @State private var newProjectName = ""
-    @State private var interview: CollectionInterviewView.Target?
+    @State private var interview: SettingsAdvisor.Target?
     @State private var projectToAsk: UUID?
     @State private var defaultsTick = 0
 
@@ -63,7 +63,7 @@ struct SettingsProcessingTab: View {
             .formStyle(.grouped)
             // On a view of its own: two sheets on one view present only one (the scope section holds New project's).
             .sheet(item: $interview) { target in
-                CollectionInterviewView(target: target) { interview = nil; scope.reload() }
+                SettingsAdvisorSheet(target: target) { interview = nil; scope.reload() }
             }
             Divider()
             SettingsEstimateFooter()

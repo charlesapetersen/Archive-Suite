@@ -131,7 +131,7 @@ struct OCRView: View {
     @State private var hasConfiguredAPIKey = false
     @State private var outputDirectory: URL?
     /// A new output collection is asked about its material once there are files to describe.
-    @State private var collectionInterview: CollectionInterviewView.Target?
+    @State private var collectionInterview: SettingsAdvisor.Target?
     @State private var offeredCollectionInterviewPaths: Set<String> = []
     /// W44 Improve OCR: the files the dialog is open for.
     @State private var improveOCR: ImproveOCRSelection?
@@ -608,7 +608,7 @@ struct OCRView: View {
             }
         }
         .sheet(item: $collectionInterview) { target in
-            CollectionInterviewView(target: target, files: droppedFiles) { collectionInterview = nil }
+            SettingsAdvisorSheet(target: target, files: droppedFiles, pages: max(1, droppedFiles.count)) { collectionInterview = nil }
         }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet

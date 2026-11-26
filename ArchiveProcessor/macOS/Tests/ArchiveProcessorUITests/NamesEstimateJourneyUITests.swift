@@ -70,29 +70,32 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         XCTAssertTrue(app.showSettingsPanel("Processing"))
         let answer = app.buttons["Answer…"]
         XCTAssertTrue(answer.waitForExistence(timeout: 10)); answer.click()
-        let save = app.descendants(matching: .any)["ap.collectionInterview.save"]
+        let save = app.descendants(matching: .any)["ap.advisor.save"]
         XCTAssertTrue(save.waitForExistence(timeout: 10))
+        // The ranking is under the Advisor's "More about this material" (W49.proc-settings-advisor-advanced).
+        let more = app.descendants(matching: .any)["ap.advisor.more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5)); more.click()
         let up = app.buttons["Move Names of people and places up"]
         let scroll = app.sheets.scrollViews.firstMatch
         for _ in 0..<15 where !up.isHittable { scroll.scroll(byDeltaX: 0, deltaY: -180) }
-        XCTAssertTrue(up.exists && up.isHittable, "the interview offers ranking Names")
+        XCTAssertTrue(up.exists && up.isHittable, "the Advisor offers ranking Names")
         // The arrow can become hittable while the neighbouring number is still clipped by the Form.
         scroll.scroll(byDeltaX: 0, deltaY: -220)
         // The fresh collection inherits the default three priorities. Establish the control in the UI,
         // rather than assuming that the VM's general settings have never changed.
-        let namesWeight = app.textFields["ap.collectionInterview.weight.names"]
+        let namesWeight = app.textFields["ap.advisor.weight.names"]
         XCTAssertTrue(namesWeight.exists)
         XCTAssertEqual(namesWeight.value as? String, "0", "Names starts unranked")
         XCTAssertFalse(app.buttons["Move Names of people and places down"].isEnabled, "Names starts last")
         print("[s044] control: Names last, weight 0")
         // Include names without dropping one of the three existing priorities when it is moved up.
-        shot("s044-names-unranked-in-interview")
+        shot("s044-names-unranked-in-advisor")
         XCTAssertTrue(namesWeight.isHittable)
         namesWeight.click(); app.typeKey("a", modifierFlags: .command); app.typeText("10")
         app.typeKey(.tab, modifierFlags: [])
         XCTAssertEqual(namesWeight.value as? String, "10", "the positive weight was entered by hand")
         for _ in 0..<3 where up.isEnabled { up.click() }
-        shot("s044-names-first-in-interview")
+        shot("s044-names-first-in-advisor")
         save.click()
         XCTAssertTrue(save.waitForNonExistence(timeout: 10))
         app.settingsWindow.typeKey("w", modifierFlags: .command)
