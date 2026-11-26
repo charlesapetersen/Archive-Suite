@@ -432,6 +432,11 @@ struct LocalSegmenterControls: View {
             TextField("Model", text: $modelID, prompt: Text(LocalSegmenter.defaultModelID))
                 .textFieldStyle(.roundedBorder).controlSize(.small)
                 .accessibilityIdentifier("ap.segmentation.local.model")
+            if let note = Self.modelNote(modelID) {
+                Text(note).font(.caption2).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("ap.segmentation.local.modelNote")
+            }
             HStack {
                 Button(checking ? "Checking…" : "Check server") { check() }
                     .controlSize(.small).disabled(checking)
@@ -444,6 +449,16 @@ struct LocalSegmenterControls: View {
             Text(LocalSegmenter.startHint).font(.caption2).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// Under the Model field: why a model of yours would be refused, or what its gate measured
+    /// (W47.settings-trained-label); nothing for the shipped build.
+    static func modelNote(_ typed: String, read: (URL) -> Data? = { try? Data(contentsOf: $0) }) -> String? {
+        let id = typed.trimmingCharacters(in: .whitespaces)
+        if id.isEmpty || id == LocalSegmenter.defaultModelID { return nil }
+        if let refused = LocalSegmenter.refusal(modelID: id, read: read) { return refused }
+        return LocalSegmenter.loadedManifest(modelID: id, read: read)
+            .map { "Your model is a trained model " + LocalSegmenter.gateClause($0) + "." }
     }
 
     private func check() {

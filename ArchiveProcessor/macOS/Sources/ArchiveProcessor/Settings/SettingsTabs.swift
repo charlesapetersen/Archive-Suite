@@ -248,9 +248,14 @@ enum SettingsAdvanced {
         (!route.offered || route.afterTraining || route.lowerScoring) ? .advanced : .standard
     }
 
-    /// Why an Advanced route row sits there, in its route row's own words.
-    static func why(_ route: SettingsRouteTable.Route) -> String? {
-        if route.afterTraining { return "a trained model checked on a small held-out set" }
+    /// Why an Advanced route row sits there, in its route row's own words. A trained model's reason says what its gate
+    /// measured (W47.settings-trained-label): `trained` is the manifest of the model the app would load
+    /// (`LocalSegmenter.loadedManifest`); without one, no held-out figure is claimed.
+    static func why(_ route: SettingsRouteTable.Route, trained: LocalSegmenter.Manifest? = nil) -> String? {
+        if route.afterTraining {
+            return "a trained model " + (trained.map(LocalSegmenter.gateClause)
+                ?? "that the training kit's gate must check on held-out material of your own before the app runs it")
+        }
         if let c = route.conditions.first(where: { $0.hasPrefix("lower-scoring: ") }) {
             // "lower-scoring: <why>; offered at the Advanced level only, …": the measured reason alone.
             let why = c.dropFirst("lower-scoring: ".count)

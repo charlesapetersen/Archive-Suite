@@ -169,6 +169,7 @@ enum SettingsTabsTestDriver {
         } else {
             check("5 apple-fm-27 is a reading row", false)
         }
+        trainedGateWords(table)
         let model = SettingsSheetModel(
             table: table, pairs: OCRPairMatrix.bundled,
             resolver: SettingsResolver(general: SettingsLayer(kind: .general, name: "General"), project: nil, collection: nil),
@@ -184,6 +185,59 @@ enum SettingsTabsTestDriver {
                 stageRoutes.first { $0.id == o.id }.map { SettingsAdvanced.tier(of: $0) == o.tier } ?? false
             })
         }
+    }
+
+    // 5b. A trained model's Advanced reason says what its gate measured (W47.settings-trained-label): "small held-out
+    // set" only when the manifest's gate.label says so, with the kit README's rate for that many documents; otherwise the
+    // manifest's held-out figure. Manifests are read through the seam; no file is touched.
+    private static func trainedGateWords(_ table: SettingsRouteTable) {
+        guard let row = table.stages.lazy.flatMap(\.routes).first(where: \.afterTraining) else {
+            return check("5b the bundled table has an after-training row", false)
+        }
+        func manifest(_ heldout: String, _ gate: String) -> String {
+            #"{"kit_version":"seg-kit-1","prompt_id":"c1","anchor":{"box":"Lincoln","pages_exact":34.87},"heldout":"#
+                + heldout + #","gate":"# + gate + "}"
+        }
+        let small2 = manifest(#"{"gate_folders":1,"gate_documents":2,"gate_gaps":180}"#,
+                              #"{"passed":true,"label":"small held-out set","labels":["run 1: small held-out set"]}"#)
+        let small6 = manifest(#"{"gate_folders":1,"gate_documents":6,"gate_gaps":120}"#,
+                              #"{"passed":true,"label":"small held-out set","labels":[]}"#)
+        let smallGaps = manifest(#"{"gate_folders":3,"gate_documents":40,"gate_gaps":90}"#,
+                                 #"{"passed":true,"label":"small held-out set","labels":[]}"#)
+        let full = manifest(#"{"gate_folders":4,"gate_documents":31,"gate_gaps":412}"#,
+                            #"{"passed":true,"label":null,"labels":[]}"#)
+        let failed = manifest(#"{"gate_folders":4,"gate_documents":31,"gate_gaps":412}"#,
+                              #"{"passed":false,"label":null,"labels":[]}"#)
+        func read(_ json: String?) -> (URL) -> Data? {
+            { url in url.lastPathComponent == LocalSegmenter.manifestName ? json.map { Data($0.utf8) } : nil }
+        }
+        func loaded(_ json: String) -> LocalSegmenter.Manifest? {
+            LocalSegmenter.loadedManifest(modelID: "/models/mine", read: read(json))
+        }
+        func why(_ json: String?) -> String {
+            SettingsAdvanced.why(row, trained: json.flatMap(loaded)) ?? "nil"
+        }
+        let none = why(nil), w2 = why(small2), w6 = why(small6), wg = why(smallGaps), wf = why(full), wx = why(failed)
+        check("5b no loaded model: no held-out claim", !none.contains("small") && !none.contains("checked on"), none)
+        check("5b small, two documents: the label and a quarter of the time",
+              w2.contains("small held-out set") && w2.contains("180 known held-out gaps in 2 documents")
+              && w2.contains("3.5 points worse") && w2.contains("a quarter of the time"), w2)
+        check("5b small, six documents: one time in ten", w6.contains("small held-out set") && w6.contains("one time in ten"), w6)
+        check("5b small on gaps alone: the interval is wider", wg.contains("small held-out set")
+              && wg.contains("fewer than 267 known gaps") && !wg.contains("quarter"), wg)
+        check("5b a full gate: its figure and never \"small\"",
+              !wf.contains("small") && wf.contains("412 known held-out gaps in 31 documents"), wf)
+        check("5b a failed gate is not called checked", wx.contains("did not pass") && !wx.contains("checked"), wx)
+        check("5b the shipped build has no manifest to describe",
+              LocalSegmenter.loadedManifest(modelID: LocalSegmenter.defaultModelID, read: read(full)) == nil)
+        check("5b a refused model has none", LocalSegmenter.loadedManifest(modelID: "/models/mine", read: read(nil)) == nil)
+        let note = LocalSegmenterControls.modelNote("/models/mine", read: read(small2)) ?? ""
+        check("5b the Model field's note says the gate's words", note.hasPrefix("Your model is a trained model checked on a "
+              + "small held-out set") && note.hasSuffix("."), note)
+        check("5b the Model field's note gives a refusal's reason",
+              LocalSegmenterControls.modelNote("/models/mine", read: read(nil))?.contains("has no") == true)
+        check("5b the shipped model has no note", LocalSegmenterControls.modelNote(LocalSegmenter.defaultModelID) == nil
+              && LocalSegmenterControls.modelNote("") == nil)
     }
 
     // 6. The reader menu and the presets read the four backend flags exactly as a run does.

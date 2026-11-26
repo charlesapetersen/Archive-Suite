@@ -432,7 +432,7 @@ W40.g3 (Processor & Live Capture guided walkthrough)
 ### Interaction with Existing Open Items
 - **`W49.proc-pipeline-prune-apply`:** Runs ahead of step 1 and supplies the pruned `settings-routes.json`, 2-way reading split, unified tie rule, `hand-blla-ctc` default OFF, `numericDateOrder`, and rotation fallback.
 - **`W49.proc-managed-local-ocr` & `W49.proc-local-ocr-onboarding`:** Plug directly into Tab 4 (`Accounts › Local Models`) and replace `GeneralInterviewView` with the streamlined Vision-default first-run wizard. Neither is blocked by Settings, and `Accounts › Local Models` renders `ManagedGemma` + layout helpers immediately even if `W49.proc-managed-local-ocr` lands later.
-- **`W47.settings-trained-label`:** Already blocked on `W49.proc-settings-design-ok`; folds cleanly into step 3 (`Advanced` panel + Advisor route notes).
+- **`W47.settings-trained-label`:** shipped 2026-11-26 on its own (`SettingsAdvanced.why(_:trained:)`, the Advanced Model field's note); step 3 reuses `LocalSegmenter.gateClause` for Advisor route notes.
 - **`W49.proc-catalogue-cutover`:** Defaults `enableSegmentJSON = false`, matching its placement in `Advanced`.
 - **`W49.proc-metadata-unified-apply` (post-Dec 1):** Consumes `ResolvedRunConfig.metadata` cleanly with zero Settings layout changes.
 

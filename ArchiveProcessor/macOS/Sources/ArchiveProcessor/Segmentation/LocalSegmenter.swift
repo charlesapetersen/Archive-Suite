@@ -109,10 +109,61 @@ enum LocalSegmenter {
             let pagesExact: Double?
             enum CodingKeys: String, CodingKey { case box, pagesExact = "pages_exact" }
         }
+        /// What the gate's held-out figure stands on (`train_seg.py gate_counts`).
+        struct Heldout: Decodable {
+            let gateDocuments: Int?
+            let gateGaps: Int?
+            enum CodingKeys: String, CodingKey { case gateDocuments = "gate_documents", gateGaps = "gate_gaps" }
+        }
+        /// The gate's verdict; `label` is `smallLabel` when the figure stands on fewer than the minimums (call 15).
+        struct Gate: Decodable {
+            let passed: Bool?
+            let label: String?
+        }
         let kitVersion: String?
         let promptID: String?
         let anchor: Anchor?
-        enum CodingKeys: String, CodingKey { case kitVersion = "kit_version", promptID = "prompt_id", anchor }
+        let heldout: Heldout?
+        let gate: Gate?
+        enum CodingKeys: String, CodingKey {
+            case kitVersion = "kit_version", promptID = "prompt_id", anchor, heldout, gate
+        }
+    }
+
+    /// The kit's label for a gate that passed below its minimums (`train_seg.py` SMALL_LABEL, MIN_KNOWN_GAPS,
+    /// MIN_DOCUMENTS; owner call 15, W47.wh-kit-minimums).
+    static let smallLabel = "small held-out set"
+    static let gateMinGaps = 267, gateMinDocuments = 10
+
+    /// What the trained model's gate measured, as a clause after "a trained model" (W47.settings-trained-label): "small
+    /// held-out set" only when the manifest's `gate.label` says so, with the rate the kit README gives for that many
+    /// documents (W46.kit-gate-docs); otherwise the held-out figure the manifest states.
+    static func gateClause(_ m: Manifest) -> String {
+        let docs = m.heldout?.gateDocuments ?? 0, gaps = m.heldout?.gateGaps ?? 0
+        let figure = "\(gaps) known held-out gap\(gaps == 1 ? "" : "s") in \(docs) document\(docs == 1 ? "" : "s")"
+        if m.gate?.passed == false {
+            return "that did not pass the training kit's gate (\(figure)); its manifest gives the reasons"
+        }
+        guard m.gate?.label == smallLabel else { return "checked by the training kit's gate on \(figure)" }
+        let rate: String
+        switch docs {
+        case ...1: rate = "with one document the check has no interval, only the point figure"
+        case 2: rate = "with two documents, a model 3.5 points worse than the shipped one passes about a quarter of the time"
+        case 3..<gateMinDocuments:
+            rate = "with \(docs) documents, a model 3.5 points worse than the shipped one passes about one time in ten"
+        default:
+            rate = "on fewer than \(gateMinGaps) known gaps the interval is wider than the gate's 3-point test assumes"
+        }
+        return "checked on a \(smallLabel) (\(figure)): \(rate)"
+    }
+
+    /// The manifest of the model the Model setting names when the app would run it (`refusal` is nil), or nil for the
+    /// shipped build and a refused model. `read` is the file read, a seam.
+    static func loadedManifest(modelID: String = modelID(),
+                               read: (URL) -> Data? = { try? Data(contentsOf: $0) }) -> Manifest? {
+        guard modelID != defaultModelID, refusal(modelID: modelID, read: read) == nil else { return nil }
+        let url = URL(fileURLWithPath: (modelID as NSString).expandingTildeInPath).appendingPathComponent(manifestName)
+        return read(url).flatMap { try? JSONDecoder().decode(Manifest.self, from: $0) }
     }
 
     /// Why the app will not run the model the Model setting names, or nil. The shipped build is the app's own (its
