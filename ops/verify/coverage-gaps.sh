@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 # coverage-gaps.sh — run the suites with code coverage on and list the functions no run reached (W40.e4).
 #
-# USAGE:  ops/verify/coverage-gaps.sh [core|reader|notes|processor ...]   (default: all four), then
+# USAGE:  ops/verify/coverage-gaps.sh [core|processor|vm-reader|vm-notes|vm-processor ...]   (default: all), then
 #         ops/verify/coverage_gaps.py report            (union of every run in $COV_OUT; see that file)
-# ENV:    COV_OUT (default /tmp/coverage-gaps), DRIVERS (Processor driver scripts, overriding the list below)
+# ENV:    COV_OUT (default ~/Library/Caches/ArchiveSuiteRehearsal/W40.e4, so a later session adds runs to it),
+#         DRIVERS (Processor driver scripts, overriding the list below), VM_SELECT (override a vm-* selection) and VM_TAG (its
+#         run-name part, default "all", so a narrower re-run does not overwrite the full one)
 # EXIT:   0 = every run produced coverage (failing tests are logged, not fatal: a failed test still executed
 #             code) · 2 = a run produced no coverage — never read as "nothing reached"
 #
 # HOW, per run — each writes $COV_OUT/<run>.json, the normalised function list coverage_gaps.py unions:
 #   core       `xcodebuild test -scheme ArchiveCore-Package -enableCodeCoverage YES` on the package → xcresult.
-#   reader     the app-hosted unit bundles with -enableCodeCoverage YES, DerivedData ./build/cov-DD, so a
-#   notes      coverage build never replaces the normal one. The xcresult carries the app AND ArchiveCore.
-#   processor  it has no unit bundle: its tests are the headless drivers. The app is built with
-#              -enableCodeCoverage YES into macOS/build/DD (the path the drivers hardcode), each driver below
-#              runs with LLVM_PROFILE_FILE pointing into $COV_OUT, and llvm-cov exports the merged profile.
+#   processor  it has no unit bundle: its tests are the headless drivers. The app is built with coverage
+#              mapping into macOS/build/DD (the path the drivers hardcode), each driver below runs with
+#              LLVM_PROFILE_FILE pointing into $COV_OUT, and llvm-cov exports the merged profile.
 #              A plain build in this checkout afterwards replaces the instrumented one.
-# The UI and journey runs happen in the VM (`VM_COVERAGE=1 ops/gui/vm-gui-runner.sh <app> xcuitest`); add each
-# run's collected xcresult with `coverage_gaps.py xcresult <bundle> <run-name>`.
+#   vm-<app>   the app's unit bundle AND UITests in the VM, `VM_COVERAGE=1 VM_SPLIT=4 vm-gui-runner.sh <app>
+#              xcuitest`; one run per collected chunk xcresult, named vm-<app>-<VM_TAG>-<chunk>. The Reader and Notes unit bundles run in the VM,
+#              not on the host: on the host their app-hosted runs (the "Archive Suite Dev" signed, sandboxed
+#              app) wrote no profile at all, so xccov found no coverage archive (measured 2026-11-26); the VM's
+#              ad-hoc build writes it.
+# Journeys need their own environment: run `VM_COVERAGE=1 <APP>_JOURNEY=… vm-gui-runner.sh …` (or its wrapper
+# script with VM_COVERAGE=1 exported) and add the collected bundle with `coverage_gaps.py xcresult <bundle> <run>`.
 # The drivers left out need an API key or spend money (openrouter, segmentation-proof, smoke, tier2) — the same
 # list as ops/verify/sanitizer-runs.sh.
 set -uo pipefail
@@ -25,7 +30,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 export PATH="/opt/homebrew/bin:$PATH"
 log() { printf '\033[36m[cov]\033[0m %s\n' "$*"; }
-OUT="${COV_OUT:-/tmp/coverage-gaps}"
+OUT="${COV_OUT:-$HOME/Library/Caches/ArchiveSuiteRehearsal/W40.e4}"
 mkdir -p "$OUT"
 PY="$HERE/coverage_gaps.py"
 
@@ -58,8 +63,8 @@ run_processor() {
   rm -rf "$pdir"; mkdir -p "$pdir"
   (cd "$dir/macOS" && xcodegen generate >/dev/null 2>&1) || { log "processor: xcodegen failed"; worst=2; return; }
   log "processor: Debug build with coverage into macOS/build/DD…"
-  (cd "$dir/macOS" && xcodebuild -scheme ArchiveProcessor -configuration Debug -enableCodeCoverage YES \
-      -derivedDataPath ./build/DD build) >"$OUT/processor-build.log" 2>&1 \
+  (cd "$dir/macOS" && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD \
+      CLANG_COVERAGE_MAPPING=YES CLANG_COVERAGE_MAPPING_LINKER_ARGS=YES build) >"$OUT/processor-build.log" 2>&1 \
     || { log "processor: build FAILED ($OUT/processor-build.log)"; worst=2; return; }
   for d in ${DRIVERS:-$DEFAULT_DRIVERS}; do
     LLVM_PROFILE_FILE="$pdir/${d%.sh}-%p.profraw" bash "$dir/scripts/$d" >"$pdir/${d%.sh}.out" 2>&1
@@ -80,18 +85,33 @@ run_processor() {
   fi
 }
 
-suites=("$@"); [ ${#suites[@]} -gt 0 ] || suites=(core reader notes processor)
+run_vm() {  # $1 = reader | notes | processor
+  local app="$1" sel stamp="$OUT/.vm-$1.stamp" b n
+  case "$app" in
+    reader)    sel="ArchiveReaderTests,ArchiveReaderUITests" ;;
+    notes)     sel="ArchiveNotesTests,ArchiveNotesUITests" ;;
+    processor) sel="ArchiveProcessorUITests" ;;
+  esac
+  touch "$stamp"
+  log "vm-$app: ${VM_SELECT:-$sel} with coverage in the VM (VM_SPLIT=4)…"
+  VM_COVERAGE=1 VM_SPLIT=4 ONLY_TESTING="${VM_SELECT:-$sel}" "$ROOT/ops/gui/vm-gui-runner.sh" "$app" xcuitest \
+    >"$OUT/vm-$app.log" 2>&1
+  log "vm-$app: runner exit $? (log: $OUT/vm-$app.log)"
+  n=0
+  for b in "$HOME/.tart-mirror/vm-artifacts/$app"/chunk*.xcresult "$HOME/.tart-mirror/vm-artifacts/$app"/uitest.xcresult; do
+    [ -d "$b" ] && [ "$b" -nt "$stamp" ] || continue
+    extract "$b" "vm-$app-${VM_TAG:-all}-$(basename "$b" .xcresult)"; n=$((n + 1))
+  done
+  [ "$n" -gt 0 ] || { log "vm-$app: no result bundle collected"; worst=2; }
+}
+
+suites=("$@"); [ ${#suites[@]} -gt 0 ] || suites=(core processor vm-reader vm-notes vm-processor)
 for s in "${suites[@]}"; do
   case "$s" in
     core)   run_xcode core-unit "$ROOT/packages/ArchiveCore" -scheme ArchiveCore-Package -only-testing:ArchiveCoreTests -derivedDataPath ./build/cov-DD ;;
-    reader) (cd "$ROOT/ArchiveReader/macOS" && xcodegen generate >/dev/null 2>&1)
-            run_xcode reader-unit "$ROOT/ArchiveReader/macOS" -scheme ArchiveReader -only-testing:ArchiveReaderTests \
-              -skip-testing:ArchiveReaderTests/DeepLinkTests -derivedDataPath ./build/cov-DD ;;
-    notes)  (cd "$ROOT/ArchiveNotes/macOS" && xcodegen generate >/dev/null 2>&1)
-            run_xcode notes-unit "$ROOT/ArchiveNotes/macOS" -scheme ArchiveNotesUnit -only-testing:ArchiveNotesTests \
-              -derivedDataPath ./build/cov-DD ;;
     processor) run_processor ;;
-    *) echo "unknown suite '$s' (use: core | reader | notes | processor)" >&2; exit 2 ;;
+    vm-reader|vm-notes|vm-processor) run_vm "${s#vm-}" ;;
+    *) echo "unknown suite '$s' (use: core | processor | vm-reader | vm-notes | vm-processor)" >&2; exit 2 ;;
   esac
 done
 log "runs in $OUT: $(cd "$OUT" && ls *.json 2>/dev/null | tr '\n' ' ')"
