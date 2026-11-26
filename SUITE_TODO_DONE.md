@@ -18715,3 +18715,8 @@ The **silently-swallowed tag-write failures** (`_ = try? MacOSTagger.applyTags(.
 `LiveCaptureProcessor.swift:640/647/673`) — a real finding that appeared in **neither** KNOWN_ISSUES entry — is
 folded into **`W3.cap-r1`** above and **must ship in the same commit as r1's overload fix**, because both rewrite
 the same three lines and landing them separately would silently revert part of the first. See that entry.
+- [x] **W49.notes-docs-hygiene — Reconcile stale Archive Notes docs, archive fixed `KNOWN_ISSUES.md` history, and remove `.DS_Store` clutter [XS]** · §Archive Notes — holistic pre-user-testing review (owner, 2026-11-25) (lane: notes) — SHIPPED 2026-11-25
+  - `ArchiveNotes/README.md` (Architecture) and `SMOKE_TEST.md` (Safety) now describe the store as the `.archivenotes` library package the user makes or opens, not the retired container store.
+  - `ArchiveNotes/KNOWN_ISSUES.md` 2,266 → 77 lines: it keeps the two `⚠️ LIMIT` entries, the one fixed entry with a still-`(queued: W49.notes-html-block-starts)` residual (`W49.notes-lines-after-html`, cited by that item) and the build/test gotchas. The other 92 sections (fixed/changed/verified entries and the 2026-07 W7/W8 build-out logs) moved verbatim to the new `ArchiveNotes/KNOWN_ISSUES_HISTORY.md`; none carried a `(queued:)`/`(asked:)` disposition.
+  - Stray `.DS_Store` files (already gitignored, none tracked) under `ArchiveNotes/`, `macOS/` and `macOS/Sources/` in the primary checkout moved to the Trash. Docs only: no build or bench scratch.
+  <!-- /W49.notes-docs-hygiene -->

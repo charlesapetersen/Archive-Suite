@@ -20,9 +20,8 @@ step.
 
 > **Safety (Prime Directive #1 — see [GUI_SAFETY.md](GUI_SAFETY.md)):** every step runs against a
 > **scratch** store of copies —
-> `~/Library/Application Support/ArchiveNotes/AN-GUI-Fixture` (never the real store, which lives in the
-> sandbox container at `~/Library/Containers/com.archivenotes.app/Data/Library/Application
-> Support/ArchiveNotes/Store`), built by `scripts/make-notes-fixture.sh` and reached via the DEBUG
+> `~/Library/Application Support/ArchiveNotes/AN-GUI-Fixture` (never the owner's real store, the
+> `.archivenotes` library package he made or opened, e.g. `~/Documents/Archive Notes.archivenotes`), built by `scripts/make-notes-fixture.sh` and reached via the DEBUG
 > `-ANUITestStorePath` launch arg (in-memory only — **never** drive File ▸ New Library… / Open Library…, which
 > would persist a bookmark over the owner's real store; only `ChooseStoreFolderUITests` drives it, with
 > `-ANUITestStoreBookmarkSuite` sending the pick to a throwaway suite). A DEBUG scratch-write guard in `NotesTagProjector` mechanically aborts

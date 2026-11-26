@@ -104,13 +104,15 @@ store or corpus** — [GUI_SAFETY.md](GUI_SAFETY.md).
 - [GUI_SAFETY.md](GUI_SAFETY.md) — the test/GUI file-safety protocol (the one write surface,
   scratch-only rules, the DEBUG scratch-write guard).
 - [SMOKE_TEST.md](SMOKE_TEST.md) — the manual/driven GUI smoke-test procedure and record.
-- [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+- [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — open limits; fixed history in
+  [KNOWN_ISSUES_HISTORY.md](KNOWN_ISSUES_HISTORY.md).
 
 ## Architecture (short)
 
 Swift 6 · SwiftUI (+ AppKit where needed) · PDFKit · system SQLite FTS5 (no third-party deps) ·
-XcodeGen build · sandboxed; the store is the container default (a user-granted store root by
-security-scoped bookmark is not wired in the UI yet — `W40.fix-notes-choose-store`). Depends on the
+XcodeGen build · sandboxed; the store is an `.archivenotes` library package the user makes or opens
+(File ▸ New Library… / Open Library…), kept by security-scoped bookmark; there is no hidden container store
+(`W49.notes-store-format`). Depends on the
 shared [`ArchiveCore`](../packages/ArchiveCore) package for tags, PDF parsing, durable links, and the
 suite marker. The store is a set of UUID-folder Markdown notes (`NoteStore`), indexed into a
 disposable FTS5 cache (`NotesIndex`); folders/memberships/templates live in an
