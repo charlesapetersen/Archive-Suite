@@ -13,6 +13,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 swiftc -parse-as-library -O \
     "$PWD/macOS/Sources/ArchiveProcessor/OCR/VisionQueue.swift" \
+    "$PWD/macOS/Sources/ArchiveProcessor/OCR/PageVisionCache.swift" \
     "${ROTATION_DETECTOR_SRC:-$PWD/macOS/Sources/ArchiveProcessor/OCR/RotationDetector.swift}" \
     "$PWD/scripts/rotation-axis-headless.swift" -o "$work/rotation-axis-headless"
 "$work/rotation-axis-headless" "$@"

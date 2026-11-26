@@ -19,9 +19,15 @@ enum RotationDetector {
     private static let visionQueue = VisionQueue(name: "ArchiveProcessor.RotationDetector.vision", width: 4)
 
     static func detectCorrection(imageURL: URL) async -> Int? {
-        guard let image = downscaledCGImage(from: imageURL) else { return nil }
-        return await visionQueue.run { correction(cgImage: image) }
+        // W49.proc-vision-page-cache: the agreement rule and the comparative route's fallback both ask; one pass answers.
+        await PageVisionCache.shared.value(PageVisionCache.key(imageURL, profile: profile)) {
+            guard let image = downscaledCGImage(from: imageURL) else { return nil }
+            return await visionQueue.run { correction(cgImage: image) }
+        }
     }
+
+    /// The pass's request settings, for the shared cache.
+    static let profile = "rotation|\(maxPixelSize)|accurate|corrected|0.015"
 
     private static func correction(cgImage: CGImage) -> Int? {
         let request = VNRecognizeTextRequest()
@@ -31,23 +37,23 @@ enum RotationDetector {
         do {
             try VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:]).perform([request])
         } catch { return nil }
+        return correction(PageVisionSnapshot(observations: request.results ?? [], width: cgImage.width,
+                                             height: cgImage.height, characterBoxes: true))
+    }
 
+    /// The correction a pass's lines vote for, or nil without a clear reading direction.
+    static func correction(_ snapshot: PageVisionSnapshot) -> Int? {
         var votes = [Float](repeating: 0, count: 4)
-        for observation in request.results ?? [] {
-            guard let candidate = observation.topCandidates(1).first, candidate.confidence > 0 else { continue }
-            let text = candidate.string
-            guard let first = text.firstIndex(where: { !$0.isWhitespace }),
-                  let last = text.lastIndex(where: { !$0.isWhitespace }), first < last,
-                  let a = try? candidate.boundingBox(for: first..<text.index(after: first)),
-                  let b = try? candidate.boundingBox(for: last..<text.index(after: last)) else { continue }
+        for line in snapshot.lines {
+            guard line.confidence > 0, let a = line.firstCharacter, let b = line.lastCharacter else { continue }
             // Vision normalizes x and y independently. Restore pixels before comparing axes on
             // nonsquare pages. Missing/single-character/coincident boxes cannot establish direction.
-            let dx = (b.boundingBox.midX - a.boundingBox.midX) * CGFloat(cgImage.width)
-            let dy = (b.boundingBox.midY - a.boundingBox.midY) * CGFloat(cgImage.height)
+            let dx = (b.midX - a.midX) * CGFloat(snapshot.width)
+            let dy = (b.midY - a.midY) * CGFloat(snapshot.height)
             guard dx.isFinite, dy.isFinite, hypot(dx, dy) > 0 else { continue }
             // y points up: right → 0 CW, up → 90 CW, left → 180 CW, down → 270 CW.
             let quarter = (Int((atan2(dy, dx) / (.pi / 2)).rounded()) + 4) % 4
-            votes[quarter] += candidate.confidence * Float(text.count)
+            votes[quarter] += line.confidence * Float(line.text.count)
         }
         let total = votes.reduce(0, +)
         guard total >= minTextScore, let best = votes.indices.max(by: { votes[$0] < votes[$1] }),

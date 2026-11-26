@@ -69,20 +69,53 @@ struct VisionClient: Sendable {
         // The shared client shape deliberately accepts the LLM-only context/prompt/scale arguments. Vision
         // has no prompt or multi-image context channel and reads the original image to retain small text.
         _ = (previousText, previousImageURL, customPrompt, imageScale)
-        return try await Self.visionQueue.run {
-            try Self.transcribe(imageURL: imageURL, settings: settings, rotationDegrees: rotationDegrees)
+        guard settings.isValid else {
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: "Apple Vision OCR settings are invalid.", errorCode: "vision_settings")
         }
+        // W49.proc-vision-page-cache: the cascade's word count, the read-poorly check and the Vision reader read the
+        // same page at the same turn with the same settings; the first pass answers the others.
+        let (settings, rotationDegrees) = (settings, rotationDegrees)
+        let key = PageVisionCache.key(imageURL, rotation: rotationDegrees, profile: Self.profile(settings))
+        let read: Read = await PageVisionCache.shared.value(key, keeps: { if case .snapshot = $0 { true } else { false } }) {
+            do {
+                return .snapshot(try await Self.visionQueue.run {
+                    try Self.recognise(imageURL: imageURL, settings: settings, rotationDegrees: rotationDegrees)
+                })
+            } catch OCRError.imageLoadFailed {
+                return .imageLoadFailed
+            } catch {
+                return .requestFailed(error.localizedDescription)
+            }
+        }
+        switch read {
+        case .snapshot(let snapshot): return Self.result(snapshot, settings: settings)
+        case .imageLoadFailed: throw OCRError.imageLoadFailed
+        case .requestFailed(let message):
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: "Apple Vision could not read this image: \(message)",
+                             errorCode: "vision_request_failed")
+        }
+    }
+
+    /// One pass's outcome, as the cache keeps it. Only a snapshot is kept; a failure is retried by the next stage.
+    private enum Read: Sendable {
+        case snapshot(PageVisionSnapshot)
+        case imageLoadFailed
+        case requestFailed(String)
+    }
+
+    /// Every setting that changes what the request returns. The confidence floor filters afterwards, so it is not one.
+    static func profile(_ settings: VisionOCRSettings) -> String {
+        "transcription|\(settings.usesFastRecognition ? "fast" : "accurate")|\(settings.languages.joined(separator: ","))"
+            + "|\(settings.customWords.joined(separator: "\u{1F}"))"
     }
 
     /// The blocking Vision pass runs off the cooperative pool (W40.fix-processor-rotation-deadlock): a detached task
     /// still runs there, and the cascade's second reader calls this inside page task groups sized by the worker count.
     private static let visionQueue = VisionQueue(name: "ArchiveProcessor.VisionClient.vision", width: recommendedConcurrency)
 
-    private static func transcribe(imageURL: URL, settings: VisionOCRSettings, rotationDegrees: Int) throws -> OCRResult {
-        guard settings.isValid else {
-            return OCRResult(text: nil, classification: nil,
-                             errorMessage: "Apple Vision OCR settings are invalid.", errorCode: "vision_settings")
-        }
+    private static func recognise(imageURL: URL, settings: VisionOCRSettings, rotationDegrees: Int) throws -> PageVisionSnapshot {
         let image: CGImage
         let orientation: CGImagePropertyOrientation
         if rotationDegrees % 360 == 0 {
@@ -111,19 +144,15 @@ struct VisionClient: Sendable {
         request.customWords = settings.customWords
 
         let handler = VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:])
-        do {
-            try handler.perform([request])
-        } catch {
-            return OCRResult(text: nil, classification: nil,
-                             errorMessage: "Apple Vision could not read this image: \(error.localizedDescription)",
-                             errorCode: "vision_request_failed")
-        }
+        try handler.perform([request])
+        return PageVisionSnapshot(observations: request.results ?? [], width: image.width, height: image.height)
+    }
 
-        let kept = (request.results ?? []).compactMap { observation -> (text: String, confidence: Float)? in
-            guard let candidate = observation.topCandidates(1).first,
-                  candidate.confidence >= settings.minimumConfidence else { return nil }
-            let line = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
-            return line.isEmpty ? nil : (line, candidate.confidence)
+    private static func result(_ snapshot: PageVisionSnapshot, settings: VisionOCRSettings) -> OCRResult {
+        let kept = snapshot.lines.compactMap { line -> (text: String, confidence: Float)? in
+            guard line.confidence >= settings.minimumConfidence else { return nil }
+            let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : (text, line.confidence)
         }
         let lines = kept.map(\.text)
         guard !lines.isEmpty else {

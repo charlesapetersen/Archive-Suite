@@ -111,13 +111,39 @@ enum PageKindClassifier {
     /// the image file's (its camera tags tell a photograph) and `tags` its Finder tags (`PageKind.detect`).
     static func classify(_ image: CGImage, properties: [CFString: Any]? = nil, tags: [String] = [],
                          model: PageKindModel? = PageKindModel.bundled) async -> PageKind? {
-        guard let model, let s = await measure(image) else { return nil }
+        await classify(image, page: nil, properties: properties, tags: tags, model: model)
+    }
+
+    /// `page` is the image file `image` was loaded from upright: its Vision passes (the signals and the newspaper
+    /// reading, neither of which depends on the model or the tags) are shared with every other classification of the
+    /// same unchanged file (W49.proc-vision-page-cache; the pre-run classification and the newspaper reader both ask).
+    private static func classify(_ image: CGImage, page: URL?, properties: [CFString: Any]?, tags: [String],
+                                 model: PageKindModel?) async -> PageKind? {
+        guard let model else { return nil }
+        let measured: PageKindSignals? = if let page {
+            await PageVisionCache.shared.value(PageVisionCache.key(page, profile: "page-kind-signals")) {
+                await measure(image)
+            }
+        } else {
+            await measure(image)
+        }
+        guard let s = measured else { return nil }
         var call: PageKind?
         if s.print.count == model.printLength, let hand = model.hand.probabilities(s.handFeatures()),
            let form = model.form.probabilities(s.formFeatures()) {
             call = PageKind.decide(hand: hand, form: form, handClasses: model.hand.classes)
         }
-        let newspaper = PageKind.readsForNewspaper(call) && EnginePageKind.readNewspaper(image)?.isNewspaper == true
+        var newspaper = false
+        if PageKind.readsForNewspaper(call) {
+            let read: Bool? = if let page {
+                await PageVisionCache.shared.value(PageVisionCache.key(page, profile: "page-kind-newspaper")) {
+                    EnginePageKind.readNewspaper(image)?.isNewspaper
+                }
+            } else {
+                EnginePageKind.readNewspaper(image)?.isNewspaper
+            }
+            newspaper = read == true
+        }
         return PageKind.detect(classified: call, newspaper: newspaper, tags: tags,
                                photographed: EnginePageKind.isPhotograph(image, properties: properties))
     }
@@ -128,8 +154,8 @@ enum PageKindClassifier {
         guard let image = loadImage(url) else { return nil }
         let properties = CGImageSourceCreateWithURL(url as CFURL, nil)
             .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
-        return await classify(image, properties: properties, tags: (try? MacOSTagger.readTags(from: url)) ?? [],
-                              model: model)
+        return await classify(image, page: url, properties: properties,
+                              tags: (try? MacOSTagger.readTags(from: url)) ?? [], model: model)
     }
 
     /// The image at the given path at its own size, upright by its EXIF orientation (as the bench loads it).

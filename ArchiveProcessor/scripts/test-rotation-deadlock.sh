@@ -28,6 +28,7 @@ done
 
 swiftc -parse-as-library -O \
     "$PWD/macOS/Sources/ArchiveProcessor/OCR/VisionQueue.swift" \
+    "$PWD/macOS/Sources/ArchiveProcessor/OCR/PageVisionCache.swift" \
     "${ROTATION_DETECTOR_SRC:-$PWD/macOS/Sources/ArchiveProcessor/OCR/RotationDetector.swift}" \
     "$PWD/scripts/rotation-deadlock-headless.swift" \
     -o "$work/rotation-deadlock-headless"
