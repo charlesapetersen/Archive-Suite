@@ -241,18 +241,43 @@ enum LiveCaptureTaggingFailureTestDriver {
                 throw ProbeError("Finder tag fixture failed for \(id): \(tags.sorted())")
             }
             if macFields {
-                let fields = PDFDocument(url: pdf).flatMap { PDFHeaderParser.textPageHeaders($0).first.flatMap { $0 } }?.itemFields
-                guard fields?.documentKind == "report", fields?.byline == "Mary Jones",
-                      fields?.publicationDate == "1967-03",
-                      fields?.lowerConfidence == [.documentKind, .byline, .publicationDate],
-                      let sidecar = ZoteroSidecar.read(pdf: pdf), sidecar.itemFields.byline == "Mary Jones" else {
-                    throw ProbeError("filed PDF or sidecar lost the suggested item fields")
-                }
+                try checkMacItemFields(filed: pdf)
                 lines.append("Live Capture received, staged and filed the lower-confidence Mac item fields")
             }
             lines.append("\(pdf.lastPathComponent) (\(id)) Finder tags: \(tags.sorted())")
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// Live Capture output is catalogue-filed, so its page 2 carries no item-field lines and the catalogue record
+    /// holds the Mac fields, each a model value whose evidence names the Mac route the apps show as lower confidence
+    /// (W49.proc-catalogue-cutover; SPEC/tag-format.md). The opt-in segment sidecar still carries them too.
+    private static func checkMacItemFields(filed pdf: URL) throws {
+        let header = PDFDocument(url: pdf).flatMap { PDFHeaderParser.textPageHeaders($0).first.flatMap { $0 } }
+        guard let header else { throw ProbeError("filed PDF has no page-2 header") }
+        guard header.itemFields == PDFItemFields() else {
+            throw ProbeError("catalogue-filed page 2 carries item-field lines: \(header.itemFields)")
+        }
+        let companion = pdf.deletingLastPathComponent()
+            .appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: pdf.lastPathComponent))
+        let record = try CatalogueRecord(json: Data(contentsOf: companion))
+        guard let fields = record.documents.first(where: { $0.ownerFileID == record.fileID })?.fields else {
+            throw ProbeError("catalogue record has no owned document")
+        }
+        func mac<Value>(_ field: CatalogueRecord.Field<Value>?, _ name: String) throws -> Value {
+            guard let field, case .value(let value) = field.current, field.origin == "model", !field.isChecked,
+                  field.evidence.map(\.route) == [ItemFieldExtractor.macRoute] else {
+                throw ProbeError("catalogue record lost the Mac \(name)")
+            }
+            return value
+        }
+        guard try mac(fields.documentKind, "kind") == "report", try mac(fields.byline, "byline") == ["Mary Jones"],
+              try mac(fields.publicationDate, "publication date").date.wireValue == "1967-03" else {
+            throw ProbeError("catalogue record holds other Mac item field values")
+        }
+        guard let sidecar = ZoteroSidecar.read(pdf: pdf), sidecar.itemFields.byline == "Mary Jones" else {
+            throw ProbeError("sidecar lost the Mac item fields")
+        }
     }
 
     /// Up to 60 s: a cold first launch after a build can take longer than 10 s to stage the first document.
