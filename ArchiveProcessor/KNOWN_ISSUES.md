@@ -2,19 +2,20 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## OPEN (2026-11-26) — A tag removed in the Processor's Tags window stays on the files and comes back
-
-- Window ▸ Tags (W40.tag-window-processor) removes a tag from the Processor's two lists only: a removal is not yet
-  recorded in the archive's change log (schema 1 has no remove), so the Reader is not offered it, the files keep the
-  tag, and the next harvest of the output folder puts it back in Suggestions. The window says so after a removal.
-  Renames and merges are recorded; once the Reader applies one, the harvest no longer brings the old name back.
-  (queued: W40.tag-window-processor-remove)
-
 ## OPEN (2026-11-26) — The live-capture journey exceeds the heavy lock's memory limit
 
 - `PROCESSOR_JOURNEY=livecapture` (W40.d5: the macOS 27.2 guest plus the host's headless Android emulator) was stopped
   at 10.9 GB against the 10.8 GB limit for one heavy job, so the hand-driven live-capture journey cannot be re-run
   unattended (`verification/evidence/core/W40.h2-journeys.md`). (queued: W40.fix-livecapture-journey-memory)
+
+## FIXED (2026-11-26) — A tag removed in the Processor's Tags window stayed on the files and came back
+
+- Window ▸ Tags (W40.tag-window-processor) removed a tag from the Processor's two lists only: schema 1 of the archive's
+  change log had no remove, so the Reader was not offered it and the next harvest put it back in Suggestions. Since
+  W40.tag-window-processor-remove a removal is recorded like a rename (schema 2, an empty `to`; Undo withdraws it,
+  Redo restores it), so the Reader offers it for the files; until the Reader applies it, the harvest still brings the
+  tag back, as for a rename. The window offers no change to the suite's own tokens, so none is recorded.
+  (accepted: fixed history)
 
 ## FIXED (2026-11-24) — The Android launcher icon differed from the Mac Processor icon
 

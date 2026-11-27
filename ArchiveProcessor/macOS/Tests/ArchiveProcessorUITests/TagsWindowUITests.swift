@@ -1,9 +1,9 @@
 import XCTest
 
-/// Window ▸ Tags (W40.tag-window-processor): the shared Tags window over the Processor's two lists, seeded by
+/// Window ▸ Tags (W40.tag-window-processor, W40.tag-window-processor-remove): the shared Tags window over the Processor's two lists, seeded by
 /// `-APUITestTagLists` (suggestions Labor, Environment, Environtment; subject list Labor, Strikes, Civil Rights) with
 /// the scratch output folder made a Reader archive. A rename edits both lists, is recorded in the archive's change log,
-/// and Edit ▸ Undo puts it back and withdraws the entry; a remove takes a tag off and says the other apps keep it.
+/// and Edit ▸ Undo puts it back and withdraws the entry; a remove is recorded the same way (an empty `to`) and undone.
 @MainActor
 final class TagsWindowUITests: XCTestCase {
     private let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("tags-\(UUID().uuidString)",
@@ -43,7 +43,7 @@ final class TagsWindowUITests: XCTestCase {
         print("[shot] processor-tags-\(name): wrote \(shot.path)")
     }
 
-    func testRenameIsRecordedAndUndoneAndRemoveSaysTheOtherAppsKeepIt() throws {
+    func testRenameAndRemoveAreRecordedAndUndone() throws {
         continueAfterFailure = false
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
@@ -101,7 +101,7 @@ final class TagsWindowUITests: XCTestCase {
             logEntries().contains { $0.0 == "Labor" && $0.1 == "Labour" && $0.3 }
         }
 
-        // Remove Environtment (suggestions only): gone, and the window says the files keep it.
+        // Remove Environtment (suggestions only): gone, and recorded for the other apps with an empty `to`.
         let typo = window.descendants(matching: .any)["tags.row.Environtment"].firstMatch
         XCTAssertTrue(typo.waitForExistence(timeout: 5))
         typo.click()
@@ -110,9 +110,24 @@ final class TagsWindowUITests: XCTestCase {
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), app.debugDescription)
         confirm.click()
         XCTAssertTrue(typo.waitForNonExistence(timeout: 5))
-        let note = window.descendants(matching: .any)["ap.tags.note"].firstMatch
-        XCTAssertTrue(note.waitForExistence(timeout: 5))
-        XCTAssertEqual(logEntries().count, 1, "a removal is not recorded")
+        waitFor("the remove is recorded in the archive") {
+            logEntries().contains { $0.0 == "Environtment" && $0.1 == "" && $0.2 == "processor" && !$0.3 }
+        }
+        XCTAssertFalse(window.descendants(matching: .any)["ap.tags.note"].firstMatch.exists,
+                       "no note: the other apps were told")
         try shoot(app, "removed")
+
+        // Edit ▸ Undo puts Environtment back in Suggestions and withdraws the remove.
+        app.menuBars.menuBarItems["Edit"].click()
+        let undoRemove = app.menuBars.menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Undo'")).firstMatch
+        XCTAssertTrue(undoRemove.waitForExistence(timeout: 5))
+        XCTAssertTrue(undoRemove.isEnabled, "Undo is offered after the remove: \(undoRemove.title)")
+        undoRemove.click()
+        XCTAssertTrue(window.descendants(matching: .any)["tags.row.Environtment"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(label(lists(window, "Environtment")), "Suggestions")
+        waitFor("the Undo withdraws the remove") {
+            logEntries().contains { $0.0 == "Environtment" && $0.1 == "" && $0.3 }
+        }
+        XCTAssertEqual(logEntries().count, 2, "one rename and one remove, both withdrawn")
     }
 }

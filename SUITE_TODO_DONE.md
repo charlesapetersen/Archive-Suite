@@ -19213,3 +19213,15 @@ the same three lines and landing them separately would silently revert part of t
   Design: execution-plans/tag-rename-suite.md (kept for W40.tag-window-notes). $0; bench cache: nothing created.
   Commits: checkpoints 1-2 and this one.
   <!-- /W40.tag-window-reader -->
+- [x] **W40.tag-window-processor-remove — the Processor's Tags window records a removal for the other apps [S · Tier-2]** · §W40 — verification phase · SHIPPED 2026-11-26
+  W40.tag-window-reader made `TagChangePlan.logEntries` return a remove's entries (schema 2, an empty `to`) and
+  `TagChangeLog.follow` drop another app's removed tag from both lists, so the window's removals now go through
+  `ProcessorTagChanges.record` like a rename (Undo withdraws, Redo restores). Dropped the "not passed to the other
+  apps yet" note (the window never offers a change to a suite token, so no remove reaches it unrecorded); the
+  window's header and doc comments say removals are passed on. Processor KNOWN_ISSUES entry moved to FIXED; plan
+  execution-plans/tag-rename-suite.md updated. TagsWindowUITests (VM, macOS 27.2) now checks the remove is recorded
+  with an empty `to` and no note, and that Edit ▸ Undo puts the tag back and withdraws the entry: passes. Tier-2
+  review (independent, Opus): no defects; it confirmed the Reader and Notes offer a Processor remove rather than
+  applying it, and that the Processor's follow skips its own entries. Processor builds with no new warnings.
+  $0; bench cache: nothing created.
+  <!-- /W40.tag-window-processor-remove -->

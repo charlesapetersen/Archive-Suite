@@ -185,8 +185,9 @@ each app with its items and its writer:
   lists both vocabularies as two items, "Suggestions" and "Subject list", the count column naming which
   (`TagsWindowModel.itemsLabel`: Both, Suggestions, Subject list). A plan runs on each list as it is now and is kept as
   an ArchiveCore `TagSpellingChange` per list (`TagVocabulary.apply`, the settings key), one Undo with Redo that moves
-  only the tags it changed. Renames and merges are recorded in every known archive (`ProcessorTagChanges.record`;
-  Undo withdraws, Redo restores); a removal is not (schema 1), and the window says the files keep the tag. A change
+  only the tags it changed. Renames, merges and removals are recorded in every known archive
+  (`ProcessorTagChanges.record`; Undo withdraws, Redo restores; removals from W40.tag-window-processor-remove, on
+  schema 2). A change
   that would empty a non-empty subject list leaves it as it is (empty means free-form tagging). It does not walk the
   output folder: those files are the Reader's library, so the Reader applies the change to them.
 

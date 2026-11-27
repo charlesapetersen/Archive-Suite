@@ -5,8 +5,9 @@ import ArchiveCore
 /// SPEC/tag-format.md invariant 8). The Processor keeps no library, so there is nothing to ask about: each archive it
 /// knows (the output folder and the harvested roots, each taken up to the folder holding its Reader root marker) has
 /// its `.archivesuite/tag-changes.json` read, and every entry not yet handled re-spells the autocomplete vocabulary
-/// and the controlled subject list (`TagChangeLog.follow`). The Processor's own Tags window records its renames and
-/// merges in the same archives (`record`, `setWithdrawn`; W40.tag-window-processor), through `TagChangeLog` alone;
+/// and the controlled subject list (`TagChangeLog.follow`). The Processor's own Tags window records its renames,
+/// merges and removes in the same archives (`record`, `setWithdrawn`; W40.tag-window-processor,
+/// W40.tag-window-processor-remove), through `TagChangeLog` alone;
 /// otherwise it writes only its own vocabulary file and settings. The pure part is ArchiveCore's, where it has tests.
 enum ProcessorTagChanges {
 

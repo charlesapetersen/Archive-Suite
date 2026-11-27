@@ -6,9 +6,9 @@ import ArchiveCoreUI
 /// The Processor's Tags window (W40.tag-window-processor; design: execution-plans/tag-rename-suite.md §"The Tags
 /// window"), the suite's shared window over the Processor's two lists, since it keeps no library: the suggestions it
 /// offers while a tag is typed (the autocomplete vocabulary) and the subject list Automatic tagging chooses from
-/// (Settings ▸ Output). Rename, merge and remove edit both as one Undo step. A rename or merge is recorded in each
-/// archive the Processor knows (`ProcessorTagChanges.archives`), so the Reader offers it for the files and Notes for
-/// the notes; the renames those apps record reach these lists by themselves (`ProcessorTagChanges.follow`). It never
+/// (Settings ▸ Output). Rename, merge and remove edit both as one Undo step. Each is recorded in each archive the
+/// Processor knows (`ProcessorTagChanges.archives`), so the Reader offers it for the files and Notes for the notes;
+/// the changes those apps record reach these lists by themselves (`ProcessorTagChanges.follow`). It never
 /// writes an output file: those files are the Reader's library.
 @MainActor
 final class ProcessorTagsController: ObservableObject {
@@ -148,8 +148,6 @@ final class ProcessorTagsController: ObservableObject {
                 targets.value = ProcessorTagChanges.archives(outputFolder: folder).map(\.url)
                 return try ProcessorTagChanges.record(entries, in: targets.value)
             }
-        } else if plan.kind == .remove {
-            appendNote("A removal is not passed to the other apps yet: the files and notes keep the tag.")
         }
         return .init(changed: changed, failed: failed)
     }
@@ -252,9 +250,9 @@ struct ProcessorTagsWindow: View {
         TagsWindowView(model: controller.model) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("The tags the Processor offers as you type (Suggestions) and the subject list Automatic tagging "
-                     + "chooses from. Renames and merges made here are passed to the Reader and Notes for the files "
-                     + "and notes; theirs reach these lists by themselves. A tag still on files in the output folder "
-                     + "returns to Suggestions when the folder is next read.")
+                     + "chooses from. Renames, merges and removals made here are passed to the Reader and Notes for "
+                     + "the files and notes; theirs reach these lists by themselves. A tag still on files in the output "
+                     + "folder returns to Suggestions when the folder is next read.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let note = controller.note {
