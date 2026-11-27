@@ -525,7 +525,10 @@ When label reading needs Gemma, the Processor checks the existing local servers 
   editor (the Inspector's Container section, W47.ct-reader-edit). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
   no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
   folder, missing, or merged into another label's PDF is not recorded, and the summary counts it; so is one whose
-  collection organisation stopped partway (its moves are not reported then). (queued: W49.corpus-adoption-tool).
+  collection organisation stopped partway (its moves are not reported then). Labels for PDFs that predate the app
+  are read by the adoption tool's `labels` step instead, into a derived archive (`SPEC/adoption.md`,
+  W49.corpus-adoption-tool, shipped 2026-11-27). (accepted: the owner's call, call 31 in
+  `13-stage-rules/14-owner-calls.md`: old-label backfill belongs to the scratch-first adoption tool).
 - **Process Files reads its labels one at a time before the run's summary.** One Vision pass, and with the gateway one
   call of up to 60 s, per label photo, after organisation ("Reading N box and folder labels…"); Stop ends it with
   nothing written. (accepted: labels are known only after organisation; the read is shown and Stop ends it cleanly).

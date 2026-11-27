@@ -13,9 +13,11 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
   itself. It is the row host of SwiftUI's `LazyVStack`: in guest probes it went only with a plain `VStack`, which
   would make and fetch a thumbnail for every page of every open file at once, and stayed with every lazy-stack
   variant tried. `AccessibilityAuditUITests` exempts it on those two screens. (asked: W49.reader-thumb-row-host-owner-ok)
-- The document window's find field has no description and adds a parent/child orphan while focused, and with the
-  document window's Inspector shown the date row's status badge has no valid role. The audit opens neither screen.
-  (queued: W49.reader-audit-find-bar-inspector-shown)
+- While any text field has the focus, the audit reports one unnamed "Parent/Child mismatch": AppKit's shared field
+  editor, seen with the find field, the OCR search and the plain `NSTextField` file-name filter alike, and gone when
+  the focus leaves. `AccessibilityAudit.focusedTextFieldOrphan` exempts it on the find-bar screen alone (the find
+  field's missing description and the date badge's role were fixed by W49.reader-audit-find-bar-inspector-shown).
+  (accepted: a platform fact, AppKit's field editor and not an app element)
 
 ## Tag changes across the apps — the limits (W40.tag-rename-suite, 2026-11-26)
 
