@@ -70,7 +70,7 @@ enum LabelGemmaVerifyTestDriver {
         }
         processor.jobs = jobs
         let note = await processor.recordContainerLabels(moves: [:], outputDirectory: out, preOCRedInput: false)
-        try? ("style \(ContainerLabelGemma.style.rawValue)\n" + (note ?? "")).write(
+        try? ("style \(ContainerLabelGemma.configuredStyle?.rawValue ?? "default")\n" + (note ?? "")).write(
             to: out.appendingPathComponent("NOTE.txt"), atomically: true, encoding: .utf8)
     }
 

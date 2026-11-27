@@ -366,7 +366,7 @@ enum LocalModelsTestDriver {
             eq("8 request: ct_read's 640-token cap", body["max_tokens"] as? Int, 640)
             eq("8 request: the stand-in key", request.value(forHTTPHeaderField: "Authorization"), "Bearer local")
             let content = ((body["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
-            check("8 request: the photo and ct_read's prompt",
+            check("8 Ollama by default: the photo, then ct_read's prompt",
                   (content.first?["image_url"] as? [String: Any])?["url"].map { "\($0)".hasPrefix("data:image/jpeg;base64,") } == true
                   && content.last?["text"] as? String == ContainerLabelReader.localModelPrompt)
         } else { check("8 one Gemma request sent", false, "\(wire.requests.count) requests") }
@@ -378,8 +378,8 @@ enum LocalModelsTestDriver {
         eq("8 local gateway: its own server asked first", asked.asked, ["http://127.0.0.1:9999/v1"])
         eq("8 local gateway: titles from Gemma there", set[.repository]?.reader, "gemma-3-12b")
 
-        // W49.proc-gemma-request-verify: the revised request through the same read, behind its override, on an
-        // upright JPEG copy of the photo, so the file's own bytes must reach the wire.
+        // W49.proc-gemma-request-adopt: mlx-vlm's server gets the revised request by default, through the same read,
+        // on an upright JPEG copy of the photo, so the file's own bytes must reach the wire.
         let savedStyle = ContainerLabelGemma.styleOverride
         let uprightJPEG = image.deletingLastPathComponent().appendingPathComponent("gemma-upright-label.jpg")
         if let src = CGImageSourceCreateWithURL(image as CFURL, nil),
@@ -388,7 +388,7 @@ enum LocalModelsTestDriver {
             CGImageDestinationAddImage(dest, drawn, nil)
             _ = CGImageDestinationFinalize(dest)
         }
-        ContainerLabelGemma.styleOverride = .revised
+        ContainerLabelGemma.styleOverride = nil
         asked.reset([mlx: ["mlx-community/gemma-3-12b-it-4bit"]])
         wire.reset(["127.0.0.1": reply(answer, "stop")])
         await ContainerLabelGemma.forget()
@@ -399,7 +399,7 @@ enum LocalModelsTestDriver {
         } ?? []
         let sentURL = (revisedContent.last?["image_url"] as? [String: Any])?["url"] as? String
         let fileBytes = try? Data(contentsOf: uprightJPEG)
-        check("8 revised: one request, prompt first, the upright JPEG file itself",
+        check("8 mlx-vlm by default: one request, prompt first, the upright JPEG file itself",
               wire.requests.count == 1 && revisedContent.first?["text"] as? String == ContainerLabelReader.localModelPrompt
               && fileBytes != nil && sentURL == "data:image/jpeg;base64," + (fileBytes?.base64EncodedString() ?? ""),
               "\(wire.requests.count) requests")
@@ -515,8 +515,21 @@ enum LocalModelsTestDriver {
         let saved = ContainerLabelGemma.styleOverride
         defer { ContainerLabelGemma.styleOverride = saved }
         ContainerLabelGemma.styleOverride = .revised
-        eq("11 the override selects the revised request", ContainerLabelGemma.style, .revised)
         let server = ContainerLabelGemma.Server(baseURL: "http://127.0.0.1:8080/v1", modelID: "gemma3:12b")
+        // W49.proc-gemma-request-adopt (owner, 2026-11-24): revised by default on mlx-vlm only.
+        func at(_ baseURL: String) -> ContainerLabelGemma.Server { .init(baseURL: baseURL, modelID: "gemma3:12b") }
+        eq("11 default: mlx-vlm's server gets the revised request", ContainerLabelGemma.defaultStyle(for: server), .revised)
+        eq("11 default: Ollama keeps the current request",
+           ContainerLabelGemma.defaultStyle(for: at(LocalModelRoute.Server.ollama.baseURL)), .current)
+        eq("11 default: LM Studio keeps the current request",
+           ContainerLabelGemma.defaultStyle(for: at(LocalModelRoute.Server.lmStudio.baseURL)), .current)
+        eq("11 default: a local gateway's own address keeps the current request",
+           ContainerLabelGemma.defaultStyle(for: at("http://127.0.0.1:9999/v1")), .current)
+        ContainerLabelGemma.styleOverride = .current
+        eq("11 the override sets mlx-vlm's request too", ContainerLabelGemma.style(for: server), .current)
+        ContainerLabelGemma.styleOverride = .revised
+        eq("11 the override sets Ollama's request too",
+           ContainerLabelGemma.style(for: at(LocalModelRoute.Server.ollama.baseURL)), .revised)
         func order(_ style: ContainerLabelGemma.RequestStyle) -> [String] {
             guard let request = ContainerLabelGemma.request(jpeg: Data([1, 2]), server: server, style: style),
                   let body = jsonBody(request),
