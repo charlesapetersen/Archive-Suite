@@ -72,6 +72,9 @@ struct NotesBrowserView: View {
 
     var body: some View {
         let pendingDeletion = nav.pendingDeletion
+        // The window's own Undo, as a delete's (the environment's is not the one Edit ▸ Undo reads), taken here in
+        // the body: the sheet's content is built later, outside this window's environment.
+        let windowUndo = window?.undoManager ?? undoManager
         HStack(spacing: 0) {
             if showingTree {
                 NotesFolderTreeView(model: model, nav: nav)
@@ -149,7 +152,7 @@ struct NotesBrowserView: View {
         }
         .focusedSceneValue(\.tagSheetAction, TagSheetAction(selectedSubject: selectedSubject,
                                                              open: { tagSheet = $0 }))
-        .sheet(item: $tagSheet) { sheet in tagSheetView(sheet) }
+        .sheet(item: $tagSheet) { sheet in tagSheetView(sheet, undo: windowUndo) }
         // Other apps' tag changes: read when the library is settled and whenever an archive is granted or lost, and
         // offered in the Notes window only (the Extracts window shares the same notes).
         .task(id: model.isIndexReady) {
@@ -192,18 +195,18 @@ struct NotesBrowserView: View {
     }
 
     @ViewBuilder
-    private func tagSheetView(_ sheet: NotesTagSheet) -> some View {
+    private func tagSheetView(_ sheet: NotesTagSheet, undo: UndoManager?) -> some View {
         switch sheet {
         case .rename(let from, let to):
             // Opened from Find Similar Tags (a seeded new name), it goes back to that list when done.
-            NotesRenameTagSheet(model: model, nav: nav, from: from, to: to, undoManager: undoManager,
+            NotesRenameTagSheet(model: model, nav: nav, from: from, to: to, undoManager: undo,
                                 onDone: to.isEmpty ? {} : { DispatchQueue.main.async { tagSheet = .similar } })
         case .similar:
             NotesSimilarTagsSheet(model: model) { variant, keep in
                 tagSheet = .rename(from: variant, to: keep)
             }
         case .changes:
-            NotesTagChangesSheet(model: model, nav: nav, undoManager: undoManager)
+            NotesTagChangesSheet(model: model, nav: nav, undoManager: undo)
         }
     }
 

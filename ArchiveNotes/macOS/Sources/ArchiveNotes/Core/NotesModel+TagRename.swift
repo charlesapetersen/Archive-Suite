@@ -26,9 +26,11 @@ struct SubjectRenameOutcome: Sendable, Equatable {
 }
 
 extension NotesModel {
-    /// Subjects in use with how many notes and extracts carry each, by tag identity, in the spelling most use.
+    /// Subjects in use with how many notes and extracts carry each, by tag identity, title-cased as Notes shows and
+    /// writes them (a hand-edited file may hold another case).
     var subjectCounts: [String: Int] {
-        Dictionary(tagCounts(allItems.map(\.managedTags)).map { ($0.tag, $0.count) }, uniquingKeysWith: +)
+        Dictionary(tagCounts(allItems.map { $0.managedTags.map(NotesTagVocabulary.titleCased) })
+            .map { ($0.tag, $0.count) }, uniquingKeysWith: +)
     }
 
     /// The notes and extracts carrying `subject` (by `tagKey`, so a hand-typed lower-case spelling counts).

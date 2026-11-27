@@ -41,7 +41,9 @@ struct NotesRenameTagSheet: View {
         self.undoManager = undoManager
         self.onDone = onDone
         let subjects = model.subjectCounts.keys.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-        _from = State(initialValue: from ?? subjects.first ?? "")
+        // The listed spelling of the seed, so the picker shows it selected whatever case the note's file holds.
+        let seed = from.flatMap { f in subjects.first { tagKey($0) == tagKey(f) } }
+        _from = State(initialValue: seed ?? subjects.first ?? "")
         _to = State(initialValue: to)
     }
 

@@ -19054,3 +19054,28 @@ the same three lines and landing them separately would silently revert part of t
   corrected, ledger counts refreshed; P-25/P-26 carry a non-README `verified` status, left as found. $0. Bench cache: nothing created there
   (the d7 report stays in ArchiveSuiteScale, its lane's own folder).
   <!-- /W40.h2 -->
+- [x] **W40.tag-rename-suite — rename or merge a tag across the archive and the notes, from any of the apps [M-L · Tier-2]** · §W40 — verification phase (lane: suite) (uses: build,vm) — Owner, 2026-11-06 walkthrough: "This is important functionality. Also, tag changes in one app should carry over to the other apps." Today (checked 2026-11-06): the Reader has Rename Tag… (menu and the tag cloud's right-click) and Find Similar Tags…, whose Merge drives the same rename; renaming into an existing tag merges into its spelling; it is one grouped undo through TagWriter (`NavigationModel.renameTag`, `RenameTagSheet`, `SimilarTagsSheet`). It covers only the files in the Reader's library, the tagged files under its granted folder. Notes has no rename or merge: a note's tags live in its front matter, mirrored onto its own `.md` by `NotesTagProjector`, and the Reader never sees or changes them. The Processor has none either (its typed tags take the vocabulary's spelling). So a rename in the Reader leaves the same tag on every note, and nothing renames a tag on notes at all. Wanted: (1) Notes gets Rename Tag… and Merge (with Find Similar Tags), over its notes and extracts, front matter first, then the projection, one undo; (2) a rename or merge in either app reaches the other app's items, so one tag means the same thing across the suite; (3) the Processor's vocabulary follows. Each app is sandboxed to its own folder, so (2) needs a design: for example a rename record in the archive root that the other app applies, after confirming, on its next open, or one app asking for access to the other's store. Design first in execution-plans/tag-rename-suite.md, which also designs the Tags window below (owner, 2026-11-14) (where the record lives, what happens when an app is closed, undo across apps, a tag the other app spells differently, a read-only folder), then build. Tier-2: a write to every tagged file and note; SPEC/tag-format.md gains the rule; adversarial review and scratch-copy tests in all three apps. SHIPPED 2026-11-26.
+  Design: `execution-plans/tag-rename-suite.md` (kept: its Tags window section is the open W40.tag-window-* items' design);
+  SPEC/tag-format.md invariant 8. ArchiveCore `Tags/TagChangeLog.swift`: `<archive root>/.archivesuite/tag-changes.json`,
+  one entry per tag changed (id, at, app, from, to, withdrawn), written only through ContainerFileStore (descriptor,
+  flock, stamp check, retried with backoff; newer/unreadable/linked logs refused byte-identical; facet tokens never
+  recorded; newest 2,000), `inbox` (offers, withdrawals of applied ones; only never-applicable entries settle silently,
+  a tag nothing carries yet or a withdrawn entry is passed over so a later tag or Redo still brings it), `follow` for the
+  Processor, `TagChangeHandled` per root guid; TagSimilarity moved from the Reader. Notes: Tags ▸ Rename Tag…, Find Similar
+  Tags…, Tag Changes from Other Apps…; `NotesModel.renameSubjects` (one `rewriteSubjects` withItem transaction per note,
+  front matter then the projector mirror, tagKey matching, merge into an existing subject), one Undo that puts back only
+  what it changed and a Redo on the same notes (the window's NSWindow undo manager, as delete's), recorded in each
+  reachable archive with Notes' own scope held per write; lists kept per archive and library; Notes' guide names the log
+  as its one new archive write. Reader: renames recorded with their ledger group as id through one serial queue,
+  Undo/Redo that changed something withdraw/restore (retry steps mapped), catalogue mode records after the save reports;
+  Tags ▸ Tag Changes from Other Apps… and the sheet after a settled scan; Apply is the ordinary renameTag. Processor:
+  `ProcessorTagChanges` re-spells the autocomplete vocabulary (`TagVocabulary.rename`) and the controlled list from
+  each known archive's log without asking; skipped under self-test drivers. Two Tier-2 reviews (Opus subagents) found 5
+  + 5 defects, all fixed before their checkpoints. Tests: ArchiveCore TagChangeLogTests 20 (+ suite green), Notes
+  NotesTagRenameTests 13 (unit suite 1337 green), Reader TagChangeLogReaderTests 5 (unit suite 1258 green), Processor
+  builds clean, write-surface lint clean; VM: ArchiveNotesUITests/TagRenameUITests (rename on both notes, one Undo puts
+  both back, the Tag Changes sheet; screenshots read). Known limits: Reader KNOWN_ISSUES §"Tag changes across the apps"
+  (catalogue-mode Undo, queued: W40.tag-window-reader). Edit ▸ Undo shows plain "Undo" in Notes and needs the list's
+  focus, as delete's does. No migration written: nothing to migrate. $0; bench cache: nothing created.
+  Commits: e74c4b5a (design), checkpoints 2-4, and this one.
+  <!-- /W40.tag-rename-suite -->
