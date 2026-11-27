@@ -10,10 +10,6 @@ struct SettingsProcessingTab: View {
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision = false
     @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
-    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalServer = false
-    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
-    /// The gateway is a model on this Mac: the user's own server marked local, or one the app runs itself.
-    private var gatewayLocalModel: Bool { gatewayLocalServer || !gatewayManagedModel.isEmpty }
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
     @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
     @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment = false
@@ -176,7 +172,8 @@ struct SettingsProcessingTab: View {
 
     @ViewBuilder private var readingSection: some View {
         Section("Reading") {
-            SettingsReaderPicker(keyed: keyed)
+            SettingsReaderPicker(keyed: keyed,
+                                 grayOffMac: ReaderChoice.grayOffMac(staysOnMac: scope.resolve(.staysOnMac).value.bool == true))
             // Shown only where it applies: a dimmed switch measured 1.25:1 in the accessibility audit.
             if isDirect || ocrPageKindRouting {
             Toggle(isOn: $ocrPageKindRouting) {
@@ -334,13 +331,7 @@ struct SettingsProcessingTab: View {
     @ViewBuilder private var privacySection: some View {
         Section("Privacy, spending and the app") {
             LayeredToggle(key: .staysOnMac) {
-                HelpLabel("Keep pages on this Mac", help: "The app's picks and the Advisor (“Compare routes & trade-offs…”) offer only readers that run on this Mac, so no page image or text leaves it. A cloud reader you choose yourself above still sends pages to its provider.")
-            }
-            if scope.resolve(.staysOnMac).value.bool == true, !useAppleVision, !(useGateway && gatewayLocalModel) {
-                Text("Your Reader above is not on this Mac: pages go to it when you run.")
-                    .font(.caption2).foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("ap.settings.staysOnMacConflict")
+                HelpLabel("Keep pages on this Mac", help: "Only readers that run on this Mac can be chosen: the subscription and cloud readers in the Reader menu above, and the Cloud preset, are grayed out, and the app's picks and the Advisor (“Compare routes & trade-offs…”) offer only readers on this Mac, so no page image leaves it. Turn this off to choose a cloud reader. With Apple Vision, the text-only model is a separate switch: it sends the text, never the image.")
             }
             LayeredToggle(key: .noTraining) {
                 HelpLabel("Exclude routes that may train on your pages", help: "Pages go only where the provider's terms say uploads do not train its models; a route that may train, or whose terms depend on your account, is not offered.")

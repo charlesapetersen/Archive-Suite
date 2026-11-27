@@ -12,6 +12,10 @@ enum ProcessorUITestConfiguration {
 
     static var isActive: Bool { arguments.contains("-APUITestMode") }
 
+    /// W49.proc-stays-on-mac-gray-cloud: a UI-test launch offers cloud readers with "Keep pages on this Mac" on (its
+    /// default), unless `-APUITestKeepPagesOnMac` asks for the grayed menu. Nothing is written; only the menu is affected.
+    static var offersOffMacReaders: Bool { isActive && !arguments.contains("-APUITestKeepPagesOnMac") }
+
     /// W49.proc-s044-check: a dummy credential for the guest loopback gateway, headless Keychain stays untouched.
     static var usesStandInGateway: Bool { isActive && arguments.contains("-APUITestStandInGateway") }
 

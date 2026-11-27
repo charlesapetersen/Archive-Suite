@@ -82,10 +82,14 @@ enum WorkflowPreset: String, CaseIterable, Identifiable {
         return offered.first.map { .download($0) } ?? .unavailable
     }
 
-    /// Why the preset cannot be applied on this Mac, or nil when it can.
-    @MainActor var unavailableReason: String? {
+    /// Why the preset cannot be applied on this Mac, or nil when it can. `grayOffMac`: "Keep pages on this Mac" is on,
+    /// so Cloud is grayed out like the cloud readers in the Reader menu (`ReaderChoice.grayOffMac`).
+    @MainActor func unavailableReason(grayOffMac: Bool) -> String? {
         if self == .localHD, Self.localHDPlan() == .unavailable {
             return "A reader on this Mac needs an Apple silicon Mac with at least 16 GB of memory."
+        }
+        if self == .cloud, grayOffMac {
+            return "“Keep pages on this Mac” is on: turn it off below to use a cloud reader."
         }
         return nil
     }
@@ -141,6 +145,7 @@ struct WorkflowPresetRow: View {
         _ = (useAppleVision, useGateway, useLocalAgent, gatewayLocalModel, gatewayManagedModel, modelStore.selectedModelIDs,
              managedOCR.states)
         let cluster = scope.store.resolver(for: nil).resolve(.cluster).value.bool ?? false
+        let grayOffMac = ReaderChoice.grayOffMac(staysOnMac: scope.resolve(.staysOnMac).value.bool == true)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 ForEach(WorkflowPreset.allCases) { preset in
@@ -163,8 +168,8 @@ struct WorkflowPresetRow: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .disabled(preset.unavailableReason != nil)
-                    .help(preset.unavailableReason ?? preset.caption)
+                    .disabled(preset.unavailableReason(grayOffMac: grayOffMac) != nil)
+                    .help(preset.unavailableReason(grayOffMac: grayOffMac) ?? preset.caption)
                     .accessibilityLabel("\(preset.title) preset, \(preset.subtitle)")
                     .accessibilityHint(preset.caption)
                     .accessibilityAddTraits(on ? .isSelected : [])

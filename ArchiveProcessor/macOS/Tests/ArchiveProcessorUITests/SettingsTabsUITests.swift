@@ -188,6 +188,51 @@ final class SettingsTabsUITests: XCTestCase {
         XCTAssertTrue(waitUntil { self.text(of: reader).contains(" · ") }, "Cloud chooses a provider's model: \(text(of: reader))")
     }
 
+    /// W49.proc-stays-on-mac-gray-cloud (owner, 2026-11-26): while "Keep pages on this Mac" is on, the Reader menu grays
+    /// out the subscription and cloud readers and the Cloud preset is unavailable; turned off, they can be chosen again.
+    func testKeepPagesOnThisMacGraysOutCloudReaders() throws {
+        guard let settings = launch(["-APUITestKeepPagesOnMac"]) else { return }
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        let scroller = settings.scrollViews.firstMatch
+        // Below the fold in a lazy form: it exists only once scrolled to.
+        let keep = settings.descendants(matching: .any)["ap.settings.staysOnMac"].firstMatch
+        func isOn() -> Bool { "\(keep.value ?? "")" == "1" }
+        func setKeep(_ on: Bool) {
+            for _ in 0..<30 where !(keep.exists && keep.isHittable) { scroller.scroll(byDeltaX: 0, deltaY: -200) }
+            XCTAssertTrue(keep.exists, "the Keep pages on this Mac switch")
+            if isOn() != on { keep.click() }
+            XCTAssertTrue(waitUntil { isOn() == on }, "the switch is \(on ? "on" : "off"): \(String(describing: keep.value))")
+            for _ in 0..<30 { scroller.scroll(byDeltaX: 0, deltaY: 200) }
+        }
+        let reader = settings.descendants(matching: .any)["ap.settings.readerPicker"].firstMatch
+        let cloudPreset = settings.buttons["ap.settings.preset.cloud"].firstMatch
+        let cloudItem = app.menuItems.matching(NSPredicate(format: "title CONTAINS %@", " · ")).firstMatch
+        let cliItem = app.menuItems.matching(NSPredicate(format: "title ENDSWITH %@", "on its own sign-in")).firstMatch
+
+        setKeep(true)
+        settings.buttons["ap.settings.preset.fastFree"].firstMatch.click()
+        XCTAssertTrue(waitUntil { self.text(of: reader).contains("Apple Vision") }, text(of: reader))
+        XCTAssertTrue(waitUntil { !cloudPreset.isEnabled }, "the Cloud preset is grayed out")
+        XCTAssertTrue(settings.descendants(matching: .any)["ap.settings.readerOffMacGrayed"].firstMatch
+            .waitForExistence(timeout: 5), "the Reader row says why the cloud readers are grayed out")
+        reader.click()
+        XCTAssertTrue(app.menuItems["Apple Vision (on this Mac)"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuItems["Apple Vision (on this Mac)"].firstMatch.isEnabled, "a reader on this Mac stays offered")
+        XCTAssertTrue(cloudItem.exists && !cloudItem.isEnabled, "a cloud reader is grayed out: \(cloudItem.debugDescription)")
+        XCTAssertTrue(cliItem.exists && !cliItem.isEnabled, "the subscription CLI is grayed out")
+        shoot(settings, "settings-keep-pages-on-mac-grayed")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(text(of: reader).contains("Apple Vision"), "a grayed reader cannot be chosen: \(text(of: reader))")
+
+        setKeep(false)
+        XCTAssertTrue(waitUntil { cloudPreset.isEnabled }, "the Cloud preset is offered again")
+        XCTAssertFalse(settings.descendants(matching: .any)["ap.settings.readerOffMacGrayed"].firstMatch.exists)
+        reader.click()
+        XCTAssertTrue(cloudItem.waitForExistence(timeout: 5) && cloudItem.isEnabled, "a cloud reader can be chosen again")
+        app.typeKey(.escape, modifierFlags: [])
+        setKeep(true)   // the built-in default, for the next test in this guest
+    }
+
     func testSearchablePlacementCanBeSetForOneInputFormat() throws {
         guard let settings = launch() else { return }
         XCTAssertTrue(app.showSettingsPanel("Advanced"))

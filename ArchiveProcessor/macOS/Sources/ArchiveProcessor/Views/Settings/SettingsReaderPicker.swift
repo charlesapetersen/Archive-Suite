@@ -57,6 +57,26 @@ enum ReaderChoice: Hashable {
         return .direct(p, store.model(for: p).id)
     }
 
+    /// Whether this reader keeps every page image on this Mac: Apple Vision, the on-device model, a model the app runs,
+    /// and the gateway only when it is the user's own server marked local. The CLI and every API reader send pages away.
+    func readsOnThisMac(gatewayLocal: Bool) -> Bool {
+        switch self {
+        case .appleVision, .onDevice, .managed: return true
+        case .gateway: return gatewayLocal
+        case .localAgent, .direct: return false
+        }
+    }
+
+    /// Whether the Reader menu and the Cloud preset gray out readers off this Mac (W49.proc-stays-on-mac-gray-cloud,
+    /// owner 2026-11-26: grayed, not offered with a warning). The switch is on by default, so the UI suite, whose
+    /// journeys choose cloud readers, sees them offered unless a test passes `-APUITestKeepPagesOnMac`.
+    @MainActor static func grayOffMac(staysOnMac: Bool) -> Bool {
+#if DEBUG
+        if ProcessorUITestConfiguration.offersOffMacReaders { return false }
+#endif
+        return staysOnMac
+    }
+
     /// Write the flags and model for this reader. Apple Vision has nothing to batch, so it turns batch mode off.
     @MainActor func apply(_ d: UserDefaults = .standard, store: ModelSelectionStore = .shared) {
         func flags(vision: Bool, agent: Bool, gateway: Bool) {
@@ -106,6 +126,8 @@ struct SettingsReaderPicker: View {
     @ObservedObject private var customModelStore = CustomModelStore.shared
     /// Providers with a saved key, read on appear and on a key change, never while drawing.
     let keyed: Set<LLMProvider>
+    /// "Keep pages on this Mac" is on: readers that send pages away are grayed out (`ReaderChoice.grayOffMac`).
+    var grayOffMac = false
     @State private var openRouterPricesRead = 0
 
     private var choice: ReaderChoice {
@@ -144,24 +166,35 @@ struct SettingsReaderPicker: View {
                 }
                 if gatewayLocalModel { Text(gatewayName).tag(ReaderChoice.gateway.tag) }
             }
+            // Grayed, not hidden, while pages stay on this Mac: a reader already chosen keeps its name in the menu.
             Section("Subscription — no per-page fee") {
                 Text("\(localAgentTool.displayName) on its own sign-in").tag(ReaderChoice.localAgent.tag)
+                    .selectionDisabled(grayOffMac)
             }
             Section("Cloud API — pay per page") {
-                if !gatewayLocalModel { Text(gatewayName).tag(ReaderChoice.gateway.tag) }
+                if !gatewayLocalModel { Text(gatewayName).tag(ReaderChoice.gateway.tag).selectionDisabled(grayOffMac) }
                 if let id = unavailableOpenRouterSelection.flatMap({ _ in modelStore.selectedModelIDs[LLMProvider.openrouter.rawValue] }) {
-                    Text("\(id) (unavailable)").tag(ReaderChoice.direct(.openrouter, id).tag)
+                    Text("\(id) (unavailable)").tag(ReaderChoice.direct(.openrouter, id).tag).selectionDisabled(grayOffMac)
                 }
                 ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { p in
                     ForEach(p.models) { m in
-                        Text(directLabel(p, m)).tag(ReaderChoice.direct(p, m.id).tag)
+                        Text(directLabel(p, m)).tag(ReaderChoice.direct(p, m.id).tag).selectionDisabled(grayOffMac)
                     }
                 }
             }
         } label: {
-            HelpLabel("Reader", help: "Which reader turns each page image into text. Apple Vision reads on this Mac at no cost and sends nothing off it. A subscription CLI reads with its own sign-in. A cloud model reads with your API key, at its price per page; the estimate below follows the choice. Exactly one reader is active at a time.")
+            HelpLabel("Reader", help: "Which reader turns each page image into text. Apple Vision reads on this Mac at no cost and sends nothing off it. A subscription CLI reads with its own sign-in. A cloud model reads with your API key, at its price per page; the estimate below follows the choice. Exactly one reader is active at a time. While “Keep pages on this Mac” is on, the readers that send pages away are grayed out.")
         }
         .accessibilityIdentifier("ap.settings.readerPicker")
+        if grayOffMac {
+            Text(choice.readsOnThisMac(gatewayLocal: gatewayLocalModel)
+                 ? "Subscription and cloud readers are grayed out while “Keep pages on this Mac” is on (Privacy, below)."
+                 : "This reader sends pages off this Mac, and “Keep pages on this Mac” is on: choose a reader on this Mac, or turn that switch off below.")
+                .font(.caption).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(choice.readsOnThisMac(gatewayLocal: gatewayLocalModel)
+                                         ? "ap.settings.readerOffMacGrayed" : "ap.settings.staysOnMacConflict")
+        }
         if case .direct(let p, _) = choice {
             if !keyed.contains(p) {
                 Text("No \(p.rawValue) key is saved yet: add one in Settings › Accounts before you start a run.")

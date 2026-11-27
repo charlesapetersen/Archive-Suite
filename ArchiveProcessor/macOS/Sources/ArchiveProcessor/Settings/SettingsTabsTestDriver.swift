@@ -270,6 +270,20 @@ enum SettingsTabsTestDriver {
               && !WorkflowPreset.fastFree.matches(d, cluster: false))
         check("6 the Cluster preset follows the cluster answer", WorkflowPreset.cluster.matches(d, cluster: true)
               && !WorkflowPreset.cluster.matches(d, cluster: false))
+        // 6s (W49.proc-stays-on-mac-gray-cloud): "Keep pages on this Mac" grays out exactly the readers that send pages away.
+        let onMac: [ReaderChoice] = [.appleVision, .onDevice, .managed(.qwen35_9B)]
+        let away: [ReaderChoice] = [.localAgent, .direct(.gemini, "gemini-x"), .direct(.openrouter, "vendor/model:free")]
+        check("6s Apple Vision, the on-device model and a managed model read on this Mac",
+              onMac.allSatisfy { $0.readsOnThisMac(gatewayLocal: false) })
+        check("6s the CLI and every API reader send pages away", away.allSatisfy { !$0.readsOnThisMac(gatewayLocal: true) })
+        check("6s the gateway reads on this Mac only when it is the user's own local server",
+              ReaderChoice.gateway.readsOnThisMac(gatewayLocal: true) && !ReaderChoice.gateway.readsOnThisMac(gatewayLocal: false))
+        check("6s the switch grays them out, and off it offers them", ReaderChoice.grayOffMac(staysOnMac: true)
+              && !ReaderChoice.grayOffMac(staysOnMac: false))
+        check("6s with the switch on, the Cloud preset is unavailable and says why",
+              WorkflowPreset.cloud.unavailableReason(grayOffMac: true)?.contains("Keep pages on this Mac") == true
+              && WorkflowPreset.cloud.unavailableReason(grayOffMac: false) == nil
+              && WorkflowPreset.fastFree.unavailableReason(grayOffMac: true) == nil)
     }
 
     // 6h (W49.proc-local-ocr-onboarding). Local HD recognises a managed Reader, uses a downloaded model first, keeps
