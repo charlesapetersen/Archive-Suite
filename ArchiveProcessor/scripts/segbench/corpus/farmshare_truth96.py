@@ -91,6 +91,12 @@ def settings(root, mode):
                 'revision': f"det {m['det']['revision']}, rec {m['rec']['revision']}",
                 'route': 'pipeline', 'versions': c['prepared']['versions']}
     st = json.loads((root / 'status.json').read_text())['settings']
+    if st.get('adapter') == 'vllm':  # W46.ocr-family-coverage: vLLM in process (family_run.py), batches of max_num_seqs
+        versions = json.loads((root / 'prepared.json').read_text()).get('check_versions') or {}
+        return {**st, 'route': 'vllm in process', 'max_tokens': st['max_new_tokens'],
+                'temperature': 0 if st['greedy'] else None,
+                'concurrency': st['settings']['engine'].get('max_num_seqs'), 'vllm': versions.get('vllm'),
+                'versions': versions}
     if 'adapter' in st:  # W46.ocr-new-open-boxes: the two completed transformers routes
         if st['adapter'] not in ('unlimited', 'nemotron'):
             raise ValueError('unscored adapter needs explicit runtime settings: ' + st['adapter'])

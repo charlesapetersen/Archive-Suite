@@ -23,7 +23,8 @@ import ocr_panel_score as S
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parent.parent / 'segbench-results'
 NEW = ['xiaomi-ocr-0', 'paddleocr-vl1.6', 'qwen3.8-27b', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16',
-       'infinity-parser2-pro', 'unlimited-ocr', 'nemotron-parse-2', 'granite-docling-258m-mlx']
+       'infinity-parser2-pro', 'unlimited-ocr', 'nemotron-parse-2', 'granite-docling-258m-mlx',
+       'olmocr-2-7b', 'chandra-ocr-2', 'dots-ocr', 'churro-3b', 'fs-churro']   # W46.ocr-family-coverage
 # The incumbent per set: the reading the bench shows for that route on that set.
 INCUMBENTS = {'owner96': {'qwen3.6-27b': 'local panel', 'lightonocr3-4b': 'FarmShare native'},
               'public895': {'qwen3.6-27b': 'FarmShare panel', 'lightonocr3-4b': 'FarmShare native'}}

@@ -1,0 +1,293 @@
+{
+ "label": "dots-ocr-52765254",
+ "env": {
+  "model": "rednote-hilab/dots.ocr",
+  "revision": "c0111ce6bc07803dbc267932ffef0ae3a51dc951",
+  "route": "vllm in process",
+  "mode": "native",
+  "precision": "bf16",
+  "SLURM_JOB_ID": "52765254",
+  "SLURMD_NODENAME": null,
+  "FS_MODEL": "rednote-hilab/dots.ocr",
+  "FS_PRESET": "dots-ocr-native",
+  "FS_VLLM_ARGS": "",
+  "FS_KV": null,
+  "vllm": "0.31.0",
+  "max_tokens": 8192,
+  "temperature": 0,
+  "concurrency": 16,
+  "prompt_sha256": "16ff71ac5d218f35e5b3db41240b6e70741498bc099db3fa922ce1ff972e3b2f",
+  "versions": {
+   "torch": "2.13.0+cu129",
+   "vllm": "0.31.0",
+   "python": "3.12.3"
+  },
+  "native_settings": {
+   "engine": {
+    "model": "/scratch/users/cp1/fs-ocr/hf/hub/models--rednote-hilab--dots.ocr/snapshots/c0111ce6bc07803dbc267932ffef0ae3a51dc951",
+    "limit_mm_per_prompt": {
+     "image": 1
+    },
+    "seed": 0,
+    "max_num_seqs": 16,
+    "max_model_len": 16384,
+    "gpu_memory_utilization": 0.85,
+    "trust_remote_code": true
+   },
+   "sampling": {
+    "temperature": 0.0,
+    "max_tokens": 8192
+   },
+   "mode": "chat",
+   "prompt_role": "user",
+   "text_first": false,
+   "prompt_prefix": "<|img|><|imgpad|><|endofimg|>",
+   "max_side": null,
+   "upscale": false,
+   "chat_template_kwargs": {
+    "enable_thinking": false
+   },
+   "chat_kwargs": {
+    "chat_template_content_format": "string"
+   },
+   "reduce": "dots",
+   "family_run_sha256": "4bb97ab1345469e9b8eea039ec5b4e014111fe99e255d716155f6344098055d7",
+   "family_parse_sha256": "62140d9017cf0cfb64cf160656b7f2cacb60d4a26b81f0dee75d4fbd65c5af9d",
+   "vllm_worker_multiproc_method": "spawn"
+  },
+  "runner_sha256": "574d8fc96aab63a0777bac47abb7b406985096967728fb88ed9ae2918f873576",
+  "parser_sha256": "030010a2d0ff649a9cfb50ef0a4733a538e9ed8e54227a013a8f9532b604b783",
+  "note": "the model card's own prompt, reply scored as written; caps, errors and blanks count as failures"
+ },
+ "throughput": {
+  "pages": 99,
+  "ok": 96,
+  "wall_s": 256.3,
+  "gpus": 1,
+  "pages_per_hour_per_gpu": 1390.6,
+  "mean_prompt_tokens": 5101.03125,
+  "mean_completion_tokens": 867.1145833333334,
+  "job_elapsed_s": 371,
+  "note": "wall_s is collector time (pilot + full pass); job_elapsed_s is the Slurm job including server start and model load"
+ },
+ "outcomes": {
+  "all_99": {
+   "ok": 96,
+   "cap": 3
+  },
+  "accuracy_96": {
+   "ok": 95,
+   "cap": 1
+  },
+  "cap_pages": [
+   "p018",
+   "p094",
+   "p096"
+  ],
+  "caps_repetitive": 0
+ },
+ "accuracy_96": {
+  "n": 96,
+  "ok": 95,
+  "failed": 0.01041666666666663,
+  "nes_answered": 0.914732386915231,
+  "nes": 0.9052039245515306,
+  "chrf": 0.9155585174157898,
+  "miss": 0.06044139218562475,
+  "add": 0.04257234297906388,
+  "cost": 0,
+  "words": 29996
+ },
+ "agreement_3": {
+  "n": 3,
+  "ok": 1,
+  "failed": 0.6666666666666667,
+  "nes_answered": 0.6896156052782558,
+  "nes": 0.22987186842608529,
+  "chrf": 0.19021610389331964,
+  "miss": 0.656298600311042,
+  "add": 0.14930015552099535,
+  "cost": 0,
+  "words": 643
+ },
+ "clippings": {
+  "n": 13,
+  "ok": 13,
+  "failed": 0.0,
+  "nes_answered": 0.9183282332440427,
+  "nes": 0.9183282332440427,
+  "chrf": 0.9374240291455984,
+  "miss": 0.07565680079813768,
+  "add": 0.057532424343199204,
+  "cost": 0,
+  "words": 6014
+ },
+ "all_99": {
+  "n": 99,
+  "ok": 96,
+  "failed": 0.030303030303030276,
+  "nes_answered": 0.9123874204398459,
+  "nes": 0.8847393167901536,
+  "chrf": 0.8935784442787452,
+  "miss": 0.07294624498188583,
+  "add": 0.04481216749893926,
+  "cost": 0,
+  "words": 30639
+ },
+ "strata_96": {
+  "clippings": {
+   "yes": {
+    "n": 13,
+    "ok": 13,
+    "failed": 0.0,
+    "nes_answered": 0.9183282332440427,
+    "nes": 0.9183282332440427,
+    "chrf": 0.9374240291455984,
+    "miss": 0.07565680079813768,
+    "add": 0.057532424343199204,
+    "cost": 0,
+    "words": 6014
+   }
+  },
+  "date_bin": {
+   "1900-1949": {
+    "n": 14,
+    "ok": 13,
+    "failed": 0.0714285714285714,
+    "nes_answered": 0.9165393539003261,
+    "nes": 0.85107225719316,
+    "chrf": 0.8483291406308611,
+    "miss": 0.1356161297589547,
+    "add": 0.04370353683261996,
+    "cost": 0,
+    "words": 4439
+   },
+   "1950-1984": {
+    "n": 49,
+    "ok": 49,
+    "failed": 0.0,
+    "nes_answered": 0.8867742147177593,
+    "nes": 0.8867742147177593,
+    "chrf": 0.9122205724262873,
+    "miss": 0.05673306772908367,
+    "add": 0.06661354581673307,
+    "cost": 0,
+    "words": 12550
+   },
+   "1985 on": {
+    "n": 12,
+    "ok": 12,
+    "failed": 0.0,
+    "nes_answered": 0.9422469960972176,
+    "nes": 0.9422469960972176,
+    "chrf": 0.9348887273444624,
+    "miss": 0.05405405405405406,
+    "add": 0.016707616707616706,
+    "cost": 0,
+    "words": 4070
+   },
+   "before 1900": {
+    "n": 11,
+    "ok": 11,
+    "failed": 0.0,
+    "nes_answered": 0.9471703431947113,
+    "nes": 0.9471703431947113,
+    "chrf": 0.9420271721604695,
+    "miss": 0.036854025118385834,
+    "add": 0.022647724933086266,
+    "cost": 0,
+    "words": 4857
+   },
+   "undated": {
+    "n": 10,
+    "ok": 10,
+    "failed": 0.0,
+    "nes_answered": 0.9806790906764071,
+    "nes": 0.9806790906764071,
+    "chrf": 0.9737238032296972,
+    "miss": 0.024509803921568627,
+    "add": 0.016911764705882352,
+    "cost": 0,
+    "words": 4080
+   }
+  },
+  "handwritten": {
+   "yes": {
+    "n": 12,
+    "ok": 12,
+    "failed": 0.0,
+    "nes_answered": 0.7936865593838932,
+    "nes": 0.7936865593838932,
+    "chrf": 0.7850508948445496,
+    "miss": 0.18626062322946177,
+    "add": 0.20892351274787535,
+    "cost": 0,
+    "words": 1412
+   }
+  },
+  "kind": {
+   "handwritten": {
+    "n": 16,
+    "ok": 16,
+    "failed": 0.0,
+    "nes_answered": 0.8246316777908037,
+    "nes": 0.8246316777908037,
+    "chrf": 0.814223779647782,
+    "miss": 0.1373449701423978,
+    "add": 0.14928801102434544,
+    "cost": 0,
+    "words": 2177
+   },
+   "mixed": {
+    "n": 2,
+    "ok": 2,
+    "failed": 0.0,
+    "nes_answered": 0.6873993833392453,
+    "nes": 0.6873993833392453,
+    "chrf": 0.6659520773273636,
+    "miss": 0.40476190476190477,
+    "add": 0.047619047619047616,
+    "cost": 0,
+    "words": 210
+   },
+   "printed": {
+    "n": 28,
+    "ok": 27,
+    "failed": 0.0357142857142857,
+    "nes_answered": 0.9063791698754293,
+    "nes": 0.8740084852370211,
+    "chrf": 0.9008214715043809,
+    "miss": 0.08337974381414591,
+    "add": 0.03612061420956321,
+    "cost": 0,
+    "words": 12569
+   },
+   "typewritten": {
+    "n": 50,
+    "ok": 50,
+    "failed": 0.0,
+    "nes_answered": 0.9571686711795802,
+    "nes": 0.9571686711795802,
+    "chrf": 0.9662226368154783,
+    "miss": 0.02533244680851064,
+    "add": 0.032446808510638296,
+    "cost": 0,
+    "words": 15040
+   }
+  },
+  "tables": {
+   "yes": {
+    "n": 12,
+    "ok": 12,
+    "failed": 0.0,
+    "nes_answered": 0.856433835952048,
+    "nes": 0.856433835952048,
+    "chrf": 0.9390325305853198,
+    "miss": 0.018628912071535022,
+    "add": 0.10059612518628912,
+    "cost": 0,
+    "words": 2684
+   }
+  }
+ }
+}

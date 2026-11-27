@@ -16,7 +16,8 @@ without the three agreement letters) and the 895 frozen public pages (corpus/rou
   both     Gemini 3.7 Flash through the Stanford gateway (gateway-gemini/panel, gemini37-public/responses), and
            W46.ocr-new-open's three Sherlock routes (Xiaomi-OCR-0, PaddleOCR-VL 1.6, Qwen3.8 27B) and
            W46.ocr-new-open-sherlock's Infinity-Parser2-Pro, from
-           CACHE/sherlock-results/new-open-{895,96}.
+           CACHE/sherlock-results/new-open-{895,96}; W46.ocr-family-coverage's olmOCR-2, Chandra-2 and dots.ocr from
+           CACHE/sherlock-results/family-{895,96}, and CHURRO-3B's 895 joined (its 455 there, the FarmShare 440).
 
 A reading is what that source's own report scored (the same reading() functions and modes); a failure is an
 empty reading. The invention figures (added, rewritten, suspect) are pooled over answered pages, since an empty
@@ -83,6 +84,12 @@ SHERLOCK_ROUTES = [  # W46.ocr-new-open, new-open-sherlock-20261024.md: label, m
     ('unlimited-ocr', 'unlimited-ocr', 'native'),  # W46.ocr-new-open-boxes, in-process card routes
     ('nemotron-parse-2', 'nemotron-parse-2', 'native'),
 ]
+FAMILY_ROUTES = [  # W46.ocr-family-coverage, family-coverage-20261126.md: label, folder under family-{895,96}, mode
+    ('olmocr-2-7b', 'olmocr-2-7b-fp8/results/ocr/olmocr-2-7b-fp8', 'native'),
+    ('chandra-ocr-2', 'chandra-ocr-2/results/ocr/chandra-ocr-2', 'native'),
+    ('dots-ocr', 'dots-ocr/results/ocr/dots-ocr', 'native'),
+    ('churro-3b', 'churro-3b-joined', 'native'),   # the 895 only: its 96 reading is fs-churro's
+]
 OS, GS, PS, Q18, Q19 = (FARMSHARE / 'FarmShare-open-sweep-20261019/outputs',
                         FARMSHARE / 'FarmShare-general-sweep-20261019/outputs',
                         FARMSHARE / 'FarmShare-ppocrv6-20261019/outputs',
@@ -148,6 +155,11 @@ def owner_sources():
             out[(label, f'FarmShare {mode}')] = {p: X.reading(recs.get(p), mode) for p in pages}
     for label, key, mode in SHERLOCK_ROUTES:
         d = SH / 'new-open-96' / key / 'results/ocr' / key
+        if d.is_dir():
+            recs = F.read_records(d)
+            out[(label, f'Sherlock {mode}')] = {p: X.reading(recs.get(p), mode) for p in pages}
+    for label, folder, mode in FAMILY_ROUTES:
+        d = SH / 'family-96' / folder
         if d.is_dir():
             recs = F.read_records(d)
             out[(label, f'Sherlock {mode}')] = {p: X.reading(recs.get(p), mode) for p in pages}
@@ -218,6 +230,11 @@ def public_sources(truth):
             out[(label, f'FarmShare {mode}')] = {j: X.reading(recs.get(j), mode) for j in want}
     for label, key, mode in SHERLOCK_ROUTES:
         d = SH / 'new-open-895' / key / 'results/ocr' / key
+        if d.is_dir():
+            recs = F.read_records(d)
+            out[(label, f'Sherlock {mode}')] = {j: X.reading(recs.get(j), mode) for j in want}
+    for label, folder, mode in FAMILY_ROUTES:
+        d = SH / 'family-895' / folder
         if d.is_dir():
             recs = F.read_records(d)
             out[(label, f'Sherlock {mode}')] = {j: X.reading(recs.get(j), mode) for j in want}
