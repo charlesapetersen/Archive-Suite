@@ -128,6 +128,12 @@ Check 3 in the headless ranking test could fail when the cached Gemini 3.8 Flash
 direct Gemini rate. The test now uses fixed equal-price and higher-price cases and verifies both the
 per-1,000-page cost and the selected-page estimate. (W47.reocr-price-check)
 
+## The Advisor's Range tab sometimes fails the contrast audit (W49.ui-fails-under-coverage, 2026-11-27)
+
+The light-mode accessibility audit failed once in two runs on the Range tab, with a contrast failure that names no
+element; the dark-mode and by-setting runs passed. Some mark or label on the chart may be too faint at times.
+(queued: W49.proc-audit-range-contrast-intermittent)
+
 ## FIXED (2026-11-21) — Accounts Validated badge contrast
 
 The green label measured 2.07:1 in light mode on baseline `cb394d05`. The badge now uses the system text

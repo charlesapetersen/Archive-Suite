@@ -7,6 +7,15 @@ Fixed and closed entries, and the July–October 2026 fix logs, are archived in
 keeps the open limits, measured costs, verified facts, deferred hardening, open risks and environment notes,
 and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 
+## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
+
+The document window's "Not recorded" preservation status measured 3.95:1 in light mode at caption size; it now uses
+the primary text colour. Two audit findings remain:
+- In the preview sheet, an unnamed element wraps each page thumbnail while the preview's thumbnail sidebar is shown,
+  so VoiceOver meets an empty group before each thumbnail button. (queued: W49.reader-audit-preview-thumbs-viewer-orphan)
+- The document window reports a parent/child mismatch that names no element; VoiceOver may meet an element its
+  parent does not list. (queued: W49.reader-audit-preview-thumbs-viewer-orphan)
+
 ## Tag changes across the apps — the limits (W40.tag-rename-suite, 2026-11-26)
 
 - A rename is recorded only when the granted folder has a durable root marker (`RootFolderStore.rootMarker`); a root
