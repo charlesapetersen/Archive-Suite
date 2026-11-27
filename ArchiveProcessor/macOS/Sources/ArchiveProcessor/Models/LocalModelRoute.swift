@@ -54,6 +54,10 @@ enum LocalModelRoute {
         /// Seconds a page for the time estimate: measured for the 8B, estimated from memory bandwidth otherwise.
         let secondsPerPage: Double
         let ids: [Server: String]
+        /// NES on the owner's 16 handwritten test pages, strict (a failed page as 0), read on the 18 GB M3 Pro: the rule
+        /// table's `handwritten` figure (`segbench-results/settings-routes-app.json`, reading stage). A free run's
+        /// handwritten pages go to the downloaded pick with the highest (W49.proc-kind-split-mac).
+        let handwrittenNES: Double
 
         var id: String { "\(name) \(precision)" }
         var displayName: String { "\(name), \(precision) (this Mac)" }
@@ -69,14 +73,20 @@ enum LocalModelRoute {
             + "best reader measured on a Mac; about 34 s a page, 9.1 GB in use. Handwriting (88.1) still reads better in "
             + "the cloud.",
         secondsPerPage: 33.73,
-        ids: [.mlxVLM: "mlx-community/Qwen3.5-9B-4bit", .ollama: "qwen3.5:9b", .lmStudio: "qwen/qwen3.5-9b"])
+        ids: [.mlxVLM: "mlx-community/Qwen3.5-9B-4bit", .ollama: "qwen3.5:9b", .lmStudio: "qwen/qwen3.5-9b"],
+        handwrittenNES: 88.06)
     static let qwen3VL8B4 = Pick(
         name: "Qwen3-VL 8B", precision: "4-bit", memoryGiB: 8.4,
         summary: "Measured on an 18 GB M3 Pro: 93.62 NES on the 91 of the owner's 96 test pages it finished (89.68 "
             + "counting the 4 it failed as 0), about 35 s a page, 8.4 GB in use. Better than Qwen3.5 9B only when "
             + "a failed page goes to a second reader.",
         secondsPerPage: 35.09,
-        ids: [.mlxVLM: "mlx-community/Qwen3-VL-8B-Instruct-4bit", .ollama: "qwen3-vl:8b", .lmStudio: "qwen/qwen3-vl-8b"])
+        ids: [.mlxVLM: "mlx-community/Qwen3-VL-8B-Instruct-4bit", .ollama: "qwen3-vl:8b", .lmStudio: "qwen/qwen3-vl-8b"],
+        handwrittenNES: 89.24)
+
+    /// Apple Vision's NES on the same 16 handwritten pages (`apple-vision`'s `handwritten` figure, the same table): a
+    /// local reader takes a free run's handwritten pages only when it reads them better than this.
+    static let visionHandwrittenNES = 60.58
 
     static let all = [qwen35_9B4, qwen3VL8B4]
 

@@ -67,6 +67,17 @@ enum MoneyJourneyFixture {
             PageKindStore.classifyOverride = { _ in PageKind(kind: .typewritten, confidence: 1) }
             PageKindStore.availableOverride = [.init(provider: .openai, modelID: "gpt-5-nano")]
         }
+        // W49.proc-kind-split-mac: every photo is handwritten, and Qwen3-VL 8B is "downloaded" behind a stand-in host.
+        if ProcessInfo.processInfo.arguments.contains("-APUITestScratchMacHandwriting") {
+            PageKindStore.classifyOverride = { _ in PageKind(kind: .handwritten, confidence: 0.95) }
+            let q8 = ManagedOCRModel.qwen3VL8B
+            PageKindStore.localOverride = [.init(provider: .appleVision, modelID: q8.rawValue)]
+            PageKindRouting.managedGatewayOverride = { m in
+                m == q8 ? GatewayConfig(baseURL: "http://\(macLocalHost)/v1", modelID: m.rawValue,
+                                        displayName: m.pick.displayName, inputCostPer1M: nil, outputCostPer1M: nil,
+                                        localModel: true) : nil
+            }
+        }
     }
 
     @MainActor static func receiveScratchPhotosIfRequested(in session: CaptureSession) {
@@ -92,6 +103,9 @@ enum MoneyJourneyFixture {
         }
     }
 
+    /// The stand-in for a downloaded model's worker on this Mac.
+    static let macLocalHost = "mac-local.invalid"
+
     static let transport: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
         guard request.httpMethod == "POST", let url = request.url, let body = request.httpBody,
               let json = try JSONSerialization.jsonObject(with: body) as? [String: Any] else {
@@ -113,6 +127,17 @@ enum MoneyJourneyFixture {
             }
             model = json["model"] as? String ?? ""
             route = "openai"
+            status = 200
+            reply = ["choices": [["message": ["content": reading], "finish_reason": "stop"]]]
+        case (macLocalHost, "/v1/chat/completions"):
+            let messages = json["messages"] as? [[String: Any]] ?? []
+            images = messages.flatMap { $0["content"] as? [[String: Any]] ?? [] }.compactMap { part in
+                guard let field = part["image_url"] as? [String: Any], let dataURL = field["url"] as? String,
+                      let comma = dataURL.firstIndex(of: ",") else { return nil }
+                return Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...]))
+            }
+            model = json["model"] as? String ?? ""
+            route = "mac-local"
             status = 200
             reply = ["choices": [["message": ["content": reading], "finish_reason": "stop"]]]
         case ("generativelanguage.googleapis.com", let path) where path.hasSuffix(":generateContent"):

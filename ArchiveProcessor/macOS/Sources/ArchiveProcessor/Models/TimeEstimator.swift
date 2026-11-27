@@ -69,7 +69,8 @@ struct TimeEstimator {
         ocrWorkers: Int = 4,
         localSecondsPerPage: Double? = nil,
         gatewayRotation: Bool = false,
-        usesLocalAgent: Bool = false
+        usesLocalAgent: Bool = false,
+        routedLocalSeconds: Double = 0
     ) -> TimeEstimate {
         let n = Double(fileCount)
         let speed = speedFactor(for: model)
@@ -90,6 +91,8 @@ struct TimeEstimator {
         } else {
             ocr = ceil(n / w) * callSeconds(outputTokens: CostEstimator.estimatedOutputTokens, speed: speed)
         }
+        // W49.proc-kind-split-mac: the pages a model on this Mac reads for an Apple Vision run, one at a time.
+        ocr += routedLocalSeconds
 
         // Rotation — concurrent with each page's OCR (per image: `orderings` sequential comparisons).
         var rotation = 0.0

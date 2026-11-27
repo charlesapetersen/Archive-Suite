@@ -2116,21 +2116,27 @@ extension OCRProcessor {
                                        imageScale: imageScale, sendPreviousImage: previousImageURL != nil,
                                        contextCharCount: previousText?.count ?? 0) }
             : nil
+        let runProvider = provider, runModel = model, runKey = apiKey, runThinking = thinkingLevel
         let provider = routed?.provider ?? provider
         let model = routed?.model ?? model
         let apiKey = routed?.apiKey ?? apiKey
         let thinkingLevel = routed.map { $0.thinkingLevel } ?? thinkingLevel
+        // W49.proc-kind-split-mac: a free run's handwritten page reads through the downloaded model's gateway.
+        let localGatewayRoute = routed?.gateway
+        var routedRecord = routed?.record
 
-        let networkResult: OCRResult
+        var networkResult: OCRResult
         do {
             // W42.int-s2: the one way to read a page. `PageReaders.reader` keeps the backend precedence (the Local
             // Agent CLI, then the gateway, then the direct provider).
             let reader = try PageReaders.reader(
                 provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
-                gateway: gatewayConfig, localAgent: localAgent, visionSettings: visionSettings)
+                gateway: localGatewayRoute ?? gatewayConfig, localAgent: localAgent, visionSettings: visionSettings)
             networkResult = try await reader.read(PageReaderInput(
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
                 customPrompt: customPrompt, imageScale: scale, costScale: imageScale)).detail
+        } catch where localGatewayRoute != nil {
+            networkResult = OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: nil)
         } catch {
             let code: String?
             if case OCRError.openRouterModelUnavailable(let id) = error, id == runModelID {
@@ -2141,6 +2147,22 @@ extension OCRProcessor {
             }
             return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: code,
                              pageReader: routed?.record)
+        }
+
+        // A free run keeps every page it can: a page its reader on this Mac failed (a loop, a cut reply, a worker that
+        // would not start) is read by the run's own Apple Vision, and its record says so.
+        if localGatewayRoute != nil, networkResult.text == nil, !Task.isCancelled, let first = routedRecord {
+            NSLog("[OCR] \(imageURL.lastPathComponent): the reader on this Mac failed (\(networkResult.errorMessage ?? "no text")); Apple Vision reads it")
+            if let vision = try? PageReaders.reader(provider: runProvider, model: runModel, apiKey: runKey,
+                                                    thinkingLevel: runThinking, visionSettings: visionSettings),
+               let reading = try? await vision.read(PageReaderInput(
+                   imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+                   customPrompt: customPrompt, imageScale: scale, costScale: imageScale)).detail {
+                networkResult = reading
+                routedRecord = PageReaderRecord(kind: first.kind, confidence: first.confidence, reason: .localFailed,
+                                                provider: runProvider.rawValue, model: runModel.displayName,
+                                                readingKind: first.readingKind)
+            }
         }
 
         // W41.app-ocr-default: a page Gemini refuses goes to a second reader, never an empty success. W41.app-ocr-
@@ -2171,11 +2193,15 @@ extension OCRProcessor {
         // Override rotation with the detected correction when OCR produced text and a
         // correction was found; otherwise keep the LLM prompt's parsed rotation.
         var merged = mergeRotation(into: resolved, verdict: await rotationCorrection)
-        if let routed { merged.pageReader = routed.record }
-        // W47.wh-read-flag-readers: another reader's page is flagged when it disagrees with Vision past its own cut.
+        if let routedRecord { merged.pageReader = routedRecord }
+        // W47.wh-read-flag-readers: another reader's page is flagged when it disagrees with Vision past its own cut. A
+        // page a model on this Mac read is flagged by that model's rule, as on a run through its gateway.
+        let fellBack = routedRecord?.reason == .localFailed
+        let readGateway = fellBack ? gatewayConfig : localGatewayRoute ?? gatewayConfig
         let route = localAgent == nil
-            ? ReadQualityDisagreement.Route(provider: provider, modelID: gatewayConfig?.modelID ?? model.id,
-                                            gateway: gatewayConfig != nil, local: gatewayConfig?.isLocalModel == true)
+            ? ReadQualityDisagreement.Route(provider: readGateway.map { $0.asLLMModel().provider } ?? provider,
+                                            modelID: readGateway?.modelID ?? (fellBack ? runModel.id : model.id),
+                                            gateway: readGateway != nil, local: readGateway?.isLocalModel == true)
             : nil
         return await ReadQualityDisagreement.addingFlag(to: merged, route: route, imageURL: imageURL)
     }

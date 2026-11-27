@@ -401,9 +401,15 @@ Advanced › Lower-scoring and experimental choices, off by default.
 
 ## ⚠️ LIMITATION (W49.proc-pipeline-prune-apply, 2026-11-25): what the owner's pipeline simplifications leave open
 
-- **The two-way kind split covers direct cloud runs only.** Owner call 2 (`W49.proc-pipeline-prune-ok`, 2026-11-24)
-  asks for the split on the Mac too, but routing by kind still never applies to an Apple Vision run, so a free Mac run
-  cannot yet send its handwritten pages to a downloaded local reader (queued: W49.proc-kind-split-mac).
+- **The free Mac split sends handwriting to Qwen3-VL 8B, not the profile's LightOnOCR-3 4B.** Since
+  W49.proc-kind-split-mac an Apple Vision run sends a sure handwritten page to the downloaded model that reads handwriting
+  best (Qwen3-VL 8B 4-bit, 89.24 NES on the owner's 16 hand pages, over Qwen3.5 9B's 88.06 and Vision's 60.58). B1's
+  handwriting pick, LightOnOCR-3 4B 8-bit (89.91), is not an app download, and a model on the user's own local server
+  (the gateway's local-model field) is not offered to a Vision run (queued: W49.proc-kind-split-mac-fu).
+- **A Vision run's handwritten pages share its workers with the typed pages.** The model on this Mac reads one page at
+  a time (about 35 s), so a batch with many handwritten pages can hold every Vision worker while the typed pages wait;
+  the time estimate adds those pages serially and still counts them in Vision's share too, a slight overestimate
+  (queued: W49.proc-kind-split-mac-fu).
 - **A collection's day-first date order does not reach the trace and tagging calls.** (The Reader's folder-date
   confirmation reads it since W49.reader-folder-date-day-first.) Where the route finds a year
   but no dated form, the tagging call's month and day can still be a month-first reading (queued:

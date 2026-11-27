@@ -175,14 +175,15 @@ struct SettingsProcessingTab: View {
             SettingsReaderPicker(keyed: keyed,
                                  grayOffMac: ReaderChoice.grayOffMac(staysOnMac: scope.resolve(.staysOnMac).value.bool == true))
             // Shown only where it applies: a dimmed switch measured 1.25:1 in the accessibility audit.
-            if isDirect || ocrPageKindRouting {
+            // W49.proc-kind-split-mac: Apple Vision has the split too, to a reader downloaded on this Mac.
+            if isDirect || useAppleVision || ocrPageKindRouting {
             Toggle(isOn: $ocrPageKindRouting) {
-                HelpLabel("Use a different reader for handwritten pages", help: "Before a run, this Mac tells each dropped photo's kind with Apple Vision, free (about 0.6 s a page). Typed, printed and form pages keep the reader above; a handwritten page goes to the best measured handwriting reader you have a key or a download for. A page whose kind is unsure keeps the reader above. You can change the reader for one page in the file list, and the estimate follows. Needs macOS 26 and a cloud reader above.")
+                HelpLabel("Use a different reader for handwritten pages", help: "Before a run, this Mac tells each dropped photo's kind with Apple Vision, free (about 0.6 s a page). Typed, printed and form pages keep the reader above; a handwritten page goes to the best measured handwriting reader you have a key or a download for. With Apple Vision above, that is a reader downloaded on this Mac (Settings › Accounts), so the pages never leave it and cost nothing; it takes about 35 s a page, one page at a time. A page whose kind is unsure keeps the reader above. You can change the reader for one page in the file list, and the estimate follows. Needs macOS 26.")
             }
             .accessibilityIdentifier("ap.settings.pageKindRouting")
             }
-            if !isDirect {
-                Text("Handwritten pages go to a second reader only with a cloud reader above.")
+            if !isDirect && !useAppleVision {
+                Text("Handwritten pages go to a second reader only with a cloud reader or Apple Vision above.")
                     .font(.caption2).foregroundStyle(.primary)
             }
             if useAppleVision { appleVisionRows }

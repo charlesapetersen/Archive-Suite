@@ -28,11 +28,15 @@ final class PageKindStore: ObservableObject {
     @Published private(set) var pending = 0
     /// Every built-in model the user has a key for, refreshed with the file list (one Keychain read per provider).
     @Published private(set) var available: Set<PageKindRouting.Candidate> = []
+    /// The downloaded models on this Mac, for a run on Apple Vision (W49.proc-kind-split-mac), refreshed with the list.
+    @Published private(set) var local: Set<PageKindRouting.Candidate> = []
 
     /// Test seam: replaces the classifier (headless tests have no real page). nil in production.
     nonisolated(unsafe) static var classifyOverride: (@Sendable (URL) async -> PageKind?)?
     /// Test seam: replaces the Keychain for `available`. nil in production.
     nonisolated(unsafe) static var availableOverride: Set<PageKindRouting.Candidate>?
+    /// Test seam: replaces the installed models for `local`. nil in production.
+    nonisolated(unsafe) static var localOverride: Set<PageKindRouting.Candidate>?
 
     private var worker: Task<Void, Never>?
     private var queue: [URL] = []
@@ -41,6 +45,7 @@ final class PageKindStore: ObservableObject {
     /// left out: their pages are drawn to images only during the run, so they keep the run's model.
     func update(_ urls: [URL]) {
         available = Self.availableOverride ?? PageKindRouting.keyedCandidates()
+        local = Self.localOverride ?? PageKindRouting.localCandidates()
         let wanted = Set(urls.map(PageReaderPlan.key))
         overrides = overrides.filter { wanted.contains($0.key) }
         let fresh = urls.filter { !Self.isPDF($0) && kinds[PageReaderPlan.key($0)] == nil && !queue.contains($0) }
@@ -67,10 +72,24 @@ final class PageKindStore: ObservableObject {
 
     func kind(for url: URL) -> PageKind?? { kinds[PageReaderPlan.key(url)] }
 
+    /// The readers a run can send pages to: the models on this Mac for a run on Apple Vision, which keeps its pages on
+    /// the Mac; the keyed cloud models otherwise.
+    func candidates(for runDefault: PageKindRouting.Candidate) -> Set<PageKindRouting.Candidate> {
+        runDefault.provider == .appleVision ? local : available
+    }
+
+    /// The user's choices made for one kind of run do not carry to the other (a cloud model chosen for a page is not
+    /// offered on Apple Vision, nor a model on this Mac on a key).
+    func clearChoices() {
+        overrides = [:]
+        batchOverride = nil
+    }
+
     /// The page's reader now, with the choices as they stand.
     func choice(for url: URL, guidance: OCRPageGuidance?, runDefault: PageKindRouting.Candidate) -> PageKindRouting.Choice? {
         guard let told = kind(for: url) else { return nil }   // not classified yet
-        return PageKindRouting.choose(kind: told, guidance: guidance, available: available, runDefault: runDefault,
+        return PageKindRouting.choose(kind: told, guidance: guidance, available: candidates(for: runDefault),
+                                      runDefault: runDefault,
                                       override: (overrides[PageReaderPlan.key(url)] ?? batchOverride)?.resolve(runDefault))
     }
 
@@ -86,8 +105,8 @@ final class PageKindStore: ObservableObject {
     }
 
     /// Readers to offer in the menus, by provider then name.
-    var menuCandidates: [(PageKindRouting.Candidate, LLMModel)] {
-        available.compactMap { c in PageKindRouting.model(c).map { (c, $0) } }
+    func menuCandidates(for runDefault: PageKindRouting.Candidate) -> [(PageKindRouting.Candidate, LLMModel)] {
+        candidates(for: runDefault).compactMap { c in PageKindRouting.model(c).map { (c, $0) } }
             .sorted { ($0.1.provider.rawValue, $0.1.displayName) < ($1.1.provider.rawValue, $1.1.displayName) }
     }
 }
@@ -120,6 +139,11 @@ struct PageKindRowLine: View {
         return (PageKindRouting.summary(kind: told, choice: c, modelName: name), routed)
     }
 
+    /// A reader's name in the menus: provider and model, or the model alone for one on this Mac.
+    static func menuName(_ m: LLMModel) -> String {
+        ManagedOCRModel(rawValue: m.id) != nil ? m.displayName : "\(m.provider.rawValue) · \(m.displayName)"
+    }
+
     private func runDefaultChoice(_ r: PageKindRouting.Reason) -> PageKindRouting.Choice {
         .init(provider: runDefault.provider, modelID: runDefault.modelID, reason: r)
     }
@@ -139,8 +163,8 @@ struct PageKindRowLine: View {
                 Button("By its kind (handwriting to a handwriting reader)") { store.overrides[PageReaderPlan.key(url)] = nil }
                 Button("The run's model (now \(runModel.displayName))") { store.overrides[PageReaderPlan.key(url)] = .run }
                 Divider()
-                ForEach(store.menuCandidates, id: \.0) { cand, m in
-                    Button("\(m.provider.rawValue) · \(m.displayName)") { store.overrides[PageReaderPlan.key(url)] = .model(cand) }
+                ForEach(store.menuCandidates(for: runDefault), id: \.0) { cand, m in
+                    Button(Self.menuName(m)) { store.overrides[PageReaderPlan.key(url)] = .model(cand) }
                 }
             } label: {
                 Label(text: label.text, routed: label.routed)
@@ -172,8 +196,8 @@ struct PageKindBatchControl: View {
                 Button("By each page's kind") { store.batchOverride = nil }
                 Button("The run's model for every page (now \(runModel.displayName))") { store.batchOverride = .run }
                 Divider()
-                ForEach(store.menuCandidates, id: \.0) { cand, m in
-                    Button("\(m.provider.rawValue) · \(m.displayName) for every page") { store.batchOverride = .model(cand) }
+                ForEach(store.menuCandidates(for: runDefault), id: \.0) { cand, m in
+                    Button("\(PageKindRowLine.menuName(m)) for every page") { store.batchOverride = .model(cand) }
                 }
             } label: {
                 Text(title)
@@ -189,6 +213,12 @@ struct PageKindBatchControl: View {
             if !routed.isEmpty {
                 Text("Read by another model, in the totals: "
                      + routed.map { "\($0.1) by \($0.0.displayName)" }.joined(separator: ", ") + ".")
+                    .font(.caption2).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if runDefault.provider == .appleVision && store.local.isEmpty {
+                Text("No reader for handwriting is downloaded on this Mac, so handwritten pages stay on Apple Vision. "
+                     + "Download one in Settings › Accounts.")
                     .font(.caption2).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }

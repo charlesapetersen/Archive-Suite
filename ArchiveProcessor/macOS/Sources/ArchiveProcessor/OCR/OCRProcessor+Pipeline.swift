@@ -3439,9 +3439,12 @@ extension OCRProcessor {
         runConfig.gateway = gatewayConfig
         runConfig.outputImageFile = exportOriginals
         runConfig.localAgent = localAgent
-        // Per-page readers and institutional imports apply to direct OCR outside a provider batch.
+        // Per-page readers and institutional imports apply to direct OCR outside a provider batch. Per-page readers
+        // also apply to an Apple Vision run, whose handwritten pages may go to a model on this Mac
+        // (W49.proc-kind-split-mac; `PageKindRouting.reader` never sends one of its pages off the Mac).
         let allowsPageReaders = isDirectOCR && !useBatch
-        runConfig.pageReaders = allowsPageReaders ? plannedReaders : .empty
+        let visionReaders = provider == .appleVision && gatewayConfig == nil && localAgent == nil && !preOCRedInput
+        runConfig.pageReaders = allowsPageReaders || visionReaders ? plannedReaders : .empty
         runConfig.institutionalComputeImport = allowsPageReaders ? plannedImport : nil
         if let resumingMixedPDF {
             applyMixedPDFRuntimeConfig(resumingMixedPDF.runtimeConfig, to: &runConfig, apiKey: apiKey,

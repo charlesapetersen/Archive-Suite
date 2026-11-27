@@ -619,6 +619,148 @@ enum OCRPageKindTestDriver {
             } catch { check("12b the download installs through the app's installer: \(error)", false) }
         }
 
+        // 13. The free split on the Mac (W49.proc-kind-split-mac): on Apple Vision a sure handwritten page goes to the
+        // downloaded model that reads handwriting best, every other page stays on Vision, and no page leaves the Mac.
+        let visionModel = LLMModel.appleVisionModels[0]
+        let vision = cand(visionModel)
+        let q9 = PageKindRouting.Candidate(provider: .appleVision, modelID: ManagedOCRModel.qwen35_9B.rawValue)
+        let q8 = PageKindRouting.Candidate(provider: .appleVision, modelID: ManagedOCRModel.qwen3VL8B.rawValue)
+        check("13 a sure handwritten page goes to the downloaded model with the best measured handwriting (Qwen3-VL 8B, 89.24 over 88.06)",
+              choose(.handwritten, available: [q9, q8], run: vision) == .init(provider: .appleVision, modelID: q8.modelID, reason: .kind)
+              && choose(.handwritten, available: [q9], run: vision).modelID == q9.modelID
+              && choose(.mixed, available: [q9, q8], run: vision).modelID == q8.modelID)
+        check("13 typed, printed, form, newspaper, clipping and register pages stay on Vision",
+              typedKinds.allSatisfy { choose($0, available: [q8], run: vision) == .init(provider: .appleVision, modelID: visionModel.id, reason: .same) })
+        check("13 with nothing downloaded a handwritten page stays on Vision (no_pick)",
+              choose(.handwritten, available: [], run: vision) == .init(provider: .appleVision, modelID: visionModel.id, reason: .noPick))
+        check("13 a free run never picks a cloud model, keyed or not",
+              choose(.handwritten, available: all, run: vision).reason == .noPick)
+        check("13 an unsure handwritten page stays on Vision", choose(.handwritten, 0.79, available: [q8], run: vision).reason == .uncertain)
+        check("13 a cloud run never takes a model on this Mac as the guide's pick",
+              choose(.handwritten, available: [q8, cand(claude)], run: runDefault).reason == .noPick)
+        check("13 every local pick reads handwriting better than Vision, measured",
+              LocalModelRoute.all.allSatisfy { $0.handwrittenNES > LocalModelRoute.visionHandwrittenNES })
+        let localGW = GatewayConfig(baseURL: "http://kind-local.invalid/v1", modelID: q8.modelID,
+                                    displayName: ManagedOCRModel.qwen3VL8B.pick.displayName,
+                                    inputCostPer1M: nil, outputCostPer1M: nil, localModel: true)
+        PageKindRouting.managedGatewayOverride = { $0 == .qwen3VL8B ? localGW : nil }
+        PageKindStore.localOverride = [q8]
+        defer { PageKindRouting.managedGatewayOverride = nil; PageKindStore.localOverride = nil }
+        check("13 the candidates are the offered models whose download finished",
+              PageKindRouting.localCandidates(offered: ManagedOCRModel.allCases) == [q8]
+              && PageKindRouting.localCandidates(offered: []).isEmpty)
+
+        let macStore = PageKindStore()
+        macStore.update([a, b, c])
+        for _ in 0..<200 where macStore.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
+        let macPlan = macStore.plan([a, b, c], guidance: guide, runDefault: vision)
+        check("13 the file list's plan: the handwritten page to the model on this Mac, the typed page on Vision",
+              macPlan.entry(for: b)?.choice == .init(provider: .appleVision, modelID: q8.modelID, reason: .kind)
+              && macPlan.entry(for: a)?.choice.reason == .same && macPlan.entry(for: c)?.choice.reason == .uncertain)
+        check("13 the menus offer the models on this Mac on Vision, and only cloud models on a key",
+              macStore.menuCandidates(for: vision).map(\.0) == [q8]
+              && !macStore.menuCandidates(for: runDefault).contains { $0.0.provider == .appleVision })
+        macStore.overrides[PageReaderPlan.key(a)] = .model(q8)
+        macStore.batchOverride = .run
+        macStore.clearChoices()
+        check("13 switching between Vision and a key clears the choices", macStore.overrides.isEmpty && macStore.batchOverride == nil)
+        check("13 the estimate: nothing to pay, the caption names the model on this Mac",
+              macPlan.ocrCostDelta(runModel: visionModel, imageScale: 1) == 0
+              && macPlan.routedCounts(runModel: visionModel).map { "\($0.0.displayName) \($0.1)" }
+                == ["\(ManagedOCRModel.qwen3VL8B.pick.displayName) 1"])
+        let plainTime = TimeEstimator.estimate(fileCount: 3, model: visionModel, enableTagging: false, useGateway: true)
+        let splitTime = TimeEstimator.estimate(fileCount: 3, model: visionModel, enableTagging: false, useGateway: true,
+                                               routedLocalSeconds: macPlan.localSeconds)
+        check("13 the time estimate adds the model's measured pace for each page it reads",
+              macPlan.localSeconds == ManagedOCRModel.qwen3VL8B.pick.secondsPerPage
+              && abs(splitTime.ocrSeconds - plainTime.ocrSeconds - macPlan.localSeconds) < 1e-9
+              && PageReaderPlan.empty.localSeconds == 0, "\(plainTime.ocrSeconds) \(splitTime.ocrSeconds)")
+        let macRow = PageKindRowLine(store: macStore, url: b, guidance: guide, runDefault: vision, runModel: visionModel)
+        check("13 the row line names the model on this Mac",
+              macRow.label?.text == "\(PageKind(kind: .handwritten, confidence: 0.9).summary) → \(ManagedOCRModel.qwen3VL8B.pick.displayName)"
+              && macRow.label?.routed == true, "\(String(describing: macRow.label))")
+        PageKindStore.localOverride = []
+        let bareStore = PageKindStore()
+        bareStore.update([])
+        PageKindStore.localOverride = [q8]
+        let withLocal = renderedInk(PageKindBatchControl(store: macStore, plan: .empty, runDefault: vision, runModel: visionModel))
+        let noLocal = renderedInk(PageKindBatchControl(store: bareStore, plan: .empty, runDefault: vision, runModel: visionModel))
+        check("13 with nothing downloaded the batch control says where to download one (\(noLocal) dark px against \(withLocal))",
+              noLocal > withLocal + 300)
+
+        let localText = #"{"choices":[{"finish_reason":"stop","message":{"content":"[document_start]\nLOCAL-TEXT"}}]}"#
+        let localCut = #"{"choices":[{"finish_reason":"length","message":{"content":"[document_start]\nloop loop"}}]}"#
+        func visionOCR(_ readers: PageReaderPlan) async -> OCRResult {
+            await OCRProcessor.performOCRCall(
+                imageURL: image, provider: .appleVision, model: visionModel, thinkingLevel: nil, apiKey: "",
+                previousText: nil, previousImageURL: nil, rotationMode: .off, standardImageMB: 4, cascade: .off,
+                readers: readers)
+        }
+        func macPlanFor(_ choice: PageKindRouting.Choice, kind: PageKind = PageKind(kind: .handwritten, confidence: 0.9))
+            -> PageReaderPlan {
+            var p = PageReaderPlan()
+            p.pages[PageReaderPlan.key(image)] = .init(kind: kind, choice: choice)
+            return p
+        }
+        let toLocal = macPlanFor(.init(provider: .appleVision, modelID: q8.modelID, reason: .kind))
+        await script.set(["kind-local": (200, localText), "anthropic": (200, claudeText), "generativelanguage": (200, geminiText)])
+        r = await visionOCR(toLocal)
+        calls = await script.calls()
+        check("13 Vision run: the handwritten page is read by the model on this Mac, and only by it",
+              r.text?.contains("LOCAL-TEXT") == true && calls == ["kind-local.invalid"], "\(calls) \(r.errorMessage ?? "")")
+        check("13 its record names the model as a gateway run does, at no cost, and counts as routed",
+              r.pageReader == PageReaderRecord(kind: "handwritten", confidence: 0.9, reason: .kind,
+                                               provider: localGW.displayName, model: q8.modelID,
+                                               estimatedCost: 0, replacedCost: 0) && r.pageReader?.isRouted == true,
+              "\(String(describing: r.pageReader))")
+        _ = try? PDFGenerator().generate(imageURL: image, result: r, model: visionModel, outputURL: pdfURL)
+        let localHeader = PDFHeaderParser.extract(pdfURL)?.textPages.first?.header
+        check("13 the PDF header names the model on this Mac and keeps the handwritten Kind",
+              localHeader?.kind == .handwritten && localHeader?.provenance?.model == q8.modelID
+              && localHeader?.provenance?.provider == localGW.displayName,
+              "\(String(describing: localHeader?.provenance))")
+        let localRun = RunHistorySnapshot(
+            startedAt: Date(), provider: .appleVision, gatewayConfig: nil, localAgent: nil, imageTokenProvider: nil,
+            model: visionModel, visionTextProvider: nil, visionTextModel: nil, batchMode: false, enableTagging: false,
+            enableCollectionSegmentation: false, preOCRedInput: false, reOCRMultiPagePDF: false, mixedReOCR: false,
+            sendPreviousImage: false, contextCharCount: 0, imageScale: 1, rotationMode: .off, fileCount: 1)
+        let localRecorded = localRun.makeRun(succeeded: 1, pageReaders: [r.pageReader].compactMap { $0 })
+        check("13 the run history counts the page and adds nothing to the cost",
+              localRecorded.kindRoutedPages == 1 && localRecorded.cost == localRun.estimatedCost)
+
+        await script.set(["kind-local": (200, localCut)])
+        r = await visionOCR(toLocal)
+        calls = await script.calls()
+        check("13 a page the model on this Mac fails (a cut reply) is read by Vision, and its record says so",
+              !calls.isEmpty && calls.allSatisfy { $0 == "kind-local.invalid" } && r.pageReader?.reason == .localFailed
+              && r.pageReader?.provider == LLMProvider.appleVision.rawValue && r.pageReader?.model == visionModel.displayName
+              && r.pageReader?.isRouted == false && r.errorMessage?.contains("repeated") != true,
+              "\(calls) \(String(describing: r.pageReader)) \(r.errorMessage ?? "")")
+        await script.set(["kind-local": (500, "{}")])
+        r = await visionOCR(toLocal)
+        check("13 and a server error too", r.pageReader?.reason == .localFailed)
+
+        await script.set(["kind-local": (200, localText)])
+        r = await visionOCR(macPlanFor(.init(provider: .appleVision, modelID: q9.modelID, reason: .kind)))
+        calls = await script.calls()
+        check("13 a model whose download is gone keeps the page on Vision (no_pick), with no call",
+              calls.isEmpty && r.pageReader?.reason == .noPick)
+        await script.reset()
+        r = await visionOCR(macPlanFor(.init(provider: .gemini, modelID: flash.id, reason: .override)))
+        calls = await script.calls()
+        check("13 a cloud choice left over on a Vision run never makes a call",
+              calls.isEmpty && r.pageReader?.reason == .noPick)
+        await script.reset()
+        r = await visionOCR(macPlanFor(.init(provider: .appleVision, modelID: visionModel.id, reason: .same),
+                                       kind: PageKind(kind: .typewritten, confidence: 0.97)))
+        calls = await script.calls()
+        check("13 a typed page on Vision is read by Vision, with no call", calls.isEmpty && r.pageReader?.reason == .same)
+        await script.reset()
+        _ = await ocr(image, toLocal)
+        calls = await script.calls()
+        check("13 a cloud run never sends a page to a model on this Mac", !calls.contains("kind-local.invalid")
+              && calls.allSatisfy { $0.contains("anthropic") }, "\(calls)")
+
         finish(results)
     }
 

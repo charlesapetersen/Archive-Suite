@@ -254,10 +254,11 @@ struct OCRView: View {
     /// Both reader selection and institutional computing imports apply to direct, non-batch OCR.
     private var allowsPageReaders: Bool { isDirectOCR && !effectiveBatchMode }
     /// W41.app-page-kind applies to a direct API model reading pages one by one: not a paid batch (one model), the
-    /// gateway or the Local Agent (the user's single route), Apple Vision (free; the guide never sends a page to it,
-    /// and moving its pages to a paid model is not what choosing it asks for), or pre-OCRed input.
+    /// gateway or the Local Agent (the user's single route), or pre-OCRed input. On Apple Vision it is the free split
+    /// (W49.proc-kind-split-mac): a handwritten page goes to a model downloaded on this Mac, never to a paid one, since
+    /// moving a free run's pages to a paid model is not what choosing Vision asks for.
     private var pageKindsActive: Bool {
-        ocrPageKindRouting && allowsPageReaders
+        ocrPageKindRouting && (allowsPageReaders || (useAppleVision && !preOCRedInput))
     }
     private var pageKindRunDefault: PageKindRouting.Candidate {
         .init(provider: effectiveModel.provider, modelID: effectiveModel.id)
@@ -438,7 +439,8 @@ struct OCRView: View {
             preOCRedInput: preOCRedInput, useGateway: useGateway || useAppleVision, ocrWorkers: ocrWorkerCount,
             localSecondsPerPage: currentGatewayConfig.flatMap {
                 $0.isLocalModel ? LocalModelRoute.secondsPerPage(modelID: $0.modelID) : nil },
-            gatewayRotation: gatewayRotation, usesLocalAgent: useLocalAgent)
+            gatewayRotation: gatewayRotation, usesLocalAgent: useLocalAgent,
+            routedLocalSeconds: pageReaderPlan.localSeconds)
     }
 
     /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
@@ -540,6 +542,14 @@ struct OCRView: View {
         }
         .onChange(of: pageKindsActive) { _, active in
             if active { pageKinds.update(droppedFiles) }
+        }
+        // A download that finishes (or a model removed) while files are listed changes where handwriting goes.
+        .onReceive(ManagedLocalOCR.shared.$states) { _ in
+            if pageKindsActive && useAppleVision { pageKinds.update(droppedFiles) }
+        }
+        .onChange(of: useAppleVision) { _, _ in
+            pageKinds.clearChoices()
+            if pageKindsActive { pageKinds.update(droppedFiles) }
         }
         .onChange(of: processor.stagedCaptureFiles) { _, staged in
             guard !staged.isEmpty else { return }
