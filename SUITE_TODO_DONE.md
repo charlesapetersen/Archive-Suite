@@ -19303,3 +19303,8 @@ the same three lines and landing them separately would silently revert part of t
   Evidence: `verification/evidence/reader/W40.fix-reader-docpanekeys-vm-harness.md`. No migration: nothing to migrate.
   $0. Bench cache: nothing created.
   <!-- /W40.fix-reader-docpanekeys-vm-harness -->
+- [x] **W40.fix-livecapture-journey-memory — the W40.d5 live-capture journey no longer fits the heavy lock's memory limit [S · S3]** · §W40 — verification phase … SHIPPED 2026-11-27
+  - Found by `W40.h2` (stopped at 10.9 GB, limit 10.8 GB). Measured under the lock: guest 6.4 GB; headless AVD tree 4.0 GB peak at its 2 GB RAM, 3.3 GB at 1.5 GB. The kill record's 4.7 GB on the host was the AVD's boot, not Gradle (the APK built from cache in 7 s; a run with only the APK prebuilt was stopped again at 10.8 GB).
+  - Fix (`ops/gui/vm-gui-runner.sh`, `ArchiveProcessor/scripts/android-ui-drive.sh`): the livecapture lane builds the companion before the guest boots (new `assemble` command; Kotlin compiled in Gradle's JVM so no Kotlin daemon lingers), the phone leg installs it with `APK_PREBUILT=1`, and boots the AVD with `-memory 1536` (`EMU_MEMORY`, this lane only). The AVD config and the Mac-wide limit are unchanged.
+  - Run once: peak 9.9 GB, not stopped. Live phase passed (three PDFs filed and tagged, originals trashed); the fail phase failed one check (no `live.summary-warning`), filed as `W40.fix-livecapture-fail-phase-warning`. Evidence: `verification/evidence/processor/W40.d5-live-capture.md`, "Re-run 2026-11-27". No bench-cache scratch.
+  <!-- /W40.fix-livecapture-journey-memory -->

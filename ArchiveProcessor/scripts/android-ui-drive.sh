@@ -5,7 +5,8 @@
 #
 # Usage:
 #   scripts/android-ui-drive.sh boot                 # create (if needed) + boot the headless AVD
-#   scripts/android-ui-drive.sh install              # gradle installDebug to the emulator
+#   scripts/android-ui-drive.sh assemble             # build the debug APK only (no emulator needed)
+#   scripts/android-ui-drive.sh install              # build (unless APK_PREBUILT=1) + install to the emulator
 #   printf '%s\n' "$token" | scripts/android-ui-drive.sh pair <port>  # secret is stdin-only
 #   scripts/android-ui-drive.sh flow                 # run a capture/tag/save flow, screenshotting each step
 #   printf '%s\n' "$token" | scripts/android-ui-drive.sh all <port>  # boot+install+pair+flow
@@ -136,7 +137,10 @@ ensure_avd(){ [ -x "$EMULATOR" ] || die "emulator not installed — run: sdkmana
     log "set hw.keyboard=yes in $cfg"
   fi; }
 boot(){ ensure_avd
-  log "booting headless emulator $AVD"; "${DETACHED[@]}" "$EMULATOR" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -camera-back virtualscene -gpu swiftshader_indirect >/tmp/ap-emu.log 2>&1 &
+  # EMU_MEMORY (MB) overrides the AVD's hw.ramSize for this boot only; vm-gui-runner.sh's live-capture lane sets it so
+  # the AVD fits beside the macOS guest under the heavy lock's limit (W40.fix-livecapture-journey-memory).
+  local mem=(); [ -n "${EMU_MEMORY:-}" ] && mem=(-memory "$EMU_MEMORY")
+  log "booting headless emulator $AVD${EMU_MEMORY:+ (RAM ${EMU_MEMORY} MB)}"; "${DETACHED[@]}" "$EMULATOR" -avd "$AVD" ${mem[@]+"${mem[@]}"} -no-window -no-audio -no-boot-anim -no-snapshot -camera-back virtualscene -gpu swiftshader_indirect >/tmp/ap-emu.log 2>&1 &
   # Wait for an emulator-* serial specifically (adb wait-for-device returns immediately if a physical
   # device is already connected, causing require_emulator to fail before the emulator registers).
   log "waiting for emulator to register with adb…"
@@ -148,10 +152,17 @@ boot(){ ensure_avd
   "$ADB" shell input keyevent 82 >/dev/null 2>&1                    # dismiss the keyguard
   "$ADB" shell settings put secure show_ime_with_hard_keyboard 0 >/dev/null 2>&1  # never pop the soft IME (would cover buttons)
   log "booted."; }
+# The companion's debug APK. No daemon: it would outlive this command holding the heavy lock (see DETACHED). The
+# Kotlin compiler runs inside Gradle's JVM, not as its own daemon, which would otherwise stay up for hours after the
+# build and add its heap to the job's memory (W40.fix-livecapture-journey-memory, measured 2026-11-27).
+assemble(){ [ -f "$APPDIR/local.properties" ] || echo "sdk.dir=$SDK" > "$APPDIR/local.properties"
+  ( cd "$APPDIR" && ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process :app:assembleDebug ) || die "assemble failed"; }
 install(){ [ -f "$APPDIR/local.properties" ] || echo "sdk.dir=$SDK" > "$APPDIR/local.properties"
   # Build the APK, then install to the EMULATOR ONLY with an explicit -s serial. NOT `gradle installDebug`,
   # which can push to every attached device (incl. a physical phone in use). adb -s can only hit the emulator.
-  ( cd "$APPDIR" && ./gradlew --no-daemon :app:assembleDebug ) || die "assemble failed"   # no daemon: it would outlive this command holding the heavy lock (see DETACHED)
+  # APK_PREBUILT=1: the caller ran `assemble` before anything else was up (vm-gui-runner.sh's live-capture lane), so
+  # no Gradle JVM runs here beside the guest and the AVD (W40.fix-livecapture-journey-memory).
+  [ "${APK_PREBUILT:-0}" = 1 ] || assemble
   local apk="$APPDIR/app/build/outputs/apk/debug/app-debug.apk"; [ -f "$apk" ] || die "APK not found: $apk"
   "$ADB" -s "$EMU_SERIAL" install -r "$apk" || die "install to $EMU_SERIAL failed"
   # Clear app data so every run starts at the CONNECT screen (deterministic pairing). `install -r` keeps
@@ -246,6 +257,7 @@ for d in json.load(open(sys.argv[1])): print(d["file"])' "$gt")
 
 case "${1:-all}" in
   boot) boot;;
+  assemble) assemble;;
   install) require_emulator; install;;
   pair) IFS= read -r PAIR_TOKEN || die "LAN token missing on stdin"; validate_lan_token "$PAIR_TOKEN"
         require_emulator; pair "$2"; unset PAIR_TOKEN;;

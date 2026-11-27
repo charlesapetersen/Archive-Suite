@@ -783,7 +783,7 @@ start_phone_leg() {
   rm -rf "$run"; mkdir -p "$run"
   tart exec "$VM" bash -lc "rm -rf '$LIVE_GDIR' && mkdir -p '$LIVE_GDIR' && date +%s > '$LIVE_GDIR/started'" \
     || die "could not prepare $LIVE_GDIR in the guest"
-  bash "$REPO/ArchiveProcessor/scripts/live-capture-journey-phone.sh" "$VM" "$LIVE_GDIR" "$run" \
+  APK_PREBUILT=1 EMU_MEMORY="${EMU_MEMORY:-1536}" bash "$REPO/ArchiveProcessor/scripts/live-capture-journey-phone.sh" "$VM" "$LIVE_GDIR" "$run" \
     > "$run/phone-leg.out" 2>&1 &
   PHONE_PID=$!
   log "phone leg started (pid $PHONE_PID; log: $run/phone.log)"
@@ -1038,6 +1038,16 @@ log "app=$APP  lane=$LANE  vm=$VM"
 XCUITEST_FAILED=0
 CRASH_FOUND=0
 gen_project
+# W40.fix-livecapture-journey-memory: the companion's APK is built BEFORE the guest boots. Built by the phone leg
+# beside the 6.4 GB guest, Gradle and its Kotlin compiler added ~4.7 GB to the job and the heavy lock stopped it at
+# 10.9 GB (limit 10.8 GB; 2026-11-26). The leg then only installs it (APK_PREBUILT=1), and boots the AVD with 1.5 GB of
+# RAM instead of its 2 GB (EMU_MEMORY): measured 2026-11-27, the AVD's tree peaks at 4.0 GB at 2 GB and 3.3 GB at 1.5 GB,
+# so beside the 6.4 GB guest the job peaks near 9.8 GB rather than at the limit.
+if [ "$PROCESSOR_LIVECAPTURE" = 1 ]; then
+  log "building the Android companion before the guest boots…"
+  bash "$REPO/ArchiveProcessor/scripts/android-ui-drive.sh" assemble >"$APP_ART/phone-assemble.log" 2>&1 \
+    || die "companion assemble failed (log: $APP_ART/phone-assemble.log)"
+fi
 ensure_vm
 ensure_fixture
 prepare_integrations
