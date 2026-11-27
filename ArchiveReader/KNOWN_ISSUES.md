@@ -7,6 +7,13 @@ Fixed and closed entries, and the July–October 2026 fix logs, are archived in
 keeps the open limits, measured costs, verified facts, deferred hardening, open risks and environment notes,
 and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 
+## OPEN (2026-11-26) — The document-pane keys VM test cannot find the image page in the macOS 27.2 guest
+
+- `DocumentPaneKeysUITests` (both tests) fails before any key is pressed: the PDF page's accessibility node,
+  titled "Original image page", is not found. It fails the same way at the commit where it passed on 2026-11-12,
+  so the guest changed, not the app; ledger row R-35 waits on it (`verification/evidence/reader/W40.h2-recheck.md`).
+  (queued: W40.fix-reader-docpanekeys-vm-harness)
+
 ## Moving the archive folder (W49.reader-root-movable, 2026-11-23)
 
 On the same mounted volume, Reader can reopen the same adopted directory at a new path and read flags and

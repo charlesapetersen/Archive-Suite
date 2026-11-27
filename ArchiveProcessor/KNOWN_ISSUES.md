@@ -2,6 +2,12 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## OPEN (2026-11-26) — The live-capture journey exceeds the heavy lock's memory limit
+
+- `PROCESSOR_JOURNEY=livecapture` (W40.d5: the macOS 27.2 guest plus the host's headless Android emulator) was stopped
+  at 10.9 GB against the 10.8 GB limit for one heavy job, so the hand-driven live-capture journey cannot be re-run
+  unattended (`verification/evidence/core/W40.h2-journeys.md`). (queued: W40.fix-livecapture-journey-memory)
+
 ## FIXED (2026-11-24) — The Android launcher icon differed from the Mac Processor icon
 
 Raised in the owner's November 23 Processor guided session
