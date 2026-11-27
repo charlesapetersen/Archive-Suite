@@ -333,7 +333,11 @@ enum RunQuitResumeContract {
             while !(await server.isOpen()) { try await Task.sleep(nanoseconds: 20_000_000) }
             let failing = await server.failing()
             let failed = url.contains(":batchGenerateContent") && failing
-            let job = url.contains(":batchGenerateContent") ? #"{"name":"batches/quit-test"}"# : "{}"
+            // Since W49.proc-ledger-track-paid, Stop reads the job back after the cancel and drops the journal only
+            // once the provider reports it finished, so the status read answers with a cancelled job.
+            let statusRead = request.httpMethod == "GET" && url.contains("batches/quit-test")
+            let job = url.contains(":batchGenerateContent") ? #"{"name":"batches/quit-test"}"#
+                : statusRead ? #"{"name":"batches/quit-test","metadata":{"state":"BATCH_STATE_CANCELLED"}}"# : "{}"
             let response = HTTPURLResponse(url: request.url ?? URL(string: "https://x.invalid")!,
                                            statusCode: failed ? 500 : 200, httpVersion: "HTTP/1.1", headerFields: nil)!
             return (Data((failed ? #"{"error":{"message":"test failure"}}"# : job).utf8), response)
@@ -393,8 +397,8 @@ enum RunQuitResumeContract {
         // Stop: waits for the reply too, then cancels the job it now knows; the app stays open.
         let (stopper, _, stopSent) = await submit { $0.requestStop() }
         check("Stop during a batch submission waits, then cancels the recorded job",
-              stopSent.count == 2 && stopSent[1].contains("batches/quit-test:cancel")
-              && !stopper.isProcessing && !stopper.drainingPages && quits.value == quitsBefore + 1
+              stopSent.count == 3 && stopSent[1].contains("batches/quit-test:cancel")
+              && stopSent[2].contains("batches/quit-test?") && !stopper.isProcessing && !stopper.drainingPages && quits.value == quitsBefore + 1
               && !FileManager.default.fileExists(atPath: journal.path),
               "\(stopSent), journal \(FileManager.default.fileExists(atPath: journal.path) ? "kept" : "gone")")
 
@@ -405,7 +409,8 @@ enum RunQuitResumeContract {
         }
         _ = await waitFor { quits.value > quitsBefore + 1 }
         check("a quit after Stop still cancels the job, then quits",
-              bothSent.count == 2 && bothSent[1].contains("batches/quit-test:cancel") && quits.value == quitsBefore + 2
+              bothSent.count == 3 && bothSent[1].contains("batches/quit-test:cancel")
+              && bothSent[2].contains("batches/quit-test?") && quits.value == quitsBefore + 2
               && !both.isProcessing && !FileManager.default.fileExists(atPath: journal.path),
               "\(bothSent), quits \(quits.value - quitsBefore)")
         OCRProcessor.quitApproved = false

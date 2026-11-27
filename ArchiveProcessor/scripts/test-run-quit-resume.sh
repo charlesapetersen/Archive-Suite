@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source "$PWD/scripts/test-report-wait.sh"
 
-bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
+bin="${ARCHIVEPROC_TEST_BINARY:-$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor}"
 [ -x "$bin" ] || { echo "ArchiveProcessor is not built" >&2; exit 1; }
 
 work=$(mktemp -d)

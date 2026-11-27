@@ -436,6 +436,9 @@ step processor-launch-proof bash "$ROOT/ops/autonomous/tests/prove-processor-lau
 # (its driver stops before any retry if the injected transport is not active). It hung unnoticed on main
 # for weeks because no gate ran it.
 step processor-retry-backend bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-retry-backend.sh'
+# W40.fix-processor-batch-stop-contract: the quit/Stop/resume contract (standard, mixed and batch runs) on the same
+# gate artifact; injected transport, no key, ~8 s, free. Its batch-Stop checks went red unnoticed because no gate ran it.
+step processor-run-quit-resume bash -c 'cd ArchiveProcessor && ARCHIVEPROC_TEST_BINARY="$PWD/macOS/build/gate-DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor" bash scripts/test-run-quit-resume.sh'
 # W40.i-usb-mac: the iPhone cable route's Mac end against a fake usbmuxd (pool, handshake, splice, expiry,
 # throttle key), on the same gate artifact; loopback only, ~45 s, free. The probe checks the REAL usbmuxd
 # still speaks the private protocol (read-only, no phone, ~50 ms).
