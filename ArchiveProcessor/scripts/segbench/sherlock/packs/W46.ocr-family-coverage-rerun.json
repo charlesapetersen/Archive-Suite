@@ -1,0 +1,53 @@
+{
+  "tag": "W46.ocr-family-coverage-rerun",
+  "pack": "ocr-family-coverage-rerun-20261126",
+  "mac": "artifacts/ocr-family-coverage-rerun-20261126",
+  "submit": "support/sherlock/family-coverage/submit.sh",
+  "jobs": 5,
+  "gpu_hours": 13,
+  "review": "execution-plans/items/W46.ocr-family-coverage-rerun.md",
+  "imports": [
+    {
+      "dir": "support/sherlock/family-coverage",
+      "modules": [
+        "family_parse",
+        "family_run",
+        "family_setup"
+      ]
+    },
+    {
+      "modules": [
+        "vllm",
+        "huggingface_hub"
+      ]
+    }
+  ],
+  "creates": [
+    "$FS_ROOT/ocr-family-coverage-rerun-20261126",
+    "$FS_ROOT/family-895",
+    "$FS_ROOT/family-96",
+    "$HF_HOME/hub/models--deepseek-ai--DeepSeek-OCR-2",
+    "$HF_HOME/hub/models--opendatalab--MinerU2.5-Pro-2605-1.2B",
+    "$GROUP_HOME/$USER/envs/family-mineru25-pro",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/ocr-family-coverage-rerun-20261126"
+  ],
+  "provenance": [],
+  "requires": [
+    "$SH_IMG",
+    "$SH_SHIM",
+    "$FS_ROOT/open-sweep-20261019/public895.jsonl",
+    "$FS_ROOT/open-sweep-20261019/pilot3.jsonl",
+    "$FS_ROOT/truth96-20261020/truth99.jsonl",
+    "$FS_ROOT/truth96-20261020/pilot3.jsonl"
+  ],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/ocr-family-coverage-rerun-20261126",
+  "collect": [
+    "$FS_ROOT/ocr-family-coverage-rerun-20261126/jobs.tsv",
+    "$FS_ROOT/ocr-family-coverage-rerun-20261126/logs",
+    "$FS_ROOT/family-895/deepseek-ocr-2",
+    "$FS_ROOT/family-895/mineru25-pro",
+    "$FS_ROOT/family-96/deepseek-ocr-2",
+    "$FS_ROOT/family-96/mineru25-pro"
+  ],
+  "release": "DeepSeek-OCR-2 and MinerU2.5-Pro readings on the 895 and the 96 (895/ and 96/ session folders), collected into the Mac artifact; score as family-coverage-20261126.md \u00a7Reproduce and add their rows"
+}

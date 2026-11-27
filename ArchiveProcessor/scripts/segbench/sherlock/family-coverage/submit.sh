@@ -7,7 +7,8 @@
 # Twelve jobs, chained here so the batch holds, releases and collects them all: the CPU setup job (setup-job.sh:
 # prompts, pinned snapshots, the subset, MinerU's overlay, checks), then per model its 895 on one card afterok the
 # setup and its 96 afterok its 895 (CHURRO: the 455 only; its 96 was read on FarmShare, job 1855420). Each GPU job
-# runs the three-page pilot gate before its set. Ids go in the pack's jobs.tsv. --dry-run (the engine's only mode)
+# runs the three-page pilot gate before its set. A rerun pack carries only some of the keys (pack.sh FAMILY_KEYS;
+# W46.ocr-family-coverage-rerun: DeepSeek-OCR-2 and MinerU2.5-Pro, five jobs). Ids go in the pack's jobs.tsv. --dry-run (the engine's only mode)
 # checks the pack locally and prints the sbatch lines; it never contacts the cluster.
 set -euo pipefail
 PACK="${1:?PACK required}"; DRY="${2:-}"
@@ -26,8 +27,9 @@ done
 ROWS=$(python3 - "$CANDS" "$SH_DIR/family-coverage" <<'PY'
 import json, pathlib, sys
 c = json.load(open(sys.argv[1]))
-assert [x['key'] for x in c] == ['olmocr-2-7b-fp8', 'chandra-ocr-2', 'dots-ocr', 'deepseek-ocr-2', 'mineru25-pro',
-                                 'churro-3b'], c
+ALL = ['olmocr-2-7b-fp8', 'chandra-ocr-2', 'dots-ocr', 'deepseek-ocr-2', 'mineru25-pro', 'churro-3b']
+keys = [x['key'] for x in c]  # all six, or the subset a rerun packed (pack.sh FAMILY_KEYS), in this order
+assert keys and keys == [k for k in ALL if k in keys], keys
 for x in c:
     assert x['adapter'] in ('vllm', 'mineru') and x['sets'] in (['895', '96'], ['895']), x
     assert x['adapter'] == 'mineru' or (x['mode'] in ('chat', 'generate') and x['reduce']), x
