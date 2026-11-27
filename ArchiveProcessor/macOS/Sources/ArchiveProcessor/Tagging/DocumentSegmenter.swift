@@ -14,6 +14,12 @@ struct DocumentSegment {
     /// start page — never inferred from adjacency, dates in body text, or a neighbour's format. The
     /// owner can clear it in manual review.
     var enclosureOf: Int? = nil
+    /// W49.proc-s047-cover-select (owner call 33) — set only when the baseline check dropped this
+    /// segment's OCR-proposed relation (a window split or a review edit changed its cover's pages): the
+    /// indices of the document segments in the same collection before it that are not enclosures themselves
+    /// (enclosures share one cover, as proposals chain), oldest first, any one of which document review may
+    /// name as the actual cover. Empty everywhere else, so nothing is offered.
+    var coverCandidates: [Int] = []
     var combinedText: String { texts.joined(separator: "\n\n") }
 }
 
@@ -36,6 +42,11 @@ struct DocumentSegmenter {
     ///   enclosure's start page; any boundary change, removal or insertion around the cover drops it
     ///   (dropping is the safe direction — the owner can still type the date). `nil` = no baseline check
     ///   (used to compute the baseline itself).
+    /// - Parameter chosenCovers: W49.proc-s047-cover-select — the cover a person named in document review
+    ///   for an enclosure whose proposal the baseline check dropped, as enclosure first-page path → cover
+    ///   first-page path. It restores the relation only when that cover is one of the segment's
+    ///   `coverCandidates`; anything else is ignored, so a stale choice can never point across a
+    ///   collection. Never consulted for a relation the baseline kept.
     /// - Parameter folderStarts: Page indices at tree-folder boundaries. These end the preceding
     ///   document and its enclosure context even when the next page is classified as a continuation.
     func segment(
@@ -44,6 +55,7 @@ struct DocumentSegmenter {
         texts: [String],
         enclosureFlags: [Bool] = [],
         expectedCoverPages: [URL: [URL]]? = nil,
+        chosenCovers: [String: String] = [:],
         folderStarts: Set<Int> = []
     ) -> [DocumentSegment] {
         guard !files.isEmpty else { return [] }
@@ -53,9 +65,12 @@ struct DocumentSegmenter {
         var currentTexts: [String] = []
         var currentEnclosureOf: Int? = nil
         var firstSegmentInFolder = 0
+        // The first segment of each segment's tree folder, aligned with `segments`.
+        var folderFirst: [Int] = []
 
         func flush() {
             guard !currentFiles.isEmpty else { return }
+            folderFirst.append(firstSegmentInFolder)
             segments.append(DocumentSegment(pdfURLs: currentFiles, texts: currentTexts,
                                             enclosureOf: currentEnclosureOf))
             currentFiles = []
@@ -75,10 +90,12 @@ struct DocumentSegmenter {
             switch classification {
             case .boxLabel:
                 flush()
+                folderFirst.append(firstSegmentInFolder)
                 segments.append(DocumentSegment(pdfURLs: [file], isBox: true, texts: [text]))
 
             case .folderLabel:
                 flush()
+                folderFirst.append(firstSegmentInFolder)
                 segments.append(DocumentSegment(pdfURLs: [file], isFolder: true, texts: [text]))
 
             case .documentContinuation:
@@ -112,7 +129,23 @@ struct DocumentSegmenter {
             for i in segments.indices where segments[i].enclosureOf != nil {
                 let start = segments[i].pdfURLs.first
                 let matches = start.map { s in expectedCoverPages[s] != nil && actual[s] == expectedCoverPages[s] } ?? false
-                if !matches { segments[i].enclosureOf = nil }
+                guard !matches else { continue }
+                segments[i].enclosureOf = nil
+                // Owner call 33: the dropped relation may be restored only by a person naming the cover.
+                // Offer the document segments back to the nearest box, folder label or tree folder start —
+                // the same collection rule a proposal obeys — and never pick one from adjacency. An enclosure
+                // (its relation already settled, as `i` runs forward) is never a cover.
+                var candidates: [Int] = []
+                var c = i - 1
+                while c >= folderFirst[i], !segments[c].isBox, !segments[c].isFolder {
+                    if segments[c].enclosureOf == nil { candidates.insert(c, at: 0) }
+                    c -= 1
+                }
+                segments[i].coverCandidates = candidates
+                if let start, let chosen = chosenCovers[start.path],
+                   let cover = candidates.first(where: { segments[$0].pdfURLs.first?.path == chosen }) {
+                    segments[i].enclosureOf = cover
+                }
             }
         }
 

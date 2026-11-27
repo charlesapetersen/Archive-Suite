@@ -634,7 +634,10 @@ section is kept as the design record and for its proof list. Baseline: `3465e15`
 `[enclosure]` marker on a `[document_start]` page that begins a separately dated document sent with the
 letter before it (`OCRPrompt.parseEnclosureFlag`, header lines only). `DocumentSegmenter` turns a marked
 page into `DocumentSegment.enclosureOf` (the covering segment), never across a box/folder label or an
-unclassified page and never from adjacency alone; consecutive enclosures share one letter. The
+unclassified page and never from adjacency alone; consecutive enclosures share one letter. When a
+window split or a review edit changes the cover's pages the proposal drops, and document review offers
+the earlier documents in the same collection (never another enclosure) as an optional named cover; left
+blank, there is none (owner call 33, W49.proc-s047-cover-select). The
 enclosure's `Sent With` value is the covering letter's own date at tagging time (none if the letter is
 undated — no neighbour is borrowed). The manual tag sheet shows the proposal, can clear it, and takes a
 typed sent-with date. Mistral/Vision and pre-OCRed classification-only runs propose nothing. The owner already required two dates for an enclosure with its own date; the open

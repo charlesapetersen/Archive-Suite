@@ -23,30 +23,83 @@ extension OCRProcessor {
         segments = currentSegments(files: files)
     }
     /// The segmentation `rebuildSegments` would assign, without assigning it (W37 reconcile reuses it).
-    func currentSegments(files: [URL]) -> [DocumentSegment] {
+    /// `reviewing` previews the open document review instead: its rows' classes and removals stand in for the
+    /// jobs' until the review is confirmed (W49.proc-s047-cover-select).
+    func currentSegments(files: [URL], reviewing items: [DocumentReviewItem]? = nil) -> [DocumentSegment] {
+        var rowByIndex: [Int: DocumentReviewItem] = [:]
+        for item in items ?? [] { rowByIndex[item.fileIndex] = item }
+        var removed = removedSourceURLs
+        for item in items ?? [] where item.markedForRemoval { removed.insert(item.fileURL) }
         let segmenter = DocumentSegmenter()
         var activeFiles: [URL] = []
         var classifications: [DocumentClassification?] = []
         var texts: [String] = []
         var enclosureFlags: [Bool] = []
-        let originalFolderStarts = treeFolderStarts(in: files, excluding: removedSourceURLs)
+        let originalFolderStarts = treeFolderStarts(in: files, excluding: removed)
         var activeFolderStarts = Set<Int>()
         for (i, url) in files.enumerated() {
-            if removedSourceURLs.contains(url) { continue }
+            if removed.contains(url) { continue }
             if originalFolderStarts.contains(i) { activeFolderStarts.insert(activeFiles.count) }
             activeFiles.append(url)
-            classifications.append(i < jobs.count ? jobs[i].result?.classification : nil)
-            texts.append(i < jobs.count ? (jobs[i].result?.text ?? "") : "")
+            let result = i < jobs.count ? jobs[i].result : nil
+            let classification = rowByIndex[i].map(\.classification) ?? result?.classification
+            classifications.append(classification)
+            texts.append(result?.text ?? "")
             // W37: the model judged "enclosure of the PREVIOUS page's letter". If that previous page was
             // removed, the unit now in front of it is not what the model saw — drop the proposal rather
-            // than carry it across the gap.
-            let previousRemoved = i > 0 && removedSourceURLs.contains(files[i - 1])
-            enclosureFlags.append(!previousRemoved && i < jobs.count && jobs[i].result?.enclosure == true)
+            // than carry it across the gap. A review row that changes the page's class drops its flag, as
+            // `OCRResult.with(classification:)` will once the review is applied.
+            let previousRemoved = i > 0 && removed.contains(files[i - 1])
+            enclosureFlags.append(!previousRemoved && result?.enclosure == true
+                                  && classification == result?.classification)
         }
         return segmenter.segment(files: activeFiles, classifications: classifications, texts: texts,
                                  enclosureFlags: enclosureFlags,
                                  expectedCoverPages: enclosureBaseline(files: files),
+                                 chosenCovers: effectiveEnclosureCovers.filter { !$0.value.isEmpty },
                                  folderStarts: activeFolderStarts)
+    }
+    /// W49.proc-s047-cover-select (owner call 33) — the covers named in document review so far, enclosure
+    /// first-page path → cover first-page path, with "" for a choice left blank. A resume seeds
+    /// `enclosureCoverChoices` from its manifest; a manifest's own choices still count beneath them.
+    var effectiveEnclosureCovers: [String: String] {
+        (activePendingRun?.enclosureCovers ?? activePendingBatch?.enclosureCovers ?? [:])
+            .merging(enclosureCoverChoices) { $1 }
+    }
+    /// One enclosure the open document review can name a cover for: the enclosure's first page, and the
+    /// first page of each document in its collection before it (oldest first).
+    struct EnclosureCoverOptions {
+        let enclosurePath: String
+        let covers: [(path: String, name: String)]
+    }
+    /// The enclosures in the open whole-run document review whose OCR-proposed cover no longer stands,
+    /// keyed by the review row of each enclosure's first page. Empty outside that review.
+    func enclosureCoverOptions() -> [Int: EnclosureCoverOptions] {
+        // Only a page the OCR marked can lose a proposal: most runs skip the preview entirely.
+        guard !documentReviewFiles.isEmpty, jobs.contains(where: { $0.result?.ocrEnclosure == true }) else { return [:] }
+        let files = documentReviewFiles
+        var indexByPath: [String: Int] = [:]
+        for (i, url) in files.enumerated() { indexByPath[url.path] = i }
+        let preview = currentSegments(files: files, reviewing: documentReviewItems)
+        var out: [Int: EnclosureCoverOptions] = [:]
+        for seg in preview where !seg.coverCandidates.isEmpty {
+            guard let start = seg.pdfURLs.first, let row = indexByPath[start.path] else { continue }
+            let covers = seg.coverCandidates.compactMap { c -> (path: String, name: String)? in
+                guard let first = preview[c].pdfURLs.first else { return nil }
+                let count = preview[c].pdfURLs.count
+                return (first.path, first.lastPathComponent + (count == 1 ? "" : " (\(count) pages)"))
+            }
+            out[row] = EnclosureCoverOptions(enclosurePath: start.path, covers: covers)
+        }
+        return out
+    }
+    /// The cover chosen for an enclosure in review, "" when none is chosen.
+    func enclosureCover(for enclosurePath: String) -> String {
+        effectiveEnclosureCovers[enclosurePath] ?? ""
+    }
+    /// Record a review row's cover choice; "" leaves the enclosure without a cover (and without Sent With).
+    func setEnclosureCover(_ coverPath: String, for enclosurePath: String) {
+        enclosureCoverChoices[enclosurePath] = coverPath
     }
     /// Apply Live-Capture group boundaries/types to job classifications, so segmentation uses
     /// the phone's grouping instead of the LLM. Boundaries → documentStart/continuation;
@@ -519,11 +572,21 @@ extension OCRProcessor {
                                 runConfig: effectiveRunConfig).reviewShowsDocumentClasses
         currentReviewCollectionName = "All Files"
         statusMessage = "Review document segmentation."
+        documentReviewFiles = files
         awaitingDocumentReview = true
 
         await withCheckedContinuation { continuation in
             documentReviewContinuation = continuation
         }
+        // A choice the review did not show as valid (hidden by a later edit) is cleared, so a later change can never
+        // bring back a cover the user did not see when confirming.
+        let shown = enclosureCoverOptions().values
+        for (enclosure, cover) in effectiveEnclosureCovers where !cover.isEmpty {
+            if !shown.contains(where: { $0.enclosurePath == enclosure && $0.covers.contains { $0.path == cover } }) {
+                enclosureCoverChoices[enclosure] = ""
+            }
+        }
+        documentReviewFiles = []
 
         guard !Task.isCancelled else { return }
 

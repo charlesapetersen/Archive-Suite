@@ -18995,3 +18995,35 @@ the same three lines and landing them separately would silently revert part of t
   - **Docs:** Processor `CLAUDE.md` rule "New non-UI tests go in `ArchiveProcessorTests`, not a new driver", full detail in `REFERENCE.md` §"Unit tests (ProcessorCore)". The guide was already 88 bytes over its 24,000 budget before this item; trimmed duplicated detail (E2E prerequisites, versioning, cadence wording, which REFERENCE.md already carries) to 23,991 bytes.
   - **Checked:** `xcodebuild test -scheme ArchiveProcessorUnit -only-testing:ArchiveProcessorTests` 10/10 pass in seconds; mutation check (no-route verdict not marked unsure) fails 4 of 10; clean Debug app build, no new warnings; `test-rotation-rule.sh` ALL PASS; `lint-release-drivers.sh` OK; policy coherence OK. Not Tier-2 (no Capture/·Net/, file-writing or isolation change; the moved rule is byte-for-byte the same logic). No migration (nothing to migrate). $0. Bench cache: nothing written.
   <!-- /W49.proc-unit-test-target -->
+- [x] **W49.proc-s047-cover-select — Let document review name the cover of an enclosure a window split cut off [S · S3]** · §Known limits are queued, accepted or asked (owner, 2026-11-19) (lane: processor) (uses: build) · SHIPPED 2026-11-26 (this commit)
+  Owner call 33 after S-047 (independently confirmed by W49.proc-s047-check, `732f5920`).
+  - **What the user gets:** when a window split (or a review edit) changes the cover the OCR proposed for a marked
+    enclosure, the proposal still drops, and the enclosure's first row in document review shows "Sent with:" with
+    "No covering letter" and the documents before it in the same collection (back to the nearest box, folder label or
+    tree folder start; never a later page and never another enclosure, since enclosures share one cover). The named
+    document's final date becomes the enclosure's Sent With and the enclosure keeps its own date; blank leaves no
+    relation and no Sent With. Nothing is inferred from adjacency. A choice is applied only when it is still one of
+    the offered covers, and a choice hidden by a later edit is cleared when the review is confirmed.
+  - **How:** `DocumentSegmenter.segment(chosenCovers:)` records `coverCandidates` on a segment whose proposal the
+    baseline dropped and restores the relation only to a named candidate. `OCRProcessor.enclosureCoverChoices`
+    (paths, "" = blank) feeds every `currentSegments` call, so rebuilds, Redo tagging, the MED-3 reconcile and the
+    manual tag sheet (seeded from `validCoverIndex`) all see it. Saved as `enclosureCovers` in `PendingRun` and
+    `PendingBatch` (outside the run fingerprint; in the batch lifecycle identity, nil leaves existing fingerprints
+    unchanged) after the window skim and the per-page review, and seeded back on both resumes. The sheet previews the
+    segments from the open review's rows and recomputes only when a row's class or removal changes; runs with no
+    OCR enclosure marker skip it. A non-window paid batch does not save the choice (its review is asked again on
+    resume; fails safe, no Sent With).
+  - **Verified:** clean Debug build, no new warnings. `test-segmentation-review.sh` ALL PASS with §9a-e (no offer when
+    the proposal stands; after the split the enclosure's row alone offers pages 2 and 3; blank → none and saved;
+    page 2 named → its cover and saved; a resumed manifest's choice applies; a saved later page is ignored).
+    `test-dual-date.sh` ALL PASS (126) with §5c (candidates, named/blank/self, a kept proposal never overridden,
+    chained enclosures, end to end blank → no Sent With and page 2 → `Sent With 1958-03` with its own 1957 kept,
+    the manual sheet's seed, and an unrelated reclassification after tagging keeping it). `ArchiveProcessorTests`
+    10/10. VM: `ReviewDialogsJourneyUITests/testEnclosureCoverChosenInReview` passes — photo 1 made a Folder,
+    photos 3-6 offer a cover, photo 4 offers only photo 2, photo 2 named for photo 3 lands in its sidecar's
+    `enclosure_of` and no other photo gets one (the stand-in leaves documents undated, so the dated case is §5c).
+  - **Tier-2 review (Opus):** found a resumed run not seeding its saved choices (a later reclassification would have
+    stripped the Sent With), an enclosure offered as another's cover, a per-redraw recompute, and a hidden stale
+    choice; all four fixed with tests. Accepted: a failed photo removal makes the preview differ (choice then ignored).
+  - No migration (nothing to migrate). $0. No bench-cache scratch.
+  <!-- /W49.proc-s047-cover-select -->

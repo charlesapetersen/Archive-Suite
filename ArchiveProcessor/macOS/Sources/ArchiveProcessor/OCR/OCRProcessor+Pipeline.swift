@@ -152,6 +152,7 @@ extension OCRProcessor {
         let segmentationPartner: SegmentationApproach?
         let segmentationWindows: [AnsweredWindow]?
         let segmentationAnswers: [String: SavedGapAnswer]?
+        let enclosureCovers: [String: String]?
         let resultsCollected: Bool?
         let paidRequestLinks: [String: UUID]?
 
@@ -195,6 +196,7 @@ extension OCRProcessor {
                 .sorted { ($0.key.voter, $0.key.pages, $0.key.start, $0.key.end) <
                           ($1.key.voter, $1.key.pages, $1.key.start, $1.key.end) }
             segmentationAnswers = batch.segmentationAnswers
+            enclosureCovers = batch.enclosureCovers
             resultsCollected = batch.resultsCollected
             paidRequestLinks = batch.paidRequestLinks
         }
@@ -662,7 +664,7 @@ extension OCRProcessor {
         guard let lifecycleVersion = batch.lifecycleVersion else {
             return batch.mixedPDFOutcomes == nil && batch.segmentationApproach == nil
                 && batch.segmentationPartner == nil && batch.segmentationWindows == nil
-                && batch.segmentationAnswers == nil && batch.resultsCollected == nil && batch.paidRequestLinks == nil
+                && batch.segmentationAnswers == nil && batch.enclosureCovers == nil && batch.resultsCollected == nil && batch.paidRequestLinks == nil
         }
         guard lifecycleVersion == PendingBatch.currentLifecycleVersion,
               !batch.fileURLs.isEmpty,
@@ -1051,14 +1053,17 @@ extension OCRProcessor {
         return " \(names.count) \(names.count == 1 ? "page" : "pages") may have read poorly (\(why)); "
             + "check \(shown)\(more). " + measured.joined(separator: "; ") + "."
     }
-    /// Save window and flagged-gap answers so a resume can reuse them after OCR.
+    /// Save window and flagged-gap answers, and document review's cover choices, so a resume can reuse them
+    /// after OCR.
     @discardableResult
     func persistWindowSegmentationProgress(windows: [WindowKey: WindowAnswer]? = nil,
-                                           answers: [String: SavedGapAnswer]? = nil) -> Bool {
+                                           answers: [String: SavedGapAnswer]? = nil,
+                                           covers: [String: String]? = nil) -> Bool {
         guard !Task.isCancelled else { return false }
         if var run = activePendingRun {
             if let windows { run.segmentationWindows = windows }
             if let answers { run.segmentationAnswers = (run.segmentationAnswers ?? [:]).merging(answers) { $1 } }
+            if let covers { run.enclosureCovers = (run.enclosureCovers ?? [:]).merging(covers) { $1 } }
             activePendingRun = run
             if let save = pendingRunSaveOverride { save(run) } else { Self.savePendingRun(run) }
         } else if let batch = activePendingBatch, batch.usesWindowSegmentation {
@@ -1067,6 +1072,7 @@ extension OCRProcessor {
             ) { batch in
                 if let windows { batch.segmentationWindows = windows }
                 if let answers { batch.segmentationAnswers = (batch.segmentationAnswers ?? [:]).merging(answers) { $1 } }
+                if let covers { batch.enclosureCovers = (batch.enclosureCovers ?? [:]).merging(covers) { $1 } }
             }
             guard saved else {
                 finishInterruptedBatchPoll()
@@ -1917,6 +1923,7 @@ extension OCRProcessor {
         exportedImageMap = [:]
         outputSubfolders = pending.outputSubfolders ?? [:]   // W47.ct-processor-intake
         removedSourceURLs = []
+        enclosureCoverChoices = pending.enclosureCovers ?? [:]   // W49.proc-s047-cover-select: kept for the run's life
         currentModel = pending.model
         // The run's own frozen settings, not the last started run's: the PDFs it still writes read them
         // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
@@ -2196,6 +2203,7 @@ extension OCRProcessor {
         let textThinkingLevel = runConfig.textThinkingLevel
         let textAPIKey = runConfig.textAPIKey
         removedSourceURLs = []
+        enclosureCoverChoices = pending.enclosureCovers ?? [:]   // W49.proc-s047-cover-select: kept for the run's life
         jobs = pending.fileURLs.map { OCRJob(sourceURL: $0) }
         restoreMixedPDFAssociations(pending.mixedPDFOutcomes)
         var restoredFullJobs = false
@@ -3406,6 +3414,7 @@ extension OCRProcessor {
         exportedImageMap = [:]
         pdfToImageMap = [:]
         removedSourceURLs = []
+        enclosureCoverChoices = [:]
         // W47.ct-processor-intake: the pre-OCRed route tags its inputs where they are, so it has no tree.
         outputSubfolders = resumingMixedPDF.map { $0.runtimeConfig.outputSubfolders ?? [:] }
             ?? (preOCRedInput ? [:] : Self.keyedSubfolders(plannedSubfolders))

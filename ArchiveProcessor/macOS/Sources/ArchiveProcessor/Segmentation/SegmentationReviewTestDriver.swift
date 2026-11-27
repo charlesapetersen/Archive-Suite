@@ -22,6 +22,9 @@ import Foundation
 ///   7. A usage limit asks; "check the rest myself" flags every gap the model did not answer.
 ///   8. Each window's answer is in the manifest as soon as it lands, so a run killed mid-windows resumes asking
 ///      only the windows that had not answered.
+///   9. An enclosure keeps its OCR-proposed cover through windows that agree; windows that split the cover drop
+///      it, and document review offers the documents before it to name the cover (owner call 33): blank leaves
+///      none, a named one is the cover, and the choice is saved and survives a resume.
 @MainActor
 enum SegmentationReviewTestDriver {
     private static var didRun = false
@@ -386,12 +389,14 @@ enum SegmentationReviewTestDriver {
         let print0 = OCRProcessor.pendingRunFingerprintV2(pending)
         pending.segmentationWindows = full?.answered
         pending.segmentationAnswers = FlaggedReview.answersByPage(items)
+        pending.enclosureCovers = [urls[3].path: urls[1].path]
         eq("4 the progress fields leave the fingerprint alone", OCRProcessor.pendingRunFingerprintV2(pending), print0)
         let decoded = (try? JSONEncoder().encode(pending))
             .flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRun.self, from: $0) }
         eq("4 the approach survives JSON", decoded?.runtimeConfig?.segmentationApproach, .claude)
         eq("4 the window answers survive JSON", decoded?.segmentationWindows, full?.answered)
         eq("4 the gap answers survive JSON", decoded?.segmentationAnswers, pending.segmentationAnswers)
+        eq("4 the cover choices survive JSON", decoded?.enclosureCovers, pending.enclosureCovers)
         if let data = try? JSONEncoder().encode(runtime),
            var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
             // W49.proc-settings-config-unify: the approach is in the run's whole config. A snapshot written before
@@ -588,8 +593,16 @@ enum SegmentationReviewTestDriver {
 
         // 9. W49.proc-suspects-filing (S-031): an enclosure the OCR marked keeps its cover through the window stage.
         // Five photos: folder, a two-page letter, its enclosure (OCR `[enclosure]`), another document. (a) windows
-        // that agree with the OCR; (b) windows that split the letter, which the OCR read as one document.
-        for (label, splitLetter) in [("a", false), ("b", true)] {
+        // that agree with the OCR; (b) windows that split the letter, which the OCR read as one document: the
+        // relation drops and document review offers the covers (W49.proc-s047-cover-select, owner call 33), left
+        // blank; (c) page 2 named as the cover in review, and saved to the run; (d) a resume whose manifest holds
+        // that choice; (e) a saved choice of the page after the enclosure, which is no cover and is ignored.
+        let p2 = urls[1].path, p3 = urls[2].path, p4 = urls[3].path, p5 = urls[4].path
+        let cases: [(label: String, split: Bool, choose: String?, saved: [String: String]?)] = [
+            ("a", false, nil, nil), ("b", true, "", nil), ("c", true, p2, nil),
+            ("d", true, nil, [p4: p2]), ("e", true, nil, [p4: p5]),
+        ]
+        for (label, splitLetter, choose, savedCovers) in cases {
             let five = Array(urls.prefix(5))
             let e = OCRProcessor()
             e.taggingMode = .automatic
@@ -607,14 +620,23 @@ enum SegmentationReviewTestDriver {
             }
             e.windowTransportOverride = FakeTransport(verdicts: [2: (splitLetter ? "new" : "continue", 0.99),
                                                                  3: ("new", 0.99), 4: ("new", 0.99)])
-            e.pendingRunSaveOverride = { _ in }
+            let runSaves = Box<[OCRProcessor.PendingRun]>()
+            var run = pending.withoutProgress()
+            run.enclosureCovers = savedCovers
+            e.activePendingRun = run
+            e.pendingRunSaveOverride = { runSaves.value = (runSaves.value ?? []) + [$0] }
             let done = Box<WindowStageOutcome>()
             Task { done.value = await e.runWindowSegmentationStage(files: five, approach: .claude, runConfig: nil,
                                                                    outputDirectory: dir, settings: nil) }
+            var offered: [Int: OCRProcessor.EnclosureCoverOptions]?
             for _ in 0..<60 where done.value == nil {
                 if e.awaitingBoxFolderConfirmation { e.confirmBoxFolderReview() }
                 else if e.awaitingFlaggedReview { e.confirmFlaggedReview() }
-                else if e.awaitingDocumentReview { e.confirmDocumentReview() }
+                else if e.awaitingDocumentReview {
+                    offered = e.enclosureCoverOptions()
+                    if let choose, let o = offered?[3] { e.setEnclosureCover(choose, for: o.enclosurePath) }
+                    e.confirmDocumentReview()
+                }
                 try? await Task.sleep(for: .milliseconds(100))
             }
             let shape = e.segments.map { s in
@@ -622,15 +644,40 @@ enum SegmentationReviewTestDriver {
                     + (s.enclosureOf.map { " enclosureOf \($0)" } ?? "")
             }
             lines.append("INFO 9\(label) segments: \(shape.joined(separator: " | "))")
+            check("9\(label) the stage finishes", done.value == .done)
             let enclosureSegment = e.segments.firstIndex { $0.texts.first == "text of page-4" }
             let cover = enclosureSegment.flatMap { e.segments[$0].enclosureOf }
-            if splitLetter {
-                lines.append("INFO 9b the enclosure's cover after windows split the letter: \(cover.map(String.init) ?? "none")")
-            } else {
-                check("9a the stage finishes", done.value == .done)
-                check("9a the enclosure keeps its cover (the letter)",
-                      cover.map { e.segments[$0].texts.first == "text of page-2" } == true,
+            let coverFirst = cover.flatMap { e.segments[$0].texts.first }
+            switch label {
+            case "a":
+                check("9a the enclosure keeps its cover (the letter)", coverFirst == "text of page-2",
                       "cover \(String(describing: cover))")
+                check("9a no cover is offered when the proposal stands", offered?.isEmpty == true,
+                      "\(String(describing: offered?.keys))")
+            case "b":
+                check("9b document review offers a cover for the enclosure's row only",
+                      offered.map { Array($0.keys) } == [3], "\(String(describing: offered?.keys))")
+                check("9b the offered covers are the documents before it in its folder, oldest first",
+                      offered?[3]?.covers.map(\.path) == [p2, p3] && offered?[3]?.enclosurePath == p4,
+                      "\(String(describing: offered?[3]?.covers.map(\.name)))")
+                check("9b a cover left blank leaves the enclosure without one", enclosureSegment != nil && cover == nil,
+                      "cover \(String(describing: cover))")
+                check("9b the blank choice is saved for a resume",
+                      runSaves.value?.last?.enclosureCovers == [p4: ""],
+                      "\(String(describing: runSaves.value?.last?.enclosureCovers))")
+            case "c":
+                check("9c the named cover is the enclosure's cover", coverFirst == "text of page-2",
+                      "cover \(String(describing: cover))")
+                check("9c the choice is saved for a resume", runSaves.value?.last?.enclosureCovers == [p4: p2],
+                      "\(String(describing: runSaves.value?.last?.enclosureCovers))")
+                check("9c the review shows the choice", e.enclosureCover(for: p4) == p2)
+            case "d":
+                check("9d a resume keeps the saved cover", coverFirst == "text of page-2",
+                      "cover \(String(describing: cover))")
+                check("9d a resumed review shows the saved choice", e.enclosureCover(for: p4) == p2)
+            default:
+                check("9e a saved cover that is not before the enclosure is ignored",
+                      enclosureSegment != nil && cover == nil, "cover \(String(describing: cover))")
             }
             e.cancel()
         }
@@ -707,6 +754,7 @@ private extension OCRProcessor.PendingRun {
         var r = self
         r.segmentationWindows = nil
         r.segmentationAnswers = nil
+        r.enclosureCovers = nil
         return r
     }
 }

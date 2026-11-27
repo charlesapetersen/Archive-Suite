@@ -54,6 +54,9 @@ extension OCRProcessor {
             if plan.reviewWholeRun || segPlan == .noTagging {
                 await showFullSegmentationReview(files: files, runConfig: runConfig)
                 guard !Task.isCancelled else { return stop() }
+                if !enclosureCoverChoices.isEmpty {
+                    guard persistWindowSegmentationProgress(covers: enclosureCoverChoices) else { return stop() }
+                }
             }
             // Final confirmation of box/folder identifications
             await showBoxFolderConfirmation(files: files, runConfig: runConfig)

@@ -19,6 +19,9 @@ import ArchiveCore
 ///   4. The enclosure's `Sent With` date is its cover's OWN final date (decade/year/month/day), the
 ///      uncertainty is the cover's, an undated cover gives none, and the cover never gets the enclosure's.
 ///   5. End to end through `performTaggingPhase`: Finder tags + JSON sidecars on scratch outputs.
+///   5c. A window split that drops the proposal: the cover named in document review (owner call 33) gives
+///      the enclosure that letter's date as Sent With; left blank, none. Never a cover after the enclosure,
+///      never one that overrides a kept proposal.
 ///   6. The JSON sidecar is unchanged when there is no sent-with date, and `GeneratedTags` round-trips
 ///      the new fields (Live Capture's retained manifest).
 ///   7. A generated PDF's source-date header lines strip cleanly via the shared Core parser.
@@ -319,6 +322,102 @@ enum DualDateTestDriver {
                   OCRResult(text: "t", classification: .documentStart, rotationDegrees: 90, errorMessage: nil, errorCode: nil,
                             enclosure: flagged.enclosure, ocrClassification: .some(flagged.ocrClassification)).enclosure == true)
         }
+
+        // --- 5c. W49.proc-s047-cover-select (owner call 33): the cover named in document review. ---
+        // Q0 letter X 1950 · Q1 letter Y Mar 1958 · Q2 Y's second page, split off as its own document (1959) ·
+        // Q3 Y's enclosure (1957). The split drops the OCR's proposal; a cover named in review restores a relation.
+        do {
+            let (p, pf) = baselineProcessor()
+            p.jobs[2].result = p.jobs[2].result?.with(classification: .documentStart, rotationDegrees: 0)
+            let segs = p.currentSegments(files: pf)
+            check("a dropped proposal offers the documents before the enclosure, oldest first",
+                  segs.count == 4 && segs[3].coverCandidates == [0, 1, 2] && segs[0].coverCandidates.isEmpty)
+            p.setEnclosureCover(pf[1].path, for: pf[3].path)
+            check("the named cover becomes the relation", relationOfP3(p, pf) == [pf[1]])
+            p.setEnclosureCover("", for: pf[3].path)
+            check("a blank choice leaves no relation", relationOfP3(p, pf) == nil)
+            p.setEnclosureCover(pf[3].path, for: pf[3].path)
+            check("the enclosure itself is never its own cover", relationOfP3(p, pf) == nil)
+        }
+        do {
+            let (p, pf) = baselineProcessor()
+            p.setEnclosureCover(pf[0].path, for: pf[3].path)
+            check("a choice never overrides a proposal the baseline kept", relationOfP3(p, pf) == [pf[1], pf[2]]
+                  && p.currentSegments(files: pf)[2].coverCandidates.isEmpty)
+        }
+        do {
+            // Two enclosures of the split letter: the second is offered the documents, never the first enclosure.
+            let (p, pf) = baselineProcessor()
+            let p4 = u("P4.jpg")
+            var job = OCRJob(sourceURL: p4)
+            job.result = OCRResult(text: "t", classification: .documentStart, rotationDegrees: 0,
+                                   errorMessage: nil, errorCode: nil, enclosure: true)
+            job.classification = .documentStart
+            p.jobs.append(job)
+            let files5 = pf + [p4]
+            check("baseline: both enclosures share the letter", p.currentSegments(files: files5)[3].enclosureOf == 1)
+            p.jobs[2].result = p.jobs[2].result?.with(classification: .documentStart, rotationDegrees: 0)
+            p.setEnclosureCover(pf[1].path, for: pf[3].path)
+            let segs = p.currentSegments(files: files5)
+            check("an enclosure is never offered as another enclosure's cover",
+                  segs.count == 5 && segs[3].enclosureOf == 1 && segs[4].coverCandidates == [0, 1, 2])
+            p.setEnclosureCover(pf[3].path, for: p4.path)
+            check("...and a choice of it is ignored", p.currentSegments(files: files5)[4].enclosureOf == nil)
+        }
+        func coverChoiceRun(_ choice: String?) async -> (tokens: [String], json: [String: Any], ownDate: Bool, sheetCover: Int?,
+                                                         afterEdit: [String]) {
+            let dir = tmp.appendingPathComponent("cover-\(choice == nil ? "blank" : "chosen")", isDirectory: true)
+            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            let qn = ["Q0.jpg", "Q1.jpg", "Q2.jpg", "Q3.jpg"]
+            let qf = qn.map(u)
+            let qc: [DocumentClassification] = [.documentStart, .documentStart, .documentContinuation, .documentStart]
+            let p = OCRProcessor()
+            p.taggingMode = .automatic
+            p.jobs = qf.indices.map { i in
+                var job = OCRJob(sourceURL: qf[i])
+                job.result = OCRResult(text: "text of \(qn[i])", classification: qc[i], rotationDegrees: 0,
+                                       errorMessage: nil, errorCode: nil, enclosure: i == 3)
+                job.classification = qc[i]
+                return job
+            }
+            // The window split: Q2 starts its own document.
+            p.jobs[2].classification = .documentStart
+            p.jobs[2].result = p.jobs[2].result?.with(classification: .documentStart, rotationDegrees: 0)
+            p.preGroupedYears = [1950, 1958, 1959, 1957]
+            p.preGroupedMonths = [nil, 3, nil, nil]
+            p.preGroupedSubjects = qn.map { _ in ["Correspondence"] }
+            if let choice { p.setEnclosureCover(choice, for: qf[3].path) }
+            var outs: [URL: URL] = [:]
+            for job in p.jobs {
+                let f = job.sourceURL
+                let pdf = dir.appendingPathComponent(f.deletingPathExtension().lastPathComponent + ".pdf")
+                if let result = job.result {
+                    _ = try? PDFGenerator().generate(imageURL: f, result: result, model: model, outputURL: pdf,
+                                                     originalFileName: f.lastPathComponent)
+                }
+                outs[f] = pdf
+            }
+            p.outputURLMap = outs
+            p.rebuildSegments(files: qf)
+            let sheetCover = OCRProcessor.validCoverIndex(of: 3, in: p.segments)
+            await p.performTaggingPhase(provider: .anthropic, model: model, apiKey: "",
+                                        outputDirectory: dir, enableSegmentJSON: true)
+            let q3 = outs[qf[3]]!
+            let tokens = sentWithTokens(q3), sidecar = jsonOf(q3.deletingPathExtension().appendingPathExtension("json"))
+            // A later edit elsewhere re-derives every relation (MED-3 reconcile); the named cover stands.
+            p.updateClassification(at: 0, to: .folderLabel)
+            return (tokens, sidecar, tagsOf(q3).contains("1957"), sheetCover, sentWithTokens(q3))
+        }
+        let blank = await coverChoiceRun(nil)
+        check("split cover left blank: the enclosure keeps its own date and gets no Sent With",
+              blank.ownDate && blank.tokens.isEmpty && blank.json["sent_with"] == nil && blank.json["enclosure_of"] == nil)
+        let chosen = await coverChoiceRun(u("Q1.jpg").path)
+        check("split cover named in review (page 2): Sent With is that letter's date, own date kept",
+              chosen.ownDate && chosen.tokens == ["Sent With 1958-03"]
+              && chosen.json["sent_with"] as? String == "1958-03" && chosen.json["enclosure_of"] as? String == "Q1.jpg")
+        check("the manual tag sheet is seeded with the named cover", chosen.sheetCover == 1 && blank.sheetCover == nil)
+        check("an unrelated reclassification after tagging keeps the named cover's Sent With",
+              chosen.afterEdit == ["Sent With 1958-03"] && blank.afterEdit.isEmpty)
 
         // --- 6. JSON stability + GeneratedTags Codable. ---
         let plainTags = GeneratedTags(year: "1968", subjectTags: ["taxes"])

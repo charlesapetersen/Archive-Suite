@@ -246,12 +246,14 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
   (reproduced 2026-11-21, Codex gpt-6.2-sol, `1f5cc337`); the run then stopped at catalogue filing with no PDF
   (independently confirmed 2026-11-24, Claude Opus 5.5, `0a954a3e`). (accepted: fixed history)
 
-## A window split can drop the enclosure's covering-letter date (S-047)
+## FIXED (S-047, 2026-11-26) — a window split no longer leaves the enclosure without a way to name its cover
 
-- When a window splits the OCR's two-page letter, the marked enclosure remains a separate document.
-  The exact-cover check drops the proposed relation, so Automatic tagging has no verified cover from
-  which to derive Sent With. Owner call 33 chooses optional explicit cover selection in review.
-  Independently confirmed 2026-11-24 (Claude Opus 5.5, `732f5920`). [Scratch evidence](../verification/evidence/processor/W49.proc-s047-verify.md). (queued: W49.proc-s047-cover-select)
+- Was: when a window split the OCR's two-page letter, the exact-cover check dropped the proposed relation and the
+  enclosure got no Sent With, with no way to say which document was the cover. Independently confirmed 2026-11-24
+  (Claude Opus 5.5, `732f5920`). [Scratch evidence](../verification/evidence/processor/W49.proc-s047-verify.md).
+  Now (owner call 33, W49.proc-s047-cover-select): the dropped proposal stays dropped, and document review's
+  "Sent with:" choice on the enclosure's row offers the earlier documents in its collection; the named one's final
+  date becomes Sent With, blank leaves none. (accepted: fixed history)
 
 ## FIXED (S-046, 2026-11-23) — the Documents switch controls the fresh whole-run review
 

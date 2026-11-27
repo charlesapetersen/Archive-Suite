@@ -67,6 +67,64 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         XCTAssertNotEqual(shapeA, shapeB, "the 90° chosen in Review rotation is baked into photo 3's PDF")
     }
 
+    /// W49.proc-s047-cover-select (owner call 33): the reader marks every photo an enclosure of the one before, so all
+    /// six chain to photo 1 as their letter. Making photo 1 a Folder in review changes every later cover, so those
+    /// proposals drop and photos 3-6 offer "Sent with:" (photo 2, right after the label, has nothing to be sent with).
+    /// Naming photo 2 as photo 3's cover makes photo 2 its cover in the sidecar (and its date, when it has one, Sent With);
+    /// no other photo gets a cover.
+    func testEnclosureCoverChosenInReview() throws {
+        let out = try launch("s047", [
+            "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
+            "-rotationModeRaw", "off", "-reviewRotation", "NO",
+            "-reviewDocumentSegmentation", "YES", "-outputImageFile", "NO"
+        ], agentClass: "document_start] [enclosure")
+        clickStart()
+        let review = reviewWindow("Document Segmentation Review", timeout: 120)
+        let pickers = review.descendants(matching: .any).matching(identifier: "enclosureCoverPicker")
+        XCTAssertFalse(pickers.firstMatch.waitForExistence(timeout: 3), "no cover is offered while the reader's letter stands")
+        shot("s047-review-opened")
+        app.typeKey("4", modifierFlags: [])   // the keys act on photo 1 as the window opens: a Folder
+        XCTAssertTrue(pickers.firstMatch.waitForExistence(timeout: 5), "the enclosures offer a cover once their letter changes")
+        shrinkThumbnails(in: review)
+        XCTAssertEqual(pickers.count, 4, "photos 3-6 each offer a cover")
+        shot("s047-cover-offered")
+        let names = (ProcessInfo.processInfo.environment["W40D2_PHOTOS"] ?? "").components(separatedBy: "|")
+        guard names.count >= 6 else { dump(review, "W40D2_PHOTOS names \(names.count) photos, not six"); return }
+        pickers.element(boundBy: 0).click()
+        let option = app.menuItems[names[1]]
+        XCTAssertTrue(option.waitForExistence(timeout: 5), "photo 2 is offered as photo 3's cover")
+        XCTAssertFalse(app.menuItems[names[0]].exists, "the folder label is never offered")
+        XCTAssertFalse(app.menuItems[names[3]].exists, "a photo after the enclosure is never offered")
+        option.click()
+        shot("s047-cover-chosen")
+        app.typeKey(.return, modifierFlags: [])
+        waitGone(review, "the page review has been confirmed")
+        let boxConfirmation = app.sheets.buttons["Confirm"]
+        if boxConfirmation.waitForExistence(timeout: 30) { boxConfirmation.click() }
+        let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
+        if complete.waitForExistence(timeout: 120) { complete.click() }
+        waitForDone("s047")
+
+        let files = outputs(in: out)
+        report("s047", files)
+        func sentWith(_ n: Int) -> [String] { (files[n]?.tags ?? []).filter { $0.hasPrefix("Sent With") } }
+        func sidecar(_ n: Int) -> [String: Any] {
+            guard let pdf = files[n]?.pdf,
+                  let data = try? Data(contentsOf: pdf.deletingPathExtension().appendingPathExtension("json")),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+            return object
+        }
+        print("[w40d2] s047 Sent With: \((1...6).map { "\($0): \(sentWith($0)) \(sidecar($0)["enclosure_of"] ?? "-")" }.joined(separator: "; "))")
+        XCTAssertEqual(sidecar(3)["enclosure_of"] as? String, names[1], "photo 3's sidecar names photo 2 as its cover")
+        for n in [2, 4, 5, 6] { XCTAssertNil(sidecar(n)["enclosure_of"], "photo \(n) has no cover") }
+        // The stand-in leaves this journey's documents undated (Date Uncertain), so the named cover has no date to give:
+        // the relation is in the sidecar and no Sent With is written. The dated case is DUAL_DATE_TEST §5c.
+        let coverYear = files[2]?.tags.first { $0.count == 4 && Int($0) != nil }
+        XCTAssertEqual(sentWith(3), coverYear.map { _ in ["Sent With 1918-03-12"] } ?? [],
+                       "photo 3's Sent With is photo 2's own date, or none when photo 2 is undated")
+        for n in [1, 2, 4, 5, 6] { XCTAssertEqual(sentWith(n), [], "photo \(n) has no Sent With") }
+    }
+
     /// S-046: an unset preference opens the review. An explicit Off skips it and keeps the later confirmations.
     func testFreshProcessFilesDocumentReviewSetting() throws {
         for enabled in [true, false] {
@@ -683,7 +741,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
     // MARK: Launch and waiting
 
     private func launch(_ name: String, _ settings: [String], collectionID: Bool = false,
-                        classificationCycle: Bool = false, preservePendingRun: Bool = false,
+                        classificationCycle: Bool = false, agentClass: String? = nil,
+                        preservePendingRun: Bool = false,
                         input: URL? = nil, searchablePDF: URL? = nil) throws -> URL {
         let out = scratchRoot.appendingPathComponent("\(name)-out", isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
@@ -708,6 +767,7 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",   // keychain quiet; the window still draws
             "FAKE_AGENT_CLASS_CYCLE": classificationCycle ? "1" : "0",
+            "FAKE_AGENT_CLASS": agentClass ?? "document_start",
             "FAKE_AGENT_LOG": scratchRoot.appendingPathComponent("\(name)-agent.log").path
         ]
         app.launch()

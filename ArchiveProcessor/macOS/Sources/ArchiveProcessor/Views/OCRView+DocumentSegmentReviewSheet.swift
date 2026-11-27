@@ -9,6 +9,16 @@ struct DocumentSegmentReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
     @State private var thumbnailSize: CGFloat = 400
     @State private var focusedIndex: Int = 0
+    /// Owner call 33: enclosures whose OCR-proposed cover a split or an edit changed, refreshed when a row's class or
+    /// removal changes rather than on every redraw.
+    @State private var coverOptions: [Int: OCRProcessor.EnclosureCoverOptions] = [:]
+    private var coverSignature: [String] {
+        ["\(showDocClasses)\(rotationOnly)\(processor.documentReviewFiles.count)"]
+            + processor.documentReviewItems.map { "\($0.classification?.rawValue ?? "-")\($0.markedForRemoval)" }
+    }
+    private func refreshCoverOptions() {
+        coverOptions = showDocClasses && !rotationOnly ? processor.enclosureCoverOptions() : [:]
+    }
     /// The window itself takes the keys (W40.fix-processor-review-keys): `onKeyPress` reaches only a focused view
     /// or its ancestors, and nothing else in this window is focusable, so without it every key fell through.
     @FocusState private var keysFocused: Bool
@@ -105,6 +115,7 @@ struct DocumentSegmentReviewSheet: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         ForEach(processor.documentReviewItems.indices, id: \.self) { idx in
+                            let options = coverOptions[processor.documentReviewItems[idx].fileIndex]
                             DocumentReviewRow(
                                 item: $processor.documentReviewItems[idx],
                                 thumbnailSize: thumbnailSize,
@@ -112,7 +123,16 @@ struct DocumentSegmentReviewSheet: View {
                                 showDocumentClasses: showDocClasses,
                                 rotationOnly: rotationOnly,
                                 checked: processor.reviewCheckedFileIndices.contains(
-                                    processor.documentReviewItems[idx].fileIndex)
+                                    processor.documentReviewItems[idx].fileIndex),
+                                coverOptions: options,
+                                coverChoice: options.map { o in
+                                    Binding(
+                                        get: {
+                                            let chosen = processor.enclosureCover(for: o.enclosurePath)
+                                            return o.covers.contains { $0.path == chosen } ? chosen : ""
+                                        },
+                                        set: { processor.setEnclosureCover($0, for: o.enclosurePath) })
+                                }
                             )
                             .id(idx)
                             // A click anywhere in a row, its radios included, makes it the row the keys act on
@@ -155,7 +175,8 @@ struct DocumentSegmentReviewSheet: View {
         .focusable(true)
         .focusEffectDisabled()
         .focused($keysFocused)
-        .onAppear { keysFocused = true }
+        .onAppear { keysFocused = true; refreshCoverOptions() }
+        .onChange(of: coverSignature) { _, _ in refreshCoverOptions() }
         .onKeyPress(.upArrow) {
             if focusedIndex > 0 { focusedIndex -= 1 }
             return .handled
@@ -236,6 +257,10 @@ struct DocumentReviewRow: View {
     var rotationOnly: Bool = false
     /// The user answered the flagged boundary before this page (W36.seg-opt-review).
     var checked: Bool = false
+    /// W49.proc-s047-cover-select — set on the first page of an enclosure whose OCR-proposed cover no longer
+    /// stands: the documents the user may name as its cover, and the choice ("" = none).
+    var coverOptions: OCRProcessor.EnclosureCoverOptions? = nil
+    var coverChoice: Binding<String>? = nil
     @State private var loadedImage: NSImage?
 
     private var rowBackground: Color {
@@ -301,6 +326,22 @@ struct DocumentReviewRow: View {
                     .truncationMode(.middle)
                     .strikethrough(item.markedForRemoval)
                     .frame(minWidth: 180, alignment: .leading)
+
+                if !rotationOnly, let coverOptions, let coverChoice, item.classification == .documentStart {
+                    Picker("Sent with:", selection: coverChoice) {
+                        Text("No covering letter").tag("")
+                        ForEach(coverOptions.covers, id: \.path) { cover in
+                            Text(cover.name).tag(cover.path)
+                        }
+                    }
+                    .font(.caption)
+                    .frame(maxWidth: 320)
+                    .disabled(item.markedForRemoval)
+                    .accessibilityIdentifier("enclosureCoverPicker")
+                    .help("The OCR read this page as an enclosure, but the letter it came with has changed. "
+                          + "Choose the letter it was sent with to give it that letter's date as Sent With, "
+                          + "or leave it with no covering letter.")
+                }
 
                 // Rotation radio buttons — only in the dedicated rotation-review pass.
                 if rotationOnly {

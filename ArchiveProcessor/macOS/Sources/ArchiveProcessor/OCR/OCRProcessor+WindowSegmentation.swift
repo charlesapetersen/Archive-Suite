@@ -122,6 +122,9 @@ extension OCRProcessor {
             reviewCheckedFileIndices = []
             reviewSkimNote = nil
             guard !Task.isCancelled else { return .stopped }
+            if !enclosureCoverChoices.isEmpty {
+                guard persistWindowSegmentationProgress(covers: enclosureCoverChoices) else { return .stopped }
+            }
         }
         // Without the skim, only the gaps a person answered belong in the review record.
         let answered = Set(items.filter { $0.answer != nil }.map(\.id))

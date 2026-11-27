@@ -1225,8 +1225,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** the owner's call that Processor should ask which segment is the actual cover when the
   window splits it.
 - **Would clear it:** a ruling that a changed cover boundary drops the relation by design.
-- **Status:** `reproduced` — independently confirmed by `W49.proc-s047-check`; owner call 33's optional cover
-  selection queued as `W49.proc-s047-cover-select`.
+- **Status:** `fixed` — W49.proc-s047-cover-select: document review names the cover (owner call 33).
   [Scratch evidence](evidence/processor/W49.proc-s047-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
@@ -1238,6 +1237,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   - 2026-11-24 W49.proc-s047-check — Claude Opus 5.5 confirmed at `732f5920`: both drivers passed, 9b again left
     the enclosure with no cover, and the code trace matches (provisional cover page 3 fails the `[page-2, page-3]`
     baseline). Owner call 33 filed as `W49.proc-s047-cover-select`.
+  - 2026-11-26 W49.proc-s047-cover-select — fixed: a "Sent with:" choice in document review; drivers §9a-e and §5c,
+    VM `testEnclosureCoverChosenInReview`.
 
 
 ### S-048 · Adding a file Process Files already lists adds it again

@@ -182,6 +182,13 @@ class OCRProcessor: ObservableObject {
 
     /// Source URLs the user removed during segmentation review; excluded from segments, tagging, and output.
     var removedSourceURLs: Set<URL> = []
+    /// W49.proc-s047-cover-select (owner call 33) — this run's document-review cover choices, enclosure
+    /// first-page path → cover first-page path ("" = left blank). Saved to the pending run or batch when the
+    /// review closes; `effectiveEnclosureCovers` merges them over a resumed manifest's.
+    @Published var enclosureCoverChoices: [String: String] = [:]
+    /// The run's files while the whole-run document review is open (its rows are aligned with them by
+    /// `fileIndex`), so the review can preview the segments it would make; empty otherwise.
+    @Published var documentReviewFiles: [URL] = []
 
     /// Review state for collection confirmation flow
     @Published var collectionReviewItems: [CollectionReviewItem] = []
@@ -537,6 +544,8 @@ class OCRProcessor: ObservableObject {
         var segmentationPartner: SegmentationApproach? = nil
         var segmentationWindows: [WindowKey: WindowAnswer]? = nil
         var segmentationAnswers: [String: SavedGapAnswer]? = nil
+        /// W49.proc-s047-cover-select: the covers named in document review (`OCRProcessor.enclosureCoverChoices`).
+        var enclosureCovers: [String: String]? = nil
         /// True after the poll ended and every OCR result and output path was recorded.
         var resultsCollected: Bool? = nil
         /// Links that could not be saved in the paid ledger when the provider returned the job ID.
@@ -627,6 +636,7 @@ class OCRProcessor: ObservableObject {
             segmentationPartner = try c.decodeIfPresent(SegmentationApproach.self, forKey: .segmentationPartner)
             segmentationWindows = try c.decodeIfPresent([WindowKey: WindowAnswer].self, forKey: .segmentationWindows)
             segmentationAnswers = try c.decodeIfPresent([String: SavedGapAnswer].self, forKey: .segmentationAnswers)
+            enclosureCovers = try c.decodeIfPresent([String: String].self, forKey: .enclosureCovers)
             resultsCollected = try c.decodeIfPresent(Bool.self, forKey: .resultsCollected)
             paidRequestLinks = try c.decodeIfPresent([String: UUID].self, forKey: .paidRequestLinks)
             reviewWholeRun = try c.decodeIfPresent(Bool.self, forKey: .reviewWholeRun)
@@ -773,6 +783,9 @@ class OCRProcessor: ObservableObject {
         /// proposal the user reviews before anything is written.
         var segmentationWindows: [WindowKey: WindowAnswer]? = nil
         var segmentationAnswers: [String: SavedGapAnswer]? = nil
+        /// W49.proc-s047-cover-select: the covers named in document review, enclosure first-page path → cover
+        /// first-page path ("" = left blank). Outside the fingerprint, like the gap answers: a review answer.
+        var enclosureCovers: [String: String]? = nil
         /// The settings layers as they resolved when the run started (W46.settings-layers): a record of what
         /// produced it, read by nothing that decides how the run goes, so outside the fingerprint. A resume keeps it.
         var resolvedSettings: ResolvedSettingsSnapshot? = nil
