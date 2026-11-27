@@ -216,6 +216,7 @@ enum DateRouteTestDriver {
         check("2 numeric order: month first unless a layer sets day first",
               !DateRoute.dayFirstSetting(nil) && DateRoute.dayFirstSetting(orderValues)
                 && SettingsKey.numericDatesDayFirst.allowed(in: .collection))
+        liveRecordOrder(orderValues)
         let o = explicit.with(measured: true).sidecarObject()
         check("2 sidecar, explicit: class, step, the quote and its line", o["class"] as? String == "text"
               && o["step"] as? Int == 1 && o["quote"] as? String == "March 3, 1947" && o["line"] as? Int == 2
@@ -1307,6 +1308,46 @@ enum DateRouteTestDriver {
     }
 
     // MARK: 6. Live Capture
+
+    /// W49.proc-live-date-order-per-collection: a Live run record in a new `<output>/<collection>/` folder keeps the order
+    /// the session dated with (day first set on the output root only), so the Reader's folder date reads `6/2/61` as Live
+    /// Capture's tags did. A scratch settings store and folder, never the operator's.
+    private static func liveRecordOrder(_ dayFirstValues: [String: ResolvedSetting]) {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory.appendingPathComponent("APDateOrder-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: tmp) }
+        let store = SettingsLayerStore(directory: tmp.appendingPathComponent("store", isDirectory: true))
+        let root = tmp.appendingPathComponent("out", isDirectory: true)
+        let key = SettingsKey.numericDatesDayFirst.rawValue
+        func recorded(_ name: String, session: [String: ResolvedSetting]?) -> (snapshot: Bool?, reader: Bool, folder: Int?) {
+            let folder = root.appendingPathComponent(name, isDirectory: true)
+            try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            let snapshot = LiveCaptureProcessor.liveRunSnapshot(store: store, folder: folder, run: nil, session: session)
+            store.record(snapshot, kind: "liveCapture", fileCount: 1, in: folder)
+            let reader = CollectionSettingsRecord.numericDatesDayFirst(directory: folder, within: root)
+            let date = ContainerFolderDate.$dayFirst.withValue(reader) {
+                ContainerFolderDate.confirmed(at: "", in: [ContainerRun(
+                    start: "", level: .folder, fields: ContainerFieldSet([.date: ContainerValue("6/2/61", source: .user)]))])
+            }
+            return (snapshot.values[key]?.value.bool, reader, date?.month)
+        }
+        let alone = store.snapshot(outputDirectory: root.appendingPathComponent("Alone", isDirectory: true), runID: UUID())
+        let dayFirst = recorded("Day", session: dayFirstValues)
+        check("2 numeric order: a Live record in a new collection keeps the session's day first; the Reader reads 6/2/61 as February",
+              alone.values[key]?.value.bool == false && dayFirst == (true, true, 2), "\(dayFirst)")
+        // The general layer says day first, the session's root says month first (its own collection layer).
+        let monthValues = [key: ResolvedSetting(value: .bool(false), layer: .collection)]
+        let general = store.setGeneral(.numericDatesDayFirst, .bool(true), source: .setByUser(Date()))
+        let monthFirst = recorded("Month", session: monthValues)
+        check("2 numeric order: a month-first session's record stays month first over a day-first general layer; 6/2/61 is June",
+              general && monthFirst == (false, false, 6), "\(monthFirst)")
+        // A chosen collection that sets the order itself keeps its own value in the record.
+        let own = root.appendingPathComponent("Own", isDirectory: true)
+        try? fm.createDirectory(at: own, withIntermediateDirectories: true)
+        store.updateCollection(in: own) { $0.collection.set(.numericDatesDayFirst, .bool(false), source: .setByUser(Date())) }
+        let kept = recorded("Own", session: dayFirstValues)
+        check("2 numeric order: a collection's own order stays in its Live record", kept == (false, false, 6), "\(kept)")
+    }
 
     private static func liveCapture() async {
         let fm = FileManager.default

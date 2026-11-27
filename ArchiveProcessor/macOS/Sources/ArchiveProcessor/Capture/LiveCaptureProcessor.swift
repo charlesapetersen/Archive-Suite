@@ -2757,10 +2757,11 @@ final class LiveCaptureProcessor: ObservableObject {
             }
         }
         let store = SettingsLayerStore.shared
+        let sessionSettings = config.map(liveSettings)
         for folder in order {
             let key = folder.standardizedFileURL.path
             guard let count = counts[key], count > 0 else { continue }
-            let snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), run: runConfig)
+            let snapshot = Self.liveRunSnapshot(store: store, folder: folder, run: runConfig, session: sessionSettings)
             var notes = layerNotes[key] ?? []
             if let unread = unreadImageOnlyPages[key], unread > 0 {
                 // Put the count first so it survives the run log's per-page detail limit.
@@ -2770,6 +2771,23 @@ final class LiveCaptureProcessor: ObservableObject {
                          pdfLayerLogNotes: notes.isEmpty ? nil : notes)
         }
         return ContainerLabelCapture.spendNote(calls: labelCalls, dollars: labelDollars)
+    }
+
+    /// The snapshot a collection folder's Live run record carries: the layers as that folder resolves them, except the
+    /// numeric date order, which is the one the session dated with (`liveSettings`, resolved at the output root). The
+    /// Reader reads a collection's order from its nearest record (`CollectionSettingsRecord.numericDatesDayFirst`), so a
+    /// new `<output>/<collection>/` folder, which holds no layer of its own, would otherwise read a folder `6/2/61` in
+    /// another order than Live Capture's tags (W49.proc-live-date-order-per-collection). A collection that sets the order
+    /// itself keeps its own value, which the Reader reads first anyway (W49.proc-live-redate-chosen-collection re-dates
+    /// its documents). No session settings: as resolved.
+    static func liveRunSnapshot(store: SettingsLayerStore, folder: URL, run: ResolvedRunConfig?,
+                                session: [String: ResolvedSetting]?) -> ResolvedSettingsSnapshot {
+        var snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), run: run)
+        let key = SettingsKey.numericDatesDayFirst.rawValue
+        if let session, snapshot.values[key]?.layer != .collection {
+            snapshot.values[key] = session[key] ?? ResolvedSetting(value: .bool(DateRoute.dayFirstSetting(session)), layer: nil)
+        }
+        return snapshot
     }
 
     /// A filed marker's label call through the gateway, nil when it made none: its counted charge, or after a relaunch

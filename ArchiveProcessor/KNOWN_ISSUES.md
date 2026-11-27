@@ -414,10 +414,12 @@ Advanced › Lower-scoring and experimental choices, off by default.
   confirmation reads it since W49.reader-folder-date-day-first.) Where the route finds a year
   but no dated form, the tagging call's month and day can still be a month-first reading (queued:
   W49.proc-metadata-unified-apply, which puts the order into the one metadata call).
-- **Live Capture dates folders in its output root's order but records each collection's own.** Its folder and document
-  dates read `numericDatesDayFirst` from the session's output root, while Finish writes each collection subfolder's run
-  record from that subfolder's settings, which the Reader reads. With day first set on the root only, a Live folder
-  `6/2/61` is February in Live's tags and June in the Reader's offer (queued: W49.proc-live-date-order-per-collection).
+- **Live Capture dates in its output root's order even when filing into a collection that sets its own.** Its folder
+  and document dates read `numericDatesDayFirst` from the session's output root, and each Live run record keeps that
+  order (W49.proc-live-date-order-per-collection), so a new collection folder reads as Live dated it. An existing
+  collection chosen at Finish whose own settings give the other order still differs: the Reader reads the collection's
+  own value, so a folder `6/2/61` Live dated June is February in the Reader's offer (queued:
+  W49.proc-live-redate-chosen-collection).
 - **A direct key's rotation estimate leaves out a Gemini model's unbudgeted thinking.** Rotation on a direct Gemini,
   Claude or OpenAI key asks the run's own OCR model (owner call 6). A Gemini model the catalog marks as not thinking
   (Gemini 3.1 Pro, Gemini 3 Flash Preview) is sent no thinking budget, so whatever it thinks is not in the estimate;
