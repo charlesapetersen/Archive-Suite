@@ -4,7 +4,8 @@ What the bench has measured, as one page you can read and share. It has seven pa
 
 1. **OCR.** The W41 OCR panel: twenty-five hosted routes read the same 96 adjudicated truth pages, and each is
    scored for accuracy (NES) against its price per 1,000 pages, overall and separately for typewritten, printed and
-   handwritten pages. Four more routes ran the same pages on our own hardware: Qwen3-VL 8B at 4-bit, LightOnOCR-3-4B at 8-bit and
+   handwritten pages, plus tag-subset charts (`tag_charts`) for clippings (13 pages), tables (12 pages) and table
+   forms (4 pages; mixed pages at 2 of 96 stay too few to chart). Four more routes ran the same pages on our own hardware: Qwen3-VL 8B at 4-bit, LightOnOCR-3-4B at 8-bit and
    Qwen3.5-9B at 4-bit on the owner's Mac, drawn in the free column, and Qwen3.6 27B at fp8 on one L40S on Stanford
    FarmShare, which is too large for the Mac and so is priced at OpenRouter's rate for the same model. Every other
    FarmShare run of the 96 pages in `farmshare/truth/` is on the same four charts (added 2026-10-21): □ when

@@ -5,8 +5,6 @@ part 5 of the page (`W41.bench-difficulty`); a model-independent page kind for i
 `W41.bench-vision-kind`. New measured results are not on this list: the standing rule
 in the root `CLAUDE.md` (owner, 2026-10-15) adds those as they land. That includes the FarmShare run (priced from
 its measured pages per hour per GPU) and the Mac-local 4-bit run.
-- **More kinds and tags.** Clippings, tables and table forms are in the groups CSVs already. Mixed pages (2) are
-  too few to chart. (queued: W49.bench-more-kinds behind nice-to-have, owner 2026-11-20)
 - **Newspapers.** NewsBench is the lab's newspaper truth set (`W41.farmshare-news-layout`); its scores would make
   a fifth chart (queued: W49.bench-news-chart behind nice-to-have, owner 2026-11-20).
 - **A checking chart for segmentation.** Checks per 100 pages against pages right after checking, if the table

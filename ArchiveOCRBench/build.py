@@ -1549,6 +1549,178 @@ def vision_unfiltered():
             "empty": t["empty_on_has_text"], "under_min": t["vision_under_min"]}
 
 
+def tag_subset_pages():
+    """Canonical page sets for clippings (13), tables (12) and table_form (4) among the 96 accuracy pages,
+    read from a complete FarmShare pages.csv and cross-checked against ocr-panel-cloud-groups.csv."""
+    agree = agreement_pages()
+    sample_csv = None
+    for p in sorted(FARMSHARE.glob("*/pages.csv")):
+        with p.open(newline="") as f:
+            cols = next(csv.reader(f))
+        if {"page", "clippings", "tables", "table_form"} <= set(cols):
+            sample_csv = p
+            break
+    if sample_csv is None:
+        sys.exit("no FarmShare pages.csv has clippings, tables and table_form columns")
+    with sample_csv.open(newline="") as f:
+        rows = [r for r in csv.DictReader(f) if r["page"] not in agree]
+    subsets = {
+        "clippings": {r["page"] for r in rows if r.get("clippings") == "yes"},
+        "tables": {r["page"] for r in rows if r.get("tables") == "yes"},
+        "table_form": {r["page"] for r in rows if r.get("table_form") == "yes"},
+    }
+    expected_attr = {"clippings": "clippings_tag", "tables": "tables_tag", "table_form": "table_form"}
+    with CLOUD_CSV.open(newline="") as f:
+        cloud_n = {r["attribute"]: int(r["n"]) for r in csv.DictReader(f)
+                   if r["value"] == "yes" and r["attribute"] in expected_attr.values()}
+    for key, attr in expected_attr.items():
+        if len(subsets[key]) != cloud_n.get(attr):
+            sys.exit(f"tag subset {key} has {len(subsets[key])} pages in {sample_csv.parent.name}, "
+                     f"but {CLOUD_CSV.name} says {cloud_n.get(attr)}")
+    return subsets
+
+
+def tag_subset_charts(routes, extra, inputs, op, regions, regions_gw, layout_photo_data):
+    """W49.bench-more-kinds: charts for clippings (13), tables (12) and table forms (4) from held scores ($0).
+    Mixed pages (2 of 96) remain too few to chart. Whole-page routes are scored from ocr-pages.csv (cross-checked
+    against the cloud groups CSV); OpenRouter-priced cluster runs are priced from their pages.csv tokens on each
+    subset's pages; crop routes join clippings and tables where their committed JSONs carry those exact groups."""
+    subsets = tag_subset_pages()
+    specs = [
+        ("clippings", "Clippings", "clippings_tag",
+         "Whole-page routes and crop arms with measured clippings scores; Apple on-device model (macOS 27) and "
+         "dewarp, enhancement and colour-dropout arms have no per-tag breakdown."),
+        ("tables", "Tables", "tables_tag",
+         "Whole-page routes and crop arms with measured tables scores; Apple on-device model (macOS 27) and "
+         "dewarp, enhancement and colour-dropout arms have no per-tag breakdown."),
+        ("table_form", "Table forms", "table_form",
+         "Whole-page routes with measured table-form scores; Apple on-device model (macOS 27), crop arms and "
+         "dewarp, enhancement and colour-dropout arms have no table-form breakdown. Small set (4 pages): "
+         "differences are indicative only."),
+    ]
+    ratio = inputs["batch"]["ratio"]
+    own_routes = inputs["own_hardware"]["routes"]
+    route_ids = {r["id"] for r in routes}
+
+    with OCR_PAGES.open(newline="") as f:
+        by_route = {}
+        for row in csv.DictReader(f):
+            by_route.setdefault(row["route"], []).append(row)
+
+    # Cross-check cloud groups CSV against ocr-pages.csv so any future drift fails the build.
+    with CLOUD_CSV.open(newline="") as f:
+        cloud_g = {(r["route"], r["attribute"], r["value"]): r for r in csv.DictReader(f)}
+
+    # Preload OpenRouter-priced FarmShare/Sherlock token usage per subset from pages.csv.
+    fs_subset_usd = {k: {} for k in subsets}
+    agree = agreement_pages()
+    token_fields = ("prompt_tokens", "completion_tokens")
+    for rid, spec in own_routes.items():
+        if spec["where"] != "farmshare":
+            continue
+        d = FARMSHARE / spec["run"]
+        summary = json.loads((d / "summary.json").read_text())
+        preset = summary["env"]["FS_PRESET"]
+        if run_price(op, preset, summary["throughput"], spec.get("price")) is None:
+            continue
+        with (d / "pages.csv").open(newline="") as f:
+            pages = [r for r in csv.DictReader(f) if r["page"] not in agree]
+        for key, pset in subsets.items():
+            attempts = [r for r in pages if r["page"] in pset]
+            if len(attempts) != len(pset):
+                sys.exit(f"{spec['run']}: {key} has {len(attempts)} pages, expected {len(pset)}")
+            means = {f"mean_{fld}": sum(int(r[fld]) for r in attempts) / len(attempts) for fld in token_fields}
+            fs_subset_usd[key][rid] = run_price(op, preset, means, spec.get("price"))
+
+    # Also attach clippings/tables/table_form scores and prices to table_only FarmShare runs.
+    for e, spec in zip(extra, inputs["own_hardware"]["table_only"]):
+        d = FARMSHARE / spec["run"]
+        summary = json.loads((d / "summary.json").read_text())
+        preset = summary["env"]["FS_PRESET"]
+        with (d / "pages.csv").open(newline="") as f:
+            pages = [r for r in csv.DictReader(f) if r["page"] not in agree]
+        for key, pset in subsets.items():
+            attempts = [r for r in pages if r["page"] in pset]
+            e["scores"][key] = [round(100 * sum(float(r["nes"]) for r in attempts) / len(attempts), 2),
+                                sum(r["ok"] == "True" for r in attempts), len(attempts)]
+            means = {f"mean_{fld}": sum(int(r[fld]) for r in attempts) / len(attempts) for fld in token_fields}
+            usd = run_price(op, preset, means)
+            if usd is not None:
+                e["prices"][key] = kind_cents(spec["name"], key, usd)
+
+    reg_by = {(r["route"], r["arm"], r["group"]): r for r in regions["rows"]} if regions else {}
+    rgw_by = {(r["arm"], r["group"]): r for r in regions_gw["rows"]} if regions_gw else {}
+
+    out = []
+    for key, title, cloud_attr, note in specs:
+        pset = subsets[key]
+        scores = {}
+        prices = {}
+        words = None
+        for rid, prows in by_route.items():
+            if rid not in route_ids:
+                continue
+            sub = [r for r in prows if r["page"] in pset]
+            if len(sub) != len(pset):
+                sys.exit(f"ocr-pages.csv: {rid} has {len(sub)} pages for {key}, expected {len(pset)}")
+            nes = round(100 * sum(float(r["nes"]) for r in sub) / len(sub), 2)
+            ok = sum(r["ok"] == "True" for r in sub)
+            w = sum(int(r["words"]) for r in sub)
+            if words is None:
+                words = w
+            scores[rid] = [nes, ok, len(sub)]
+            if (rid, cloud_attr, "yes") in cloud_g:
+                cg = cloud_g[(rid, cloud_attr, "yes")]
+                if abs(nes - round(100 * float(cg["nes"]), 2)) > 0.02 or ok != int(cg["ok"]):
+                    sys.exit(f"{rid} {key}: ocr-pages.csv gives {(nes, ok)} vs {CLOUD_CSV.name} "
+                             f"{(round(100 * float(cg['nes']), 2), int(cg['ok']))}")
+            if rid in inputs["routes"]:
+                usd = sum(float(r.get("cost") or 0) for r in sub) / len(sub) * 1000
+                if usd:
+                    prices[rid] = kind_cents(rid, key, usd, ratio.get(rid))
+            elif rid in fs_subset_usd[key]:
+                prices[rid] = kind_cents(rid, key, fs_subset_usd[key][rid])
+
+        if key in ("clippings", "tables"):
+            if regions:
+                for rname in regions["readers"]:
+                    for arm in regions["arms"]:
+                        rid = f"regions-{rname}-{arm}"
+                        if rid in route_ids and (rname, arm, key) in reg_by:
+                            row = reg_by[(rname, arm, key)]
+                            if row["n"] != len(pset):
+                                sys.exit(f"{rid} {key}: n={row['n']} != {len(pset)}")
+                            scores[rid] = [round(100 * row["nes"], 2), row["ok"], row["n"]]
+                            usd = tokens_usd(op, rname, row)
+                            if usd:
+                                prices[rid] = kind_cents(rid, key, usd)
+            if regions_gw:
+                for arm in ("pp-doclayoutv3", "tiles"):
+                    if arm not in regions_gw["arms_on_the_96"]:
+                        continue
+                    rid = f"gw-regions-{arm}"
+                    if rid in route_ids and (arm, key) in rgw_by:
+                        row = rgw_by[(arm, key)]
+                        if row["n"] != len(pset):
+                            sys.exit(f"{rid} {key}: n={row['n']} != {len(pset)}")
+                        scores[rid] = [round(100 * row["nes"], 2), row["ok"], row["n"]]
+                        usd = cost_usd(row)
+                        if usd:
+                            prices[rid] = kind_cents(rid, key, usd)
+            if layout_photo_data and key in layout_photo_data.get("bench", {}):
+                for arm in LAYOUT_PHOTO_ARMS:
+                    rid = f"layout-photo-glm-ocr-{arm}"
+                    if rid in route_ids and arm in layout_photo_data["bench"][key]:
+                        row = layout_photo_data["bench"][key][arm]
+                        if row["n"] != len(pset):
+                            sys.exit(f"{rid} {key}: n={row['n']} != {len(pset)}")
+                        scores[rid] = [round(100 * row["nes"], 2), row["ok"], row["n"]]
+
+        out.append({"key": key, "title": title, "n": len(pset), "words": words,
+                    "scores": scores, "prices": prices, "note": note})
+    return out
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -1760,7 +1932,8 @@ def main():
                 [["Bench size", *r] for r in table_after(app_md, heading)]
                 + [["Full size", *r] for r in table_after(app_md, heading, nth=1)])
             container_labels["app_path_resources"] = table_after(app_md, "## Time and memory")
-    built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(), "r6_spot": json.loads(R6_SPOT.read_text()),
+    tag_charts = tag_subset_charts(routes, extra, inputs, op, regions, regions_gw, layout_photo_data)
+    built = {"routes": routes, "table_only": extra, "charts": charts, "tag_charts": tag_charts, "segmentation": segmentation(op), "handwriting": handwriting(), "r6_spot": json.loads(R6_SPOT.read_text()),
              "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
