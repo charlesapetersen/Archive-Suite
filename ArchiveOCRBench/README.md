@@ -57,7 +57,9 @@ What the bench has measured, as one page you can read and share. It has seven pa
    (W46.ocr-gemini37-895-paid; `gemini37-public.md`, and its rows in the scorer tables). Part 7 shows the inventory separately from the original results. Below it, the open-weight models read on FarmShare on all 895 pages, native-prompt and panel-prompt routes
    labelled apart, a review baseline (`open-sweep-20261019.csv`, written by `corpus/farmshare_expanded_report.py`;
    receipts in `data/open-sweep-20261019.json`), and the open models built for the hardest scripts (`specialists.csv`, written by
-   `corpus/specialists.py report`, W43.script-specialists).
+   `corpus/specialists.py report`, W43.script-specialists). Page-level image-hash overlap between CHURRO-DS's
+   1,170 test pages and the 895 (`bench-corpus/churro-overlap.json` / `.md`, `W46.ocr-churro-overlap`, 24/895:
+   16/440 and 8/455) is attached to the Gemini and Churro public rows.
 
 It is kept current: a change that commits a measured OCR or segmentation result updates the bench in the same
 commit (owner, 2026-10-15; the rule is in the root [`CLAUDE.md`](../CLAUDE.md)). Presentation ideas not yet

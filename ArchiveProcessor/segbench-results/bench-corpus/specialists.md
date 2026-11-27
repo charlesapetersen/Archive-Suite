@@ -81,8 +81,12 @@ lines in visual order, reversed to logical by grapheme before scoring. No model 
 From the models' own Zenodo and Hugging Face records. **Contamination** is the main finding: three of the newest
 broad historical models were trained on our test sources. Kiessling's kraken **PP-OCRv6** (Zenodo 21788410) and
 **Party** (20642057) list EPARCHOS, Muharaf, Königsfelden, OCR-D, HTR-United, iForal and VOC; **CHURRO-3B**
-(`stanford-oval/churro-3B`) lists Königsfelden, iForal, the HTR-United Castilian set, VOC and OCR-D. Those can be
-labelled references, never a stratum's specialist.
+(`stanford-oval/churro-3B`) lists Königsfelden, iForal, the HTR-United Castilian set, VOC and OCR-D, and its
+published `stanford-oval/churro-dataset` test split also includes READ 2017 (L6), Bentham/ICDAR2015 (L2),
+EPARCHOS (N3), BiblIA (N4), Muharaf (N1), Devanagari (N6) and Tapus (L3). Page-level image hashing against
+CHURRO-DS `test` (1,170 pages, `churro-overlap.md`, `W46.ocr-churro-overlap`) found **24 of 895** exact/perceptual
+page overlaps (16 of 440, 8 of 455: L5 8, L7 1, L8 1, N3 1, N4 5, N6 8). Those can be labelled references,
+never a stratum's specialist.
 
 | stratum | run here (Mac, kraken lane) | FarmShare, needs a login | not run: trained on the test source |
 |---|---|---|---|

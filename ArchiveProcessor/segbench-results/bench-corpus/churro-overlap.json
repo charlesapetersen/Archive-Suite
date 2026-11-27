@@ -1,0 +1,1368 @@
+{
+  "generated_utc": "2026-11-27T21:08:14Z",
+  "dataset": "stanford-oval/churro-dataset",
+  "split": "test",
+  "shard_urls": [
+    "https://huggingface.co/api/datasets/stanford-oval/churro-dataset/parquet/default/test/0.parquet",
+    "https://huggingface.co/api/datasets/stanford-oval/churro-dataset/parquet/default/test/1.parquet",
+    "https://huggingface.co/api/datasets/stanford-oval/churro-dataset/parquet/default/test/2.parquet"
+  ],
+  "churro_test_pages": 1170,
+  "bench_pages": 895,
+  "bench_440_pages": 440,
+  "bench_455_pages": 455,
+  "overlap_unique_bench_pages": 24,
+  "overlap_in_440": 16,
+  "overlap_in_455": 8,
+  "overlap_by_match_kind": {
+    "exact_bytes": 20,
+    "exact_pixels": 0,
+    "perceptual": 4
+  },
+  "borderline_candidates": 44,
+  "unmatched_same_corpus_filename_hits": [
+    {
+      "churro_index": 166,
+      "churro_dataset_id": "voc",
+      "churro_file_name": "NL-HaNA_1.04.02_8128_0158",
+      "bench_stratum": "L5",
+      "bench_source": "voc",
+      "bench_page_id": "NL-HaNA_1.04.02_7528_0356",
+      "dhash64_dist": 31,
+      "dhash256_dist": 147,
+      "interior_r": 0.0223
+    },
+    {
+      "churro_index": 171,
+      "churro_dataset_id": "voc",
+      "churro_file_name": "NL-HaNA_1.04.02_8144_0043",
+      "bench_stratum": "L5",
+      "bench_source": "voc",
+      "bench_page_id": "NL-HaNA_1.04.02_7528_0356",
+      "dhash64_dist": 26,
+      "dhash256_dist": 127,
+      "interior_r": -0.1282
+    }
+  ],
+  "thresholds": {
+    "perceptual": "dhash64 <= 4 and dhash256_interior <= 24 and interior_r >= 0.985 (5% border crop)",
+    "borderline": "dhash64 <= 6 or dhash256_interior <= 36 or interior_r >= 0.95, below confirmed threshold"
+  },
+  "by_stratum": {
+    "L1": {
+      "bench_pages": 80,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "L2": {
+      "bench_pages": 80,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "L3": {
+      "bench_pages": 80,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "L4": {
+      "bench_pages": 80,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "L5": {
+      "bench_pages": 80,
+      "overlap_pages": 8,
+      "exact_bytes": 7,
+      "exact_pixels": 0,
+      "perceptual": 1
+    },
+    "L6": {
+      "bench_pages": 80,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "L7": {
+      "bench_pages": 80,
+      "overlap_pages": 1,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 1
+    },
+    "L8": {
+      "bench_pages": 80,
+      "overlap_pages": 1,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 1
+    },
+    "L9": {
+      "bench_pages": 15,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "N1": {
+      "bench_pages": 40,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "N2": {
+      "bench_pages": 40,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "N3": {
+      "bench_pages": 40,
+      "overlap_pages": 1,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 1
+    },
+    "N4": {
+      "bench_pages": 40,
+      "overlap_pages": 5,
+      "exact_bytes": 5,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "N5": {
+      "bench_pages": 40,
+      "overlap_pages": 0,
+      "exact_bytes": 0,
+      "exact_pixels": 0,
+      "perceptual": 0
+    },
+    "N6": {
+      "bench_pages": 40,
+      "overlap_pages": 8,
+      "exact_bytes": 8,
+      "exact_pixels": 0,
+      "perceptual": 0
+    }
+  },
+  "by_source": {
+    "bentham": {
+      "bench_pages": 20,
+      "overlap_pages": 0,
+      "strata": [
+        "L2"
+      ]
+    },
+    "biblia": {
+      "bench_pages": 40,
+      "overlap_pages": 5,
+      "strata": [
+        "N4"
+      ]
+    },
+    "btp": {
+      "bench_pages": 218,
+      "overlap_pages": 0,
+      "strata": [
+        "L1",
+        "L2",
+        "L3"
+      ]
+    },
+    "castilian": {
+      "bench_pages": 51,
+      "overlap_pages": 1,
+      "strata": [
+        "L5"
+      ]
+    },
+    "devanagari": {
+      "bench_pages": 40,
+      "overlap_pages": 8,
+      "strata": [
+        "N6"
+      ]
+    },
+    "eparchos": {
+      "bench_pages": 40,
+      "overlap_pages": 1,
+      "strata": [
+        "N3"
+      ]
+    },
+    "iforal": {
+      "bench_pages": 26,
+      "overlap_pages": 7,
+      "strata": [
+        "L5"
+      ]
+    },
+    "koenigsfelden": {
+      "bench_pages": 80,
+      "overlap_pages": 1,
+      "strata": [
+        "L7"
+      ]
+    },
+    "kurrent": {
+      "bench_pages": 60,
+      "overlap_pages": 0,
+      "strata": [
+        "L6"
+      ]
+    },
+    "muharaf": {
+      "bench_pages": 40,
+      "overlap_pages": 0,
+      "strata": [
+        "N1"
+      ]
+    },
+    "newsbench": {
+      "bench_pages": 15,
+      "overlap_pages": 0,
+      "strata": [
+        "L9"
+      ]
+    },
+    "ocrd": {
+      "bench_pages": 80,
+      "overlap_pages": 1,
+      "strata": [
+        "L8"
+      ]
+    },
+    "omnidoc": {
+      "bench_pages": 40,
+      "overlap_pages": 0,
+      "strata": [
+        "N5"
+      ]
+    },
+    "peter": {
+      "bench_pages": 40,
+      "overlap_pages": 0,
+      "strata": [
+        "N2"
+      ]
+    },
+    "read2017": {
+      "bench_pages": 20,
+      "overlap_pages": 0,
+      "strata": [
+        "L6"
+      ]
+    },
+    "si": {
+      "bench_pages": 80,
+      "overlap_pages": 0,
+      "strata": [
+        "L4"
+      ]
+    },
+    "tapus": {
+      "bench_pages": 2,
+      "overlap_pages": 0,
+      "strata": [
+        "L3"
+      ]
+    },
+    "voc": {
+      "bench_pages": 3,
+      "overlap_pages": 0,
+      "strata": [
+        "L5"
+      ]
+    }
+  },
+  "churro_test_datasets": {
+    "impact": 108,
+    "europeana": 47,
+    "devanagari": 45,
+    "nomnaocr": 36,
+    "iforal": 31,
+    "books-ja": 30,
+    "ecpo": 30,
+    "fcr": 30,
+    "magazine": 30,
+    "norhand": 30,
+    "osman": 30,
+    "pracalit": 30,
+    "safavi": 30,
+    "sleuk": 30,
+    "transitional": 30,
+    "newseye-swe": 26,
+    "reid2019": 22,
+    "iehhr2017": 21,
+    "biblia": 19,
+    "ahisto": 15,
+    "muharaf": 15,
+    "newseye-fin": 15,
+    "postocr": 15,
+    "slovensky": 15,
+    "spain": 14,
+    "faithful": 11,
+    "pinkas": 11,
+    "salamanca": 10,
+    "dta": 9,
+    "gado": 9,
+    "voc": 9,
+    "entangled": 8,
+    "fondue-chapbooks": 8,
+    "lidi": 8,
+    "reid2017": 8,
+    "arletta": 7,
+    "codea": 7,
+    "fondue-es-print-19": 7,
+    "sloane": 7,
+    "celestino": 6,
+    "clarysse": 6,
+    "eparchos": 6,
+    "episearch": 6,
+    "greek-century": 6,
+    "hdrc": 6,
+    "heidelberg": 6,
+    "leopardi": 6,
+    "m5hisdoc": 6,
+    "medieval-it": 6,
+    "mth2": 6,
+    "papyri": 6,
+    "scribble": 6,
+    "stavronikita": 6,
+    "tkh": 6,
+    "aldicam": 5,
+    "castilian": 5,
+    "hadara": 5,
+    "jcsr": 5,
+    "notarial": 5,
+    "ocr-data": 5,
+    "ocrd": 5,
+    "rasm2019": 5,
+    "reichenau": 5,
+    "boccace": 4,
+    "finlam": 4,
+    "hisclima": 4,
+    "hn-stanford-hw": 4,
+    "hooker": 4,
+    "icdar2015": 4,
+    "rasam": 4,
+    "scarce": 4,
+    "siecle-imprime-17": 4,
+    "tarima": 4,
+    "vml": 4,
+    "bln": 3,
+    "charters": 3,
+    "cremma-16-17-print": 3,
+    "endp": 3,
+    "fondue-art": 3,
+    "fondue-en-print-20": 3,
+    "hn-stanford-print": 3,
+    "icdar2017": 3,
+    "klostern": 3,
+    "konzils": 3,
+    "kurfurst": 3,
+    "liber": 3,
+    "nubis": 3,
+    "parzival": 3,
+    "siecle-imprime-18": 3,
+    "stabs": 3,
+    "stories": 3,
+    "valais": 3,
+    "annotationdb": 2,
+    "bible": 2,
+    "books": 2,
+    "caroline": 2,
+    "fraktur": 2,
+    "germany": 2,
+    "gwalther": 2,
+    "icfhr2016": 2,
+    "laliberte": 2,
+    "newseye-aus": 2,
+    "nzz": 2,
+    "onb": 2,
+    "reichsanzeiger": 2,
+    "saintgall": 2,
+    "siecle-imprime-16": 2,
+    "wien": 2,
+    "argus": 1,
+    "assisi": 1,
+    "barye": 1,
+    "berlioz": 1,
+    "bronod": 1,
+    "celestine": 1,
+    "cremma-medieval": 1,
+    "cremma-medieval-lat": 1,
+    "cremma-mss-16": 1,
+    "cremma-mss-17": 1,
+    "cremma-mss-18": 1,
+    "cremma-mss-20": 1,
+    "dahn": 1,
+    "decameron": 1,
+    "domingue": 1,
+    "doucet": 1,
+    "eutyches": 1,
+    "expositions": 1,
+    "fabliaux": 1,
+    "fondue-cat": 1,
+    "fondue-fr-mss-18": 1,
+    "fondue-fr-print-16": 1,
+    "fondue-fr-print-20": 1,
+    "ftd": 1,
+    "hn-chavigny": 1,
+    "hn-kovalewsky": 1,
+    "hn-pontenovu": 1,
+    "mariages": 1,
+    "medieval-lat": 1,
+    "medieval-literary": 1,
+    "newseye-fre": 1,
+    "notredam": 1,
+    "peraire": 1,
+    "popp": 1,
+    "repertoires": 1,
+    "roman": 1,
+    "setaf": 1,
+    "siecle-incunable-15": 1,
+    "siecle-mss-15": 1,
+    "tapus": 1,
+    "timeus": 1,
+    "verard": 1
+  },
+  "matches": [
+    {
+      "match_kind": "perceptual",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 118,
+      "churro_dataset_id": "castilian",
+      "churro_file_name": "30.jpeg",
+      "churro_size": [
+        2378,
+        3196
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "castilian",
+      "bench_page_id": "in_domain/Sal_L/unit_2/30",
+      "bench_in_440": true,
+      "bench_size": [
+        2378,
+        3196
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 814,
+      "churro_dataset_id": "iforal",
+      "churro_file_name": "foral_de_condado_1255_1.jpeg",
+      "churro_size": [
+        1616,
+        2158
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "iforal",
+      "bench_page_id": "foral_de_condado_1255/1",
+      "bench_in_440": true,
+      "bench_size": [
+        1616,
+        2158
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 228,
+      "churro_dataset_id": "iforal",
+      "churro_file_name": "foral_de_evora_1218_1.jpeg",
+      "churro_size": [
+        1496,
+        2008
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "iforal",
+      "bench_page_id": "foral_de_evora_1218/1",
+      "bench_in_440": true,
+      "bench_size": [
+        1496,
+        2008
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 827,
+      "churro_dataset_id": "iforal",
+      "churro_file_name": "foral_de_guardao_1380_1.jpeg",
+      "churro_size": [
+        1016,
+        1300
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "iforal",
+      "bench_page_id": "foral_de_guardao_1380/1",
+      "bench_in_440": true,
+      "bench_size": [
+        1016,
+        1300
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 836,
+      "churro_dataset_id": "iforal",
+      "churro_file_name": "foral_de_sortelha_1395_2.jpeg",
+      "churro_size": [
+        1616,
+        2166
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "iforal",
+      "bench_page_id": "foral_de_sortelha_1395/2",
+      "bench_in_440": true,
+      "bench_size": [
+        1616,
+        2166
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 828,
+      "churro_dataset_id": "iforal",
+      "churro_file_name": "foral_de_teloes_de_aguiar_1491_1.jpeg",
+      "churro_size": [
+        1249,
+        1807
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "iforal",
+      "bench_page_id": "foral_de_teloes_de_aguiar_1491/1",
+      "bench_in_440": true,
+      "bench_size": [
+        1249,
+        1807
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 824,
+      "churro_dataset_id": "iforal",
+      "churro_file_name": "foral_de_teloes_de_aguiar_2_1255_1.jpeg",
+      "churro_size": [
+        1835,
+        2329
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "iforal",
+      "bench_page_id": "foral_de_teloes_de_aguiar_2_1255/1",
+      "bench_in_440": true,
+      "bench_size": [
+        1835,
+        2329
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 830,
+      "churro_dataset_id": "iforal",
+      "churro_file_name": "foral_de_torres_novas_1251_3.jpeg",
+      "churro_size": [
+        952,
+        1294
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "iforal",
+      "bench_page_id": "foral_de_torres_novas_1251/3",
+      "bench_in_440": true,
+      "bench_size": [
+        952,
+        1294
+      ]
+    },
+    {
+      "match_kind": "perceptual",
+      "dhash64_dist": 1,
+      "dhash256_dist": 10,
+      "interior_r": 0.9997,
+      "churro_index": 222,
+      "churro_dataset_id": "charters",
+      "churro_file_name": "U-17_0059_v.jpeg",
+      "churro_size": [
+        6857,
+        4510
+      ],
+      "bench_stratum": "L7",
+      "bench_source": "koenigsfelden",
+      "bench_page_id": "U-17_0059_v",
+      "bench_in_440": true,
+      "bench_size": [
+        6857,
+        4510
+      ]
+    },
+    {
+      "match_kind": "perceptual",
+      "dhash64_dist": 0,
+      "dhash256_dist": 1,
+      "interior_r": 1.0,
+      "churro_index": 31,
+      "churro_dataset_id": "ocrd",
+      "churro_file_name": "arnimb_goethe03_1835_0029.jpeg",
+      "churro_size": [
+        1675,
+        2286
+      ],
+      "bench_stratum": "L8",
+      "bench_source": "ocrd",
+      "bench_page_id": "arnimb_goethe03_1835/arnimb_goethe03_1835_0029",
+      "bench_in_440": true,
+      "bench_size": [
+        1675,
+        2286
+      ]
+    },
+    {
+      "match_kind": "perceptual",
+      "dhash64_dist": 1,
+      "dhash256_dist": 0,
+      "interior_r": 0.9999,
+      "churro_index": 566,
+      "churro_dataset_id": "eparchos",
+      "churro_file_name": "6971 (118).jpeg",
+      "churro_size": [
+        541,
+        740
+      ],
+      "bench_stratum": "N3",
+      "bench_source": "eparchos",
+      "bench_page_id": "6971_(118)",
+      "bench_in_440": true,
+      "bench_size": [
+        541,
+        740
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 267,
+      "churro_dataset_id": "biblia",
+      "churro_file_name": "btv1b10539996w.jpeg",
+      "churro_size": [
+        7462,
+        9015
+      ],
+      "bench_stratum": "N4",
+      "bench_source": "biblia",
+      "bench_page_id": "Ashkenazy/btv1b10539996w",
+      "bench_in_440": true,
+      "bench_size": [
+        7462,
+        9015
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 252,
+      "churro_dataset_id": "biblia",
+      "churro_file_name": "btv1b10549397c.jpeg",
+      "churro_size": [
+        5282,
+        7612
+      ],
+      "bench_stratum": "N4",
+      "bench_source": "biblia",
+      "bench_page_id": "Ashkenazy/btv1b10549397c",
+      "bench_in_440": true,
+      "bench_size": [
+        5282,
+        7612
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 263,
+      "churro_dataset_id": "biblia",
+      "churro_file_name": "btv1b9003019b.jpeg",
+      "churro_size": [
+        5577,
+        7865
+      ],
+      "bench_stratum": "N4",
+      "bench_source": "biblia",
+      "bench_page_id": "Ashkenazy/btv1b9003019b",
+      "bench_in_440": true,
+      "bench_size": [
+        5577,
+        7865
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 260,
+      "churro_dataset_id": "biblia",
+      "churro_file_name": "btv1b9002892x.jpeg",
+      "churro_size": [
+        11222,
+        7377
+      ],
+      "bench_stratum": "N4",
+      "bench_source": "biblia",
+      "bench_page_id": "Sephardi/btv1b9002892x",
+      "bench_in_440": true,
+      "bench_size": [
+        11222,
+        7377
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 250,
+      "churro_dataset_id": "biblia",
+      "churro_file_name": "btv1b9064414m.jpeg",
+      "churro_size": [
+        7624,
+        5412
+      ],
+      "bench_stratum": "N4",
+      "bench_source": "biblia",
+      "bench_page_id": "Sephardi/btv1b9064414m",
+      "bench_in_440": true,
+      "bench_size": [
+        7624,
+        5412
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 408,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "giridharadasa1902_08.jpeg",
+      "churro_size": [
+        2929,
+        4837
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "giridharadasa1902/08",
+      "bench_in_440": false,
+      "bench_size": [
+        2929,
+        4837
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 409,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "hajarilala1919_12.jpeg",
+      "churro_size": [
+        1864,
+        2874
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "hajarilala1919/12",
+      "bench_in_440": false,
+      "bench_size": [
+        1864,
+        2874
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 419,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "paramananda1924_000c.jpeg",
+      "churro_size": [
+        2129,
+        3399
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "paramananda1924/000c",
+      "bench_in_440": false,
+      "bench_size": [
+        2129,
+        3399
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 414,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "pyarelala1914_01.jpeg",
+      "churro_size": [
+        2048,
+        2792
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "pyarelala1914/01",
+      "bench_in_440": false,
+      "bench_size": [
+        2048,
+        2792
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 398,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "sankaracarya1925_000c.jpeg",
+      "churro_size": [
+        1257,
+        2311
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "sankaracarya1925/000c",
+      "bench_in_440": false,
+      "bench_size": [
+        1257,
+        2311
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 423,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "sivaramasukla1900_04.jpeg",
+      "churro_size": [
+        1462,
+        2437
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "sivaramasukla1900/04",
+      "bench_in_440": false,
+      "bench_size": [
+        1462,
+        2437
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 437,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "sriramastavarajah1898_05.jpeg",
+      "churro_size": [
+        1937,
+        3459
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "sriramastavarajah1898/05",
+      "bench_in_440": false,
+      "bench_size": [
+        1937,
+        3459
+      ]
+    },
+    {
+      "match_kind": "exact_bytes",
+      "dhash64_dist": 0,
+      "dhash256_dist": 0,
+      "interior_r": 1.0,
+      "churro_index": 433,
+      "churro_dataset_id": "devanagari",
+      "churro_file_name": "vyasa1906_04.jpeg",
+      "churro_size": [
+        2210,
+        3438
+      ],
+      "bench_stratum": "N6",
+      "bench_source": "devanagari",
+      "bench_page_id": "vyasa1906/04",
+      "bench_in_440": false,
+      "bench_size": [
+        2210,
+        3438
+      ]
+    }
+  ],
+  "borderline_top20": [
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 5,
+      "dhash256_dist": 39,
+      "interior_r": 0.8797,
+      "churro_index": 112,
+      "churro_dataset_id": "castilian",
+      "churro_file_name": "pg_31.jpeg",
+      "churro_size": [
+        2375,
+        3021
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "castilian",
+      "bench_page_id": "in_domain/Val_S/Hand_D/pg_27",
+      "bench_in_440": true,
+      "bench_size": [
+        2375,
+        3021
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 4,
+      "dhash256_dist": 41,
+      "interior_r": 0.8741,
+      "churro_index": 94,
+      "churro_dataset_id": "castilian",
+      "churro_file_name": "8.jpeg",
+      "churro_size": [
+        2378,
+        3196
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "castilian",
+      "bench_page_id": "in_domain/Sal_L/unit_2/30",
+      "bench_in_440": true,
+      "bench_size": [
+        2378,
+        3196
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 4,
+      "dhash256_dist": 57,
+      "interior_r": 0.7286,
+      "churro_index": 205,
+      "churro_dataset_id": "liber",
+      "churro_file_name": "7_bc51d_default.jpeg",
+      "churro_size": [
+        4311,
+        6270
+      ],
+      "bench_stratum": "N4",
+      "bench_source": "biblia",
+      "bench_page_id": "Sephardi/btv1b10539466r",
+      "bench_in_440": true,
+      "bench_size": [
+        5983,
+        7553
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 71,
+      "interior_r": 0.5346,
+      "churro_index": 376,
+      "churro_dataset_id": "klostern",
+      "churro_file_name": "CCl-48_014v.jpeg",
+      "churro_size": [
+        4612,
+        6513
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "castilian",
+      "bench_page_id": "in_domain/Mad_B/a000618",
+      "bench_in_440": true,
+      "bench_size": [
+        2938,
+        3986
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 4,
+      "dhash256_dist": 75,
+      "interior_r": 0.8705,
+      "churro_index": 380,
+      "churro_dataset_id": "charters",
+      "churro_file_name": "U-17_0956_s01.jpeg",
+      "churro_size": [
+        4912,
+        7360
+      ],
+      "bench_stratum": "L7",
+      "bench_source": "koenigsfelden",
+      "bench_page_id": "U-17_0901_02_r",
+      "bench_in_440": true,
+      "bench_size": [
+        4912,
+        7360
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 75,
+      "interior_r": 0.3808,
+      "churro_index": 1128,
+      "churro_dataset_id": "sleuk",
+      "churro_file_name": "452_pp_ttp_02_009.jpeg",
+      "churro_size": [
+        8152,
+        736
+      ],
+      "bench_stratum": "L8",
+      "bench_source": "ocrd",
+      "bench_page_id": "blumenbach_anatomie_1805/blumenbach_anatomie_1805_0047",
+      "bench_in_440": true,
+      "bench_size": [
+        1700,
+        2687
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 5,
+      "dhash256_dist": 76,
+      "interior_r": -0.0143,
+      "churro_index": 331,
+      "churro_dataset_id": "lidi",
+      "churro_file_name": "PirroLigorio_Ja_III_3_048b.jpeg",
+      "churro_size": [
+        3800,
+        5255
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "castilian",
+      "bench_page_id": "in_domain/Sal_J/pg_0006.pdf_page_1",
+      "bench_in_440": true,
+      "bench_size": [
+        2400,
+        3432
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 78,
+      "interior_r": 0.4234,
+      "churro_index": 268,
+      "churro_dataset_id": "biblia",
+      "churro_file_name": "btv1b10544753q.jpeg",
+      "churro_size": [
+        5347,
+        6874
+      ],
+      "bench_stratum": "N4",
+      "bench_source": "biblia",
+      "bench_page_id": "Sephardi/btv1b10539466r",
+      "bench_in_440": true,
+      "bench_size": [
+        5983,
+        7553
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 81,
+      "interior_r": 0.5872,
+      "churro_index": 233,
+      "churro_dataset_id": "liber",
+      "churro_file_name": "020-Trevet Lisboa 2 482.jpeg",
+      "churro_size": [
+        2230,
+        3413
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "castilian",
+      "bench_page_id": "in_domain/Val_S/Hand_C/pg_48",
+      "bench_in_440": true,
+      "bench_size": [
+        2375,
+        3125
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 82,
+      "interior_r": 0.5779,
+      "churro_index": 872,
+      "churro_dataset_id": "impact",
+      "churro_file_name": "00541489.jpeg",
+      "churro_size": [
+        2171,
+        3047
+      ],
+      "bench_stratum": "N1",
+      "bench_source": "muharaf",
+      "bench_page_id": "QBat3D_0005r",
+      "bench_in_440": true,
+      "bench_size": [
+        5760,
+        3840
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 85,
+      "interior_r": 0.4773,
+      "churro_index": 1130,
+      "churro_dataset_id": "sleuk",
+      "churro_file_name": "389_pp_ttp_02_012.jpeg",
+      "churro_size": [
+        8056,
+        704
+      ],
+      "bench_stratum": "L8",
+      "bench_source": "ocrd",
+      "bench_page_id": "blumenbach_anatomie_1805/blumenbach_anatomie_1805_0047",
+      "bench_in_440": true,
+      "bench_size": [
+        1700,
+        2687
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 4,
+      "dhash256_dist": 87,
+      "interior_r": 0.6369,
+      "churro_index": 173,
+      "churro_dataset_id": "arletta",
+      "churro_file_name": "NL-HlmNHA_1972_46_0280_proc_rewrite.jpeg",
+      "churro_size": [
+        4965,
+        4015
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "voc",
+      "bench_page_id": "NL-HlmNHA_1617_1703_0123",
+      "bench_in_440": true,
+      "bench_size": [
+        4440,
+        3137
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 5,
+      "dhash256_dist": 90,
+      "interior_r": 0.3043,
+      "churro_index": 767,
+      "churro_dataset_id": "icdar2015",
+      "churro_file_name": "116_100_001.jpeg",
+      "churro_size": [
+        2731,
+        4096
+      ],
+      "bench_stratum": "L2",
+      "bench_source": "bentham",
+      "bench_page_id": "116_288_001",
+      "bench_in_440": false,
+      "bench_size": [
+        2731,
+        4096
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 2,
+      "dhash256_dist": 91,
+      "interior_r": 0.2123,
+      "churro_index": 176,
+      "churro_dataset_id": "voc",
+      "churro_file_name": "NL-HlmNHA_1617_1638_0473.jpeg",
+      "churro_size": [
+        4406,
+        3087
+      ],
+      "bench_stratum": "L5",
+      "bench_source": "voc",
+      "bench_page_id": "NL-HlmNHA_1617_1796_0302",
+      "bench_in_440": true,
+      "bench_size": [
+        5402,
+        3791
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 92,
+      "interior_r": 0.0131,
+      "churro_index": 614,
+      "churro_dataset_id": "europeana",
+      "churro_file_name": "00762329.jpeg",
+      "churro_size": [
+        3899,
+        5728
+      ],
+      "bench_stratum": "L3",
+      "bench_source": "btp",
+      "bench_page_id": "afc1945001_ms02018-27",
+      "bench_in_440": false,
+      "bench_size": [
+        3380,
+        4371
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 3,
+      "dhash256_dist": 94,
+      "interior_r": 0.8963,
+      "churro_index": 732,
+      "churro_dataset_id": "hdrc",
+      "churro_file_name": "004708932_00222.jpeg",
+      "churro_size": [
+        3763,
+        2943
+      ],
+      "bench_stratum": "N1",
+      "bench_source": "muharaf",
+      "bench_page_id": "QBat3D_0005r",
+      "bench_in_440": true,
+      "bench_size": [
+        5760,
+        3840
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 97,
+      "interior_r": 0.1853,
+      "churro_index": 1065,
+      "churro_dataset_id": "norhand",
+      "churro_file_name": "no-nb_digimanus_24424_0001.jpeg",
+      "churro_size": [
+        3789,
+        4774
+      ],
+      "bench_stratum": "L3",
+      "bench_source": "btp",
+      "bench_page_id": "afc1945001_ms03034-117",
+      "bench_in_440": false,
+      "bench_size": [
+        3597,
+        4601
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 2,
+      "dhash256_dist": 98,
+      "interior_r": -0.0455,
+      "churro_index": 648,
+      "churro_dataset_id": "fcr",
+      "churro_file_name": "Leppavirran_1864-1867_24.jpeg",
+      "churro_size": [
+        6107,
+        4559
+      ],
+      "bench_stratum": "L1",
+      "bench_source": "btp",
+      "bench_page_id": "mss13375042-62",
+      "bench_in_440": false,
+      "bench_size": [
+        2559,
+        3128
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 98,
+      "interior_r": -0.1032,
+      "churro_index": 156,
+      "churro_dataset_id": "voc",
+      "churro_file_name": "NL-HlmNHA_1617_1769_0024.jpeg",
+      "churro_size": [
+        5279,
+        4261
+      ],
+      "bench_stratum": "L3",
+      "bench_source": "btp",
+      "bench_page_id": "afc1945001_ms01005-212",
+      "bench_in_440": false,
+      "bench_size": [
+        3394,
+        4368
+      ]
+    },
+    {
+      "match_kind": "borderline",
+      "dhash64_dist": 6,
+      "dhash256_dist": 99,
+      "interior_r": 0.0345,
+      "churro_index": 762,
+      "churro_dataset_id": "hisclima",
+      "churro_file_name": "vol003_102_0.jpeg",
+      "churro_size": [
+        2496,
+        3744
+      ],
+      "bench_stratum": "L3",
+      "bench_source": "btp",
+      "bench_page_id": "afc1945001_ms07103-46",
+      "bench_in_440": false,
+      "bench_size": [
+        3605,
+        4584
+      ]
+    }
+  ]
+}

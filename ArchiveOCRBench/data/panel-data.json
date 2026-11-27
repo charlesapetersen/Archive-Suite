@@ -49392,6 +49392,24 @@
    ],
    "status": "Review baseline for the processing review (execution-plans/processing-review/00-plan.md, Phase 0). Nothing adopted; no catalogue or default changed.",
    "hardware": "One NVIDIA L40S (48 GB) per model unless gpus says otherwise. VLM routes: vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens; 16 sequences and 8 concurrent requests, except Ling 3 Flash VL on 4 L40S (tensor parallel 4 with expert parallel, eager, 4 sequences and 4 requests). PP-OCRv6 is not vLLM and not a VLM: the stock PaddleOCR 3.7.0 detector and recognizer pipeline, no prompt and no token cap. All routes read the same 2400 px JPEG 90 inputs as the Qwen runs (image SHA-256 checked page by page). Rows marked Sherlock: One Sherlock GPU with 48 or 80 GB (Slurm constraint GPU_MEM:48GB|GPU_MEM:80GB) per model, vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens, 16 sequences and 8 concurrent requests. Rows marked Sherlock: Infinity-Parser2-Pro: two Sherlock GPUs with 48 or 80 GB (Slurm constraint GPU_MEM:48GB|GPU_MEM:80GB; tensor-parallel 2), vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens, 16 sequences and 8 concurrent requests. Rows marked Sherlock: One Sherlock GPU with 48 or 80 GB, type not recorded. In-process transformers, one page at a time, bf16, greedy, 8192 new tokens; torch 2.13.0+cu129. Unlimited-OCR transformers 4.57.1, Nemotron-Parse 2.0 transformers 5.6.1. Not vLLM served. Rows marked Sherlock: One Sherlock GPU per job (48 or 80 GB, type not recorded), vLLM 0.31.0 in process (family_run.py), batches of 16, torch 2.13.0+cu129."
+  },
+  "churro_overlap": {
+   "churro_test_pages": 1170,
+   "bench_pages": 895,
+   "overlap_895": 24,
+   "overlap_440": 16,
+   "overlap_455": 8,
+   "exact_bytes": 20,
+   "perceptual": 4,
+   "by_stratum": {
+    "L5": 8,
+    "L7": 1,
+    "L8": 1,
+    "N3": 1,
+    "N4": 5,
+    "N6": 8
+   },
+   "report": "bench-corpus/churro-overlap.md"
   }
  },
  "ocr_scorers": {
@@ -50573,7 +50591,7 @@
     "order_pages": 619,
     "markup_pages": 12,
     "markup_mean_lift": 9.652342256310239e-05,
-    "note": null
+    "note": "CHURRO-DS test image overlap: 24/895 pages; CHURRO-DS truths cleaned with Gemini 2.5 Pro (churro-overlap.md)"
    },
    {
     "route": "german-handwriting",
@@ -50617,7 +50635,7 @@
     "order_pages": 278,
     "markup_pages": 3,
     "markup_mean_lift": -1.2199287561606456e-06,
-    "note": null
+    "note": "CHURRO-DS test image overlap: 16/440 pages; CHURRO-DS truths cleaned with Gemini 2.5 Pro (churro-overlap.md)"
    },
    {
     "route": "fs-churro",
@@ -50639,7 +50657,7 @@
     "order_pages": 269,
     "markup_pages": 5,
     "markup_mean_lift": -1.2199287561606456e-06,
-    "note": null
+    "note": "CHURRO-DS test image overlap: 16/440 pages (churro-overlap.md)"
    },
    {
     "route": "churro-3b",
@@ -50661,7 +50679,7 @@
     "order_pages": 530,
     "markup_pages": 6,
     "markup_mean_lift": -5.997415114085856e-07,
-    "note": null
+    "note": "CHURRO-DS test image overlap: 24/895 pages (churro-overlap.md)"
    },
    {
     "route": "trocr-kurrent",

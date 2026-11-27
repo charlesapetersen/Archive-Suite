@@ -81,6 +81,20 @@ class BenchChartsTests(unittest.TestCase):
         self.assertIn('id="seg-check-canvas"', html)
         self.assertIn("renderSegCheck()", html)
 
+    def test_churro_overlap_count_attached_to_gemini_and_churro_public_rows(self):
+        d = json.loads((ROOT / "data" / "panel-data.json").read_text())
+        ov = d["public"]["churro_overlap"]
+        self.assertEqual(ov["churro_test_pages"], 1170)
+        self.assertEqual(ov["bench_pages"], 895)
+        self.assertEqual(ov["overlap_895"], 24)
+        self.assertEqual(ov["overlap_440"], 16)
+        self.assertEqual(ov["overlap_455"], 8)
+        pub895 = {r["route"]: r for r in d["ocr_scorers"]["public895"]}
+        self.assertIn("24/895", pub895["churro-3b"]["note"])
+        self.assertIn("24/895", pub895["gemini3.7-flash-gw"]["note"])
+        self.assertIn("16/440", pub895["gemini3.8-flash"]["note"])
+        self.assertIn("16/440", pub895["fs-churro"]["note"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -49996,6 +49996,24 @@ true,
 ],
 "status":"Review baseline for the processing review (execution-plans/processing-review/00-plan.md, Phase 0). Nothing adopted; no catalogue or default changed.",
 "hardware":"One NVIDIA L40S (48 GB) per model unless gpus says otherwise. VLM routes: vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens; 16 sequences and 8 concurrent requests, except Ling 3 Flash VL on 4 L40S (tensor parallel 4 with expert parallel, eager, 4 sequences and 4 requests). PP-OCRv6 is not vLLM and not a VLM: the stock PaddleOCR 3.7.0 detector and recognizer pipeline, no prompt and no token cap. All routes read the same 2400 px JPEG 90 inputs as the Qwen runs (image SHA-256 checked page by page). Rows marked Sherlock: One Sherlock GPU with 48 or 80 GB (Slurm constraint GPU_MEM:48GB|GPU_MEM:80GB) per model, vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens, 16 sequences and 8 concurrent requests. Rows marked Sherlock: Infinity-Parser2-Pro: two Sherlock GPUs with 48 or 80 GB (Slurm constraint GPU_MEM:48GB|GPU_MEM:80GB; tensor-parallel 2), vLLM 0.31.0, context 16384, temperature 0, thinking off, 8192 output tokens, 16 sequences and 8 concurrent requests. Rows marked Sherlock: One Sherlock GPU with 48 or 80 GB, type not recorded. In-process transformers, one page at a time, bf16, greedy, 8192 new tokens; torch 2.13.0+cu129. Unlimited-OCR transformers 4.57.1, Nemotron-Parse 2.0 transformers 5.6.1. Not vLLM served. Rows marked Sherlock: One Sherlock GPU per job (48 or 80 GB, type not recorded), vLLM 0.31.0 in process (family_run.py), batches of 16, torch 2.13.0+cu129."
+},
+"churro_overlap":{
+"churro_test_pages":1170,
+"bench_pages":895,
+"overlap_895":24,
+"overlap_440":16,
+"overlap_455":8,
+"exact_bytes":20,
+"perceptual":4,
+"by_stratum":{
+"L5":8,
+"L7":1,
+"L8":1,
+"N3":1,
+"N4":5,
+"N6":8
+},
+"report":"bench-corpus/churro-overlap.md"
 }
 },
 "ocr_scorers":{
@@ -51177,7 +51195,7 @@ true,
 "order_pages":619,
 "markup_pages":12,
 "markup_mean_lift":9.652342256310239e-05,
-"note":null
+"note":"CHURRO-DS test image overlap: 24/895 pages; CHURRO-DS truths cleaned with Gemini 2.5 Pro (churro-overlap.md)"
 },
 {
 "route":"german-handwriting",
@@ -51221,7 +51239,7 @@ true,
 "order_pages":278,
 "markup_pages":3,
 "markup_mean_lift":-1.2199287561606456e-06,
-"note":null
+"note":"CHURRO-DS test image overlap: 16/440 pages; CHURRO-DS truths cleaned with Gemini 2.5 Pro (churro-overlap.md)"
 },
 {
 "route":"fs-churro",
@@ -51243,7 +51261,7 @@ true,
 "order_pages":269,
 "markup_pages":5,
 "markup_mean_lift":-1.2199287561606456e-06,
-"note":null
+"note":"CHURRO-DS test image overlap: 16/440 pages (churro-overlap.md)"
 },
 {
 "route":"churro-3b",
@@ -51265,7 +51283,7 @@ true,
 "order_pages":530,
 "markup_pages":6,
 "markup_mean_lift":-5.997415114085856e-07,
-"note":null
+"note":"CHURRO-DS test image overlap: 24/895 pages (churro-overlap.md)"
 },
 {
 "route":"trocr-kurrent",
@@ -79801,10 +79819,13 @@ if (PB) {
     '<tr><td>' + id + ' · ' + STRATUM_NAMES[id] + '</td><td>' + s.pages + '</td><td>' + s.reference_pages +
     '</td><td>' + (s.pages - s.reference_pages) + '</td><td>' + s.sources.join(', ') + '</td></tr>').join('');
   document.getElementById('pub-meta').textContent = 'NES %, failures as 0';
+  const cov = PB.churro_overlap;
   document.getElementById('pub-rows').innerHTML = rows.map(r => {
     const s = PB.strata[r.stratum];
     const second = r.nes_mapped != null ? r.nes_mapped : r.nes_no_marks;
-    return '<tr><td>' + r.stratum + ' · ' + (STRATUM_NAMES[r.stratum] || '') + '</td><td>' + s.pages + '</td><td>' + r.route +
+    const ov = cov && r.route.startsWith('gemini') && cov.by_stratum[r.stratum]
+      ? ' <span class="meta">(CHURRO-DS test overlap: ' + cov.by_stratum[r.stratum] + '/' + s.reference_pages + ')</span>' : '';
+    return '<tr><td>' + r.stratum + ' · ' + (STRATUM_NAMES[r.stratum] || '') + '</td><td>' + s.pages + '</td><td>' + r.route + ov +
       '</td><td>' + r.ok + '/' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.nes_answered) + '</td><td>' + p1(second) +
       '</td><td>' + (r.cost ? '$' + r.cost.toFixed(3) : '–') + '</td></tr>';
   }).join('');
@@ -79819,7 +79840,9 @@ if (PB) {
     const order = [...new Set(all.map(r => r.route))].sort((a, b) => at(b, 'full895').nes - at(a, 'full895').nes);
     document.getElementById('pub-open-rows').innerHTML = order.map(k => {
       const r = at(k, 'full895'), m = OS.routes[k];
-      return '<tr><td>' + k + (m.comparison ? ' (comparison)' : '') + (m.cluster ? ' (' + m.cluster + ')' : '') + '</td><td>' + (m.route === 'native' ? 'native: ' + m.prompt : m.route === 'pipeline' ? 'line pipeline, not a VLM' : 'panel prompt') +
+      const ov = cov && k.includes('churro')
+        ? ' <span class="meta">(CHURRO-DS test overlap: ' + cov.overlap_895 + '/' + cov.bench_pages + ', ' + cov.overlap_440 + '/440)</span>' : '';
+      return '<tr><td>' + k + (m.comparison ? ' (comparison)' : '') + (m.cluster ? ' (' + m.cluster + ')' : '') + ov + '</td><td>' + (m.route === 'native' ? 'native: ' + m.prompt : m.route === 'pipeline' ? 'line pipeline, not a VLM' : 'panel prompt') +
         (m.gpus > 1 ? ' · ' + m.gpus + ' GPUs' : '') +
         '</td><td>' + m.dtype + '</td><td>' + r.ok + '</td><td>' + p1(r.nes) + '</td><td>' + p1(r.nes_answered) + '</td><td>' + p1(r.chrf) +
         '</td><td>' + p1(r.miss) + '</td><td>' + p1(r.add) + '</td><td>' + p1(at(k, 'original440').nes) + '</td><td>' +
@@ -79834,6 +79857,10 @@ if (PB) {
       LR.map(r => '<td>' + (r.strata[s] == null ? '–' : r.strata[s].toFixed(1)) + '</td>').join('') + '</tr>').join('');
     document.getElementById('pub-open-note').textContent = OS.status + ' ' + OS.hardware + ' Native routes use the model card\'s own prompt and are scored as written, as Mistral OCR\'s Markdown is; panel rows use the 96\'s prompt. PP-OCRv6 is the stock line detector and recogniser, not a VLM and not a prompt-equivalent row: it reads only Latin and Chinese and interleaves the lines of multi-column pages. A reply that ran to the 8,192-token limit counts as a failure scoring 0; nearly all of them were repetition loops. Word rates pool words, and every Chinese character counts as one, so the Chinese and newspaper pages dominate them. GPU minutes are the server\'s span (vLLM log, or the job for PP-OCRv6), model load included, times the GPUs used; the Qwen comparison rows ran in two jobs and have no single figure. Not scored: ' +
       OS.not_scored.map(n => n.route + ' (' + n.state + ')').join(' ') +
+      (cov ? ' Page-level image-hash overlap with CHURRO-DS test (' + cov.churro_test_pages.toLocaleString() + ' pages): ' +
+        cov.overlap_895 + ' of ' + cov.bench_pages + ' pages (' + cov.overlap_440 + ' of 440, ' + cov.overlap_455 + ' of 455; ' +
+        cov.exact_bytes + ' exact byte SHA-256, ' + cov.perceptual + ' perceptual; ' +
+        Object.entries(cov.by_stratum).map(([st, n]) => st + ' ' + n).join(', ') + '; ' + cov.report + ').' : '') +
       (LR.length ? ' The last columns of the stratum table are line routes read on the Mac on L1-L3 alone (W46.ocr-ppocrv6-hands, below), on the same pages and scorer; they read no other stratum, so they have no row in the 895 table.' : '');
     document.getElementById('pub-open').hidden = false;
   }
@@ -79842,8 +79869,10 @@ if (PB) {
     const sr = PB.specialists.slice().sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);
     document.getElementById('pub-spec-rows').innerHTML = sr.map(r => {
       const second = r.nes_mapped != null ? r.nes_mapped : r.nes_no_marks;
+      const ov = cov && r.route.toLowerCase().includes('churro') && cov.by_stratum[r.stratum]
+        ? ' (' + cov.by_stratum[r.stratum] + ' in CHURRO-DS test)' : '';
       return '<tr><td>' + r.stratum + ' · ' + (STRATUM_NAMES[r.stratum] || '') + '</td><td>' + r.route + '</td><td>' +
-        (r.contaminated || 'none listed') + '</td><td>' + r.ok + '/' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(second) +
+        (r.contaminated || 'none listed') + ov + '</td><td>' + r.ok + '/' + r.n + '</td><td>' + p1(r.nes) + '</td><td>' + p1(second) +
         '</td><td>' + p1(r.chrf) + '</td><td>' + d(r.vs_gemini, r.vs_gemini_lo, r.vs_gemini_hi) + '</td><td>' +
         d(r.vs_qwen, r.vs_qwen_lo, r.vs_qwen_hi) + '</td></tr>';
     }).join('');

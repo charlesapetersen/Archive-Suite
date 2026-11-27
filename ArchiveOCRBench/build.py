@@ -68,6 +68,7 @@ DATING_ENCLOSURE = RESULTS / "date-enclosure.json"  # W46.date-enclosure: date_e
 DATING_IMAGE = RESULTS / "date-image.json"  # W46.date-image: date_image.py score
 DATING_UNDATED = RESULTS / "date-undated.json"  # W46.date-undated: date_undated.py score
 PUBLIC = RESULTS / "bench-corpus"  # W43.corpus-build: corpus/routes.py report, the public strata
+CHURRO_OVERLAP = PUBLIC / "churro-overlap.json"  # W46.ocr-churro-overlap: page-level image-hash overlap with CHURRO-DS test
 OCR_SCORERS = RESULTS / "ocr-scorers.json"  # W46.fix-ocr-scorers: ocr_rescore.py, every cached reading re-scored
 TRUTH_BIAS = RESULTS / "ocr-truth-bias.json"  # W46.fix-ocr-truth-bias: ocr_truth_bias.py, agreed v adjudicated words
 HANDS_RESCORE = RESULTS / "ocr-hands-rescore.json"  # W46.ocr-hands-rescore: the hand pages on the owner's sheet
@@ -901,10 +902,24 @@ def public():
         with fs.open(newline="") as fh:
             farmshare_rows = [{k: (v if k in ("route", "stratum") else num(v)) for k, v in r.items()}
                               for r in csv.DictReader(fh)]
+    churro_ov = None
+    if CHURRO_OVERLAP.exists():
+        co = json.loads(CHURRO_OVERLAP.read_text())
+        churro_ov = {
+            "churro_test_pages": co["churro_test_pages"],
+            "bench_pages": co["bench_pages"],
+            "overlap_895": co["overlap_unique_bench_pages"],
+            "overlap_440": co["overlap_in_440"],
+            "overlap_455": co["overlap_in_455"],
+            "exact_bytes": co["overlap_by_match_kind"]["exact_bytes"],
+            "perceptual": co["overlap_by_match_kind"]["perceptual"],
+            "by_stratum": {st: row["overlap_pages"] for st, row in co["by_stratum"].items() if row["overlap_pages"]},
+            "report": "bench-corpus/churro-overlap.md",
+        }
     return {"rows": rows, "farmshare": farmshare_rows,
             "paired": json.loads((PUBLIC / "routes-paired.json").read_text()),
             "strata": {k: {**v, "sources": sorted(v["sources"])} for k, v in sorted(strata.items())},
-            "specialists": specialists, "open_sweep": open_sweep(num)}
+            "specialists": specialists, "open_sweep": open_sweep(num), "churro_overlap": churro_ov}
 
 
 def open_sweep(num):
@@ -959,8 +974,22 @@ def ocr_scorers():
     out = {s: sorted(({k: r.get(k) for k in SCORER_FIELDS} for r in d["summary"]
                       if r["set"] == s and r["stratum"] == "all" and r["ok"]), key=lambda r: -r["nes"])
            for s in ("owner96", "public895")}
+    churro_ov = json.loads(CHURRO_OVERLAP.read_text()) if CHURRO_OVERLAP.exists() else None
     for r in out["public895"]:
-        r["note"] = PARTIAL_PUBLIC.get(r["route"])
+        notes = []
+        if PARTIAL_PUBLIC.get(r["route"]):
+            notes.append(PARTIAL_PUBLIC[r["route"]])
+        if churro_ov and (r["route"].startswith("gemini") or "churro" in r["route"]):
+            if r["n"] == churro_ov["bench_pages"]:
+                cnt, tot = churro_ov["overlap_unique_bench_pages"], churro_ov["bench_pages"]
+            elif r["n"] == churro_ov["bench_440_pages"]:
+                cnt, tot = churro_ov["overlap_in_440"], churro_ov["bench_440_pages"]
+            else:
+                cnt, tot = None, None
+            if cnt is not None:
+                why = "; CHURRO-DS truths cleaned with Gemini 2.5 Pro" if r["route"].startswith("gemini") else ""
+                notes.append(f"CHURRO-DS test image overlap: {cnt}/{tot} pages{why} (churro-overlap.md)")
+        r["note"] = "; ".join(notes) if notes else None
     out["chaos"] = json.loads(CHAOS.read_text()) if CHAOS.exists() else None
     if TRUTH_BIAS.exists():
         tb = json.loads(TRUTH_BIAS.read_text())
