@@ -922,6 +922,11 @@ struct OCRView: View {
                                 }
                             }
                             segmentationCostLine
+                            // W49.proc-kind-split-mac: the free split's readers, in the free run's own box.
+                            if pageKindsActive {
+                                PageKindBatchControl(store: pageKinds, plan: pageReaderPlan,
+                                                     runDefault: pageKindRunDefault, runModel: effectiveModel)
+                            }
                         }
                         .padding(4)
                     }

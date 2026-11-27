@@ -188,6 +188,34 @@ final class MoneyJourneyUITests: XCTestCase {
         return batch
     }
 
+    /// W49.proc-kind-split-mac: on Apple Vision, handwritten pages go to a model downloaded on this Mac, and no page
+    /// reaches a paid provider (the recorder fails on any other host).
+    func testVisionSendsHandwrittenPagesToTheDownloadedReader() throws {
+        try preparePhotos(count: 2)
+        launch(extra: ["-APUITestScratchMacHandwriting", "-ocrPageKindRouting", "YES"], vision: true)
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        let toggle = settings.descendants(matching: .any)["ap.settings.pageKindRouting"].firstMatch
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the switch is offered on Apple Vision")
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 5))
+
+        let name = "Qwen3-VL 8B, 4-bit (this Mac)"
+        let row = element("ap.ocr.pageKind")
+        XCTAssertTrue(row.waitForExistence(timeout: 15), app.debugDescription)
+        XCTAssertTrue(row.title.contains("→ \(name)"), row.title)
+        let readers = element("ap.ocr.pageKindBatch")
+        XCTAssertTrue(readers.exists)
+        revealInCostPanel(readers)
+        XCTAssertTrue(text(containing: "2 by \(name)").exists, "the caption counts the pages it reads")
+        shot("kind-split-mac-file-list")
+        start()
+        waitForDone(count: 2)
+        let requests = try requestRecords()
+        XCTAssertEqual(requests.map(\.route), ["mac-local", "mac-local"])
+        XCTAssertEqual(requests.map(\.model), Array(repeating: "mlx-community/Qwen3-VL-8B-Instruct-4bit", count: 2))
+    }
+
     func testStoredBatchFlagOnOpenAIUsesStandardEstimateAndPageReaders() throws {
         let routing = ["-APUITestScratchPageKinds", "-ocrPageKindRouting", "YES"]
         var standardTotals: [String] = []
@@ -314,7 +342,7 @@ final class MoneyJourneyUITests: XCTestCase {
     }
 
     private func launch(provider: String = "OpenAI", batch: Bool = false, tagging: String = "none",
-                        extra: [String] = [], staged: Bool = false) {
+                        extra: [String] = [], staged: Bool = false, vision: Bool = false) {
         let out = root.appendingPathComponent("out").path
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode", "-APUITestMoneyJourney", "-APUITestOutputDirectory", out, "-outputDirectory", out,
@@ -324,7 +352,7 @@ final class MoneyJourneyUITests: XCTestCase {
             "-rotationModeRaw", "off", "-reviewRotation", "NO", "-reviewDocumentSegmentation", "NO",
             "-outputImageFile", "NO", "-mergeDocuments", "NO", "-sendPreviousImage", "NO",
             "-useInstitutionalComputeImport", "NO", "-skipAlreadyProcessed", "NO", "-preOCRedInput", "NO",
-            "-useAppleVision", "NO", "-useLocalAgent", "NO", "-useGateway", "NO",
+            "-useAppleVision", vision ? "YES" : "NO", "-useLocalAgent", "NO", "-useGateway", "NO",
             "-imageResolutionPercent", "100", "-standardImageSizeMB", "3",
             "-liveProcessingMode", "stageForLater"
         ] + (staged ? [] : ["-APUITestInputImages", root.appendingPathComponent("in").path]) + extra)
