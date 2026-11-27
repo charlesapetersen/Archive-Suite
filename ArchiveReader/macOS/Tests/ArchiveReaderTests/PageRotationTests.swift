@@ -10,6 +10,7 @@ import XCTest
 import PDFKit
 import AppKit
 import CryptoKit
+import ArchiveCore
 @testable import ArchiveReader
 
 @MainActor
@@ -449,6 +450,14 @@ final class PageRotationTests: XCTestCase {
             drawText("Sample OCR text, page two of the pair.", into: ctx, at: CGPoint(x: 24, y: 470), fontSize: 16)
             ctx.endPDFPage()
         }
+        // The text page carries no SPEC header, so an empty XMP entry per page says the file is pairs
+        // (W40.reader-plain-pdf: without one it would be an ordinary PDF of single pages).
+        let packet = Data("""
+        <x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\
+        </rdf:RDF></x:xmpmeta>
+        """.utf8)
+        ctx.addDocumentMetadata(try XCTUnwrap(PDFHeaderCarrier.adding(pages: Array(repeating: nil, count: pairs * 2),
+                                                                       to: packet)) as CFData)
         ctx.closePDF()
         let url = dir.appendingPathComponent("scan-\(UUID().uuidString).pdf")
         try (data as Data).write(to: url, options: .atomic)

@@ -156,23 +156,31 @@ public struct ExtractedContent: Sendable {
     }
 }
 
-/// W42.int-s5-searchable — what one physical page of an output is. Without a carrier list (`PDFHeaderCarrier`) a file
-/// is pairs: even pages images, odd pages text. With one that has an entry for every page, a page with a header is a
-/// searchable page, and the pages without one pair up in order, image then text (an image left at the end, or before a
-/// searchable page, has no text page). A list whose count is not the page count is ignored: the file was edited.
+/// W42.int-s5-searchable — what one physical page of an output is. With a carrier list (`PDFHeaderCarrier`) that has an
+/// entry for every page, a page with a header is a searchable page, and the pages without one pair up in order, image
+/// then text (an image left at the end, or before a searchable page, has no text page). Without a list that fits (none,
+/// or the file was edited), a file is pairs (even pages images, odd pages text) only when one of its odd pages reads as
+/// a SPEC text page, header and all (W40.reader-plain-pdf); otherwise it is an ordinary PDF, not made by the Processor,
+/// and every page is its own page with no text page beside it.
 public enum PDFPageRole: String, Sendable, Equatable {
     case image, text, searchable
 
     public static func roles(of document: PDFDocument) -> [PDFPageRole] {
-        guard let carried = document.documentRef.flatMap(PDFHeaderCarrier.pages(of:)) else {
-            return pairs(document.pageCount)
+        if let carried = document.documentRef.flatMap(PDFHeaderCarrier.pages(of:)), carried.count == document.pageCount {
+            return roles(carried: carried, pageCount: document.pageCount)
         }
-        return roles(carried: carried, pageCount: document.pageCount)
+        return uncarried(document)
     }
 
-    public static func roles(of document: CGPDFDocument) -> [PDFPageRole] {
-        guard let carried = PDFHeaderCarrier.pages(of: document) else { return pairs(document.numberOfPages) }
-        return roles(carried: carried, pageCount: document.numberOfPages)
+    /// A file with no list that fits: pairs when an odd page has a SPEC header, else every page alone.
+    static func uncarried(_ document: PDFDocument) -> [PDFPageRole] {
+        let count = document.pageCount
+        let paired = stride(from: 1, to: count, by: 2).contains { index in
+            // The sentinel opens every header; a page without it is skipped before the line-order recovery.
+            guard let page = document.page(at: index), page.string?.contains("Extracted text.") == true else { return false }
+            return PDFHeaderParser.parse(page).header != nil
+        }
+        return paired ? pairs(count) : Array(repeating: .searchable, count: max(0, count))
     }
 
     public static func roles(carried: [String?], pageCount: Int) -> [PDFPageRole] {
@@ -244,8 +252,9 @@ public enum PDFHeaderParser {
 
     public static func extract(_ url: URL) -> ExtractedContent? {
         guard let doc = PDFDocument(url: url), !doc.isLocked else { return nil }
-        let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
-        let roles = carried.map { PDFPageRole.roles(carried: $0, pageCount: doc.pageCount) } ?? PDFPageRole.pairs(doc.pageCount)
+        // A list that does not fit is not read (`PDFPageRole`), so no page takes its header from it.
+        let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:)).flatMap { $0.count == doc.pageCount ? $0 : nil }
+        let roles = PDFPageRole.roles(of: doc)
         var texts: [String] = []
         var textPages: [PDFTextPageMetadata] = []
         var firstTextPage: ParsedPDFTextPage?
@@ -279,8 +288,9 @@ public enum PDFHeaderParser {
     /// The header of every text page and searchable page of `doc`, in page order (`PDFPageRole`), without the bodies:
     /// for a caller that summarizes Kind or reader across a file.
     public static func textPageHeaders(_ doc: PDFDocument) -> [PDFPageHeader?] {
-        let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
-        let roles = carried.map { PDFPageRole.roles(carried: $0, pageCount: doc.pageCount) } ?? PDFPageRole.pairs(doc.pageCount)
+        // A list that does not fit is not read (`PDFPageRole`), so no page takes its header from it.
+        let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:)).flatMap { $0.count == doc.pageCount ? $0 : nil }
+        let roles = PDFPageRole.roles(of: doc)
         return roles.indices.compactMap { i -> PDFPageHeader?? in
             switch roles[i] {
             case .image: return nil

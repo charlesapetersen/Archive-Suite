@@ -303,10 +303,12 @@ keeps its text page (owner, 2026-11-17). Readers need nothing new; a file may mi
   header block exactly as a text page would carry it (the `Extracted text.` sentinel to its last field, LF-separated,
   no blank separator, no body), or an **empty** entry for a page of an image-plus-text pair, whose header stays on
   its own text page. Characters XML 1.0 cannot hold are dropped. Core `PDFHeaderCarrier` writes and reads it.
-- **Page roles** (Core `PDFPageRole.roles(of:)`): with no list, a file is pairs as before (even pages images, odd pages
-  text). With a list whose count is the page count, a page with a header is `searchable`, and the pages without one
-  pair up in order, image then text; an image left before a searchable page or at the end has no text page. A list
-  whose count differs (the file was edited) is ignored and the file is read as pairs.
+- **Page roles** (Core `PDFPageRole.roles(of:)`): with a list whose count is the page count, a page with a header is
+  `searchable`, and the pages without one pair up in order, image then text; an image left before a searchable page or
+  at the end has no text page. With no list, or one whose count differs (the file was edited, and the list is
+  ignored), a file is pairs (even pages images, odd pages text) only when an odd page parses as a text page with a
+  header; otherwise it is an ordinary PDF not made by the Processor, and every page is `searchable` with no header:
+  its own page, its text its own layer, no text page beside it (W40.reader-plain-pdf).
 - **Reading it.** `PDFHeaderParser.extract` parses each carried header with the same grammar as a text page
   (`parse(_ text:)`); the page's own text (its layer) is the body. `textPages` then holds every text page *and* every
   searchable page (`pageIndex` is the physical page, so no longer only odd); `pageRoles` says which. `strippedBody`

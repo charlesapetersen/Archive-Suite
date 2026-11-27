@@ -127,6 +127,24 @@ final class DocumentViewerPagePairTests: XCTestCase {
         XCTAssertTrue(model.embeddedText?.contains("no OCR") == true)
     }
 
+    /// W40.reader-plain-pdf — a PDF the Processor did not make (a scanned dissertation, every page real) has no XMP
+    /// list and no header on page 2: each page is its own page, Next steps one page, and no page is an OCR text pane.
+    func testAPlainPDFShowsEveryPageAsItsOwnPage() throws {
+        let url = try scratchDir().appendingPathComponent("dissertation.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: (1...4).map { "Dissertation page \($0)" }, pairs: false, to: url))
+        let model = load([url])
+        XCTAssertEqual(model.current?.pageCount, 4, "precondition")
+        XCTAssertEqual(model.pairCount, 4)
+        for page in 1...4 {
+            XCTAssertEqual(model.pair, page - 1)
+            XCTAssertTrue(model.imagePage?.string?.contains("Dissertation page \(page)") == true, "page \(page) on the left")
+            XCTAssertNil(model.textPage, "page \(page + 1) is not shown as page \(page)'s OCR text")
+            XCTAssertTrue(model.embeddedText?.contains("Dissertation page \(page)") == true, "its own text layer")
+            model.next()
+        }
+        XCTAssertEqual(model.pair, 3, "stops at the last page")
+    }
+
     func testPositionLabelNamesThePageOnlyWhenThereIsMoreThanOne() throws {
         let multi = try writeInterleaved(scans: 2, named: "multi.pdf")
         let plain = try writeInterleaved(scans: 1, named: "plain.pdf")

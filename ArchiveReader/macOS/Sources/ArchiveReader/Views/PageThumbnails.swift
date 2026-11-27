@@ -61,7 +61,7 @@ enum PageThumbnails {
     nonisolated static func pageRoles(path: String) async -> [PDFPageRole]? {
         guard PreviewImagePrefetcher.FileStamp.of(path)?.isDataless != true else { return nil }
         return CorpusWalker.withDatalessMaterializationDisabled {
-            CGPDFDocument(URL(fileURLWithPath: path) as CFURL).map { PDFPageRole.roles(of: $0) }
+            PDFDocument(url: URL(fileURLWithPath: path)).map { PDFPageRole.roles(of: $0) }
         }
     }
 

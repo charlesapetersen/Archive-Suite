@@ -13,13 +13,18 @@ enum TestPDFBuilder {
     /// A multi-page PDF whose page *i* contains `pages[i]` as drawn, selectable text.
     /// Interleave image-ish and text-ish content by ordering the strings (this suite doesn't need real
     /// raster pages — the page-pair model is page-INDEX arithmetic, and text pages make assertions exact).
-    static func textPDF(pages: [String]) -> PDFDocument {
-        PDFDocument(data: textPDFData(pages: pages))!
+    /// Its pages pair up as image, text, … : an XMP list with an empty entry per page says so, since a file with no
+    /// list and no SPEC header on an odd page is an ordinary PDF of single pages (W40.reader-plain-pdf). `pairs: false`
+    /// writes no list: that ordinary PDF.
+    static func textPDF(pages: [String], pairs: Bool = true) -> PDFDocument {
+        PDFDocument(data: textPDFData(pages: pages, pairs: pairs))!
     }
 
     /// The PDF's bytes; `carried` (one entry per page) is written as the searchable form's XMP list
-    /// (`PDFHeaderCarrier`, W42.int-s5-searchable). Quartz keeps a document's metadata outside PDF/A.
-    static func textPDFData(pages: [String], carried: [String?]? = nil) -> Data {
+    /// (`PDFHeaderCarrier`, W42.int-s5-searchable). Quartz keeps a document's metadata outside PDF/A. With no `carried`,
+    /// `pairs` writes an empty entry per page (pairs) and `pairs: false` no list at all.
+    static func textPDFData(pages: [String], carried: [String?]? = nil, pairs: Bool = true) -> Data {
+        let carried = carried ?? (pairs ? Array(repeating: nil, count: pages.count) : nil)
         let pageRect = CGRect(x: 0, y: 0, width: 400, height: 400)
         let data = NSMutableData()
         let consumer = CGDataConsumer(data: data as CFMutableData)!
@@ -52,9 +57,10 @@ enum TestPDFBuilder {
         (try? textPDFData(pages: pages, carried: carried).write(to: url)) != nil
     }
 
-    /// The same PDF, written to `url` (a scratch path) so a viewer model can load it from disk.
+    /// The same PDF, written to `url` (a scratch path) so a viewer model can load it from disk: its bytes as drawn,
+    /// so the XMP stays.
     @discardableResult
-    static func write(pages: [String], to url: URL) -> Bool {
-        textPDF(pages: pages).write(to: url)
+    static func write(pages: [String], pairs: Bool = true, to url: URL) -> Bool {
+        (try? textPDFData(pages: pages, pairs: pairs).write(to: url)) != nil
     }
 }
