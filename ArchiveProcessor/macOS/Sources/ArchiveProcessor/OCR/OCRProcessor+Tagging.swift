@@ -665,9 +665,6 @@ extension OCRProcessor {
                 appliedGeneratedTags[sourceURL] = tags
                 enclosureDateReviews[sourceURL] = review
                 if let outputPDF = outputURLMap[sourceURL] {
-                    await writeTaggedHeader(tags, evidence: dating?.headerEvidence(giving: tags), to: outputPDF,
-                                            source: sourceURL, runConfig: runConfig)
-                    guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
                     tagOutput(tags, at: outputPDF, source: sourceURL, stampUnread: stampUnread)
                 }
@@ -1033,9 +1030,6 @@ extension OCRProcessor {
                 enclosureDateReviews[sourceURL] = .init(inheritance: nil, decision: dating,
                                                         manual: (data.sentWith, data.sentWithUncertain, true))
                 if let outputPDF = outputURLMap[sourceURL] {
-                    await writeTaggedHeader(gtags, evidence: dating?.headerEvidence(giving: gtags), to: outputPDF,
-                                            source: sourceURL, runConfig: runConfig)
-                    guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     tagOutput(gtags, at: outputPDF, source: sourceURL, stampUnread: outputSettings.stampUnread)
                 }
@@ -1542,22 +1536,18 @@ extension OCRProcessor {
         let coverDatedByFolder = coverSource.flatMap { enclosureDateReviews[$0]?.decision?.evidenceClass } == .folder
         let dating = inheritance?.resolve(cover: cover, coverDatedByFolder: coverDatedByFolder)
         dating?.apply(to: &tags)
-        // Name the date given by the route before a phone month overrides it.
-        var headerEvidence = dating?.headerEvidence(giving: tags)
         var phoneMonth: String?
         var phoneYear: String?
         if let firstURL = segment.pdfURLs.first,
            let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
             phoneYear = phoneYearTag(at: fileIdx)
-            if let phoneYear { tags.year = phoneYear; tags.dateUncertain = false; headerEvidence = nil }
+            if let phoneYear { tags.year = phoneYear; tags.dateUncertain = false }
             phoneMonth = phoneMonthTag(at: fileIdx)
             if let phoneMonth, tags.year?.hasSuffix("s") != true { tags.month = phoneMonth }
         }
         let review = phoneYear == nil && !tags.ocrFailed ? inheritance.map {
             EnclosureDateReview(inheritance: $0, decision: dating, phoneMonth: phoneMonth)
         } : nil
-        // W47.item-fields-build: the filled item fields, for the outputs' header lines.
-        let headerFields = itemFields?.headerFields ?? PDFItemFields()
         // W37: the tagger never proposes a sent-with date; only a relation does.
         tags.sentWith = nil
         tags.sentWithUncertain = false
@@ -1573,11 +1563,6 @@ extension OCRProcessor {
             appliedGeneratedTags[sourceURL] = tags
             enclosureDateReviews[sourceURL] = review
             if let outputPDF = outputURLMap[sourceURL] {
-                // A tagging redo may turn a previously dated page into a container label.
-                let headerTags = segment.isBox || segment.isFolder ? GeneratedTags() : tags
-                await writeTaggedHeader(headerTags, evidence: headerEvidence, itemFields: headerFields,
-                                        to: outputPDF, source: sourceURL, runConfig: runConfig)
-                guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return tags }
                 tagOutput(tags, at: outputPDF, source: sourceURL,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             }
@@ -1594,49 +1579,6 @@ extension OCRProcessor {
         }
         return tags
     }
-    /// Add the document's resolved dates, evidence and item fields to each generated page before tagging and merging.
-    private func writeTaggedHeader(_ tags: GeneratedTags, evidence: String?, itemFields: PDFItemFields = PDFItemFields(),
-                                   to outputPDF: URL, source: URL,
-                                   runConfig: SessionProcessingConfig?) async {
-        guard catalogueRun == nil, !reOCRSourceURLs.contains(source), !OutputFileSafety.isSameFile(outputPDF, source),
-              let result = jobs.first(where: { $0.sourceURL == source })?.result else { return }
-        let text = PDFGenerator.textPageBody(result)
-        let fields = PDFSourceDates(documentDate: EnclosureDates.ownDate(of: tags)?.display, sentWith: tags.sentWith?.display,
-                                    dateEvidence: evidence, itemFields: itemFields)
-        // For an undated pair with no item fields, check for stale fields without reading the whole PDF into memory.
-        if fields.isEmpty, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2,
-           PDFPageRole.roles(of: doc) == [.image, .text], let page = doc.page(at: 1),
-           let header = PDFHeaderParser.parse(page).header, header.documentDate == nil, header.sentWith == nil,
-           header.dateEvidence == nil, header.itemFields.isEmpty {
-            return
-        }
-        guard let data = try? Data(contentsOf: outputPDF) else { return }
-        let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
-        let outcome = await PDFGenerator.runWorker {
-            PDFGenerator().taggedHeaderRewrite(of: data, sourceName: source.lastPathComponent, fields: fields,
-                                               body: text, textColumns: columns)
-        }
-        guard !Task.isCancelled, outputURLMap[source] == outputPDF else { return }
-        switch outcome {
-        case .rewrite(let new):
-            guard (try? Data(contentsOf: outputPDF)) == data else {
-                os_log(.info, "Tagging header left out of %{public}@: the output changed during the rewrite",
-                       outputPDF.lastPathComponent)
-                return
-            }
-            do {
-                try OutputFileSafety.replaceGeneratedOutput(outputPDF, for: source, with: new)
-            } catch {
-                os_log(.error, "Tagging header not written to %{public}@: %{public}@",
-                       outputPDF.lastPathComponent, String(describing: error))
-            }
-        case .skipped(let why):
-            os_log(.info, "Tagging header left out of %{public}@: %{public}@", outputPDF.lastPathComponent, why)
-        case .unchanged:
-            break
-        }
-    }
-
     /// W40.fix-processor-review-classification-stale — bring one output's `Classification:` header line to the job's
     /// current class. Every page is rendered with the reader's proposal; the per-page review, the box/folder
     /// confirmation, the final review's edit sheet, Segment & Tag and the window stage change the class afterwards.
@@ -1689,9 +1631,9 @@ extension OCRProcessor {
     }
 
     /// What one job's header rewrite needs, taken on the main actor; nil when it has no output of its own text.
-    private func classificationHeaderWork(forJobAt index: Int, includePlaceholders: Bool = false) -> ClassificationHeaderWork? {
+    private func classificationHeaderWork(forJobAt index: Int) -> ClassificationHeaderWork? {
         guard jobs.indices.contains(index), jobs[index].status != .removed,
-              let result = jobs[index].result, includePlaceholders || result.text?.isEmpty == false else { return nil }
+              let result = jobs[index].result, result.text?.isEmpty == false else { return nil }
         let source = jobs[index].sourceURL
         // An output not written yet is written with the job's class (W49.proc-unified-pipeline-2): nothing to rewrite.
         guard let outputPDF = outputURLMap[source], !reOCRSourceURLs.contains(source),
@@ -1815,7 +1757,6 @@ extension OCRProcessor {
                     }
                 }
 
-                let sentWithChanged = tags.sentWith != appliedGeneratedTags[source]?.sentWith
                 updated = Self.replacingSentWithTokens(in: updated, with: Self.sentWithTokens(for: tags))
                 if updated != current {
                     guard tagOutput(updated, at: outputURL, source: source,
@@ -1836,25 +1777,6 @@ extension OCRProcessor {
                 if let dateChange {
                     review?.decision = dateChange.after
                     if review?.pendingSidecarDecision == nil { review?.pendingSidecarDecision = dateChange.before }
-                }
-                if catalogueRunLease == nil, dateChange != nil || sentWithChanged,
-                   let work = classificationHeaderWork(forJobAt: j, includePlaceholders: true),
-                   !OutputFileSafety.isSameFile(work.outputPDF, work.source),
-                   let data = try? Data(contentsOf: work.outputPDF) {
-                    let ownDating = dateChange.map {
-                        (date: EnclosureDates.ownDate(of: tags)?.display,
-                         evidence: $0.after.headerEvidence(giving: $0.after.dateTags))
-                    }
-                    let outcome = PDFGenerator().reviewDateHeaderRewrite(
-                        of: data, sourceName: source.lastPathComponent, sentWith: tags.sentWith?.display,
-                        ownDating: ownDating, body: work.text,
-                        textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
-                    if (try? Data(contentsOf: work.outputPDF)) == data {
-                        _ = Self.applyReviewHeaderRewrite(outcome, to: work, original: data, field: "Date header")
-                    } else {
-                        os_log(.info, "Date header left as it was in %{public}@: the output changed during the rewrite",
-                               work.outputPDF.lastPathComponent)
-                    }
                 }
                 let sidecar = outputURL.deletingPathExtension().appendingPathExtension("json")
                 let pendingSidecar = review?.pendingSidecarDecision.flatMap { before in

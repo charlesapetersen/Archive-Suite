@@ -246,13 +246,12 @@ enum TextLayerTestDriver {
         let gen = PDFGenerator()
         for url in [pairURL, searchableURL] {
             guard let data = try? Data(contentsOf: url),
-                  case .rewrite = gen.taggedHeaderRewrite(of: data, sourceName: image.lastPathComponent,
-                                                          fields: PDFSourceDates(documentDate: "1958"),
-                                                          body: reading, textColumns: 1) else {
-                check("4 \(url.lastPathComponent) keeps its turn during the verified date rewrite", false)
+                  case .rewrite = gen.classificationRewrite(of: data, sourceName: image.lastPathComponent,
+                                                            classification: "Box", body: reading, textColumns: 1) else {
+                check("4 \(url.lastPathComponent) keeps its turn during the verified header rewrite", false)
                 continue
             }
-            check("4 \(url.lastPathComponent) keeps its turn during the verified date rewrite", true)
+            check("4 \(url.lastPathComponent) keeps its turn during the verified header rewrite", true)
         }
         do {
             let newReading = OCRResult(text: "A better reading.", classification: nil,
@@ -729,26 +728,27 @@ enum TextLayerTestDriver {
                                                              outputURL: dir.appendingPathComponent("refused.pdf"))) == nil
         check("7 merge: a lone image before a searchable page is refused", refused)
 
-        // Process Files adds the source dates and evidence to the XMP while keeping the page.
-        let dates = PDFSourceDates(documentDate: "1957", sentWith: "Mar 12, 1958", dateEvidence: "image; page 1")
+        // A review's class change rewrites the searchable form's XMP header while keeping the page. (Dates and item
+        // fields are catalogue facts: W49.storage-drop-dead-copies retired the step that added them here.)
         if let data = try? Data(contentsOf: typed),
-           case .rewrite(let new) = PDFGenerator().taggedHeaderRewrite(of: data, sourceName: name, fields: dates, body: reading,
-                                                                     textColumns: 1) {
-            let out = dir.appendingPathComponent("searchable-dated.pdf")
+           case .rewrite(let new) = PDFGenerator().classificationRewrite(of: data, sourceName: name, classification: "Box",
+                                                                       body: reading, textColumns: 1) {
+            let out = dir.appendingPathComponent("searchable-reclassified.pdf")
             try? new.write(to: out)
             let content = PDFHeaderParser.extract(out)
             let header = content?.textPages.first?.header
-            check("7 source dates and evidence: read back from the XMP", header?.dateEvidence == dates.dateEvidence
-                  && header?.documentDate == dates.documentDate && header?.sentWith == dates.sentWith
-                  && header?.kind == .typewritten && header?.originalFilename == name, "\(String(describing: header))")
-            check("7 date evidence: the page is kept", PDFDocument(url: out)?.page(at: 0)?.string == PDFDocument(url: typed)?.page(at: 0)?.string)
-            archivalChecks("dated searchable output", out)
-            check("7 date evidence: still compressed, not redrawn", !tools || (compressed(out)
+            check("7 header rewrite: the class reads back from the XMP", header?.classification == "Box"
+                  && header?.documentDate == nil && header?.kind == .typewritten && header?.originalFilename == name,
+                  "\(String(describing: header))")
+            check("7 header rewrite: the page is kept", PDFDocument(url: out)?.page(at: 0)?.string == PDFDocument(url: typed)?.page(at: 0)?.string)
+            archivalChecks("reclassified searchable output", out)
+            check("7 header rewrite: still compressed, not redrawn", !tools || (compressed(out)
                   && abs(size(out) - size(typed)) < 4_096), "\(size(out)) bytes against \(size(typed))")
-            if case .unchanged = PDFGenerator().taggedHeaderRewrite(of: new, sourceName: name, fields: dates, body: reading, textColumns: 1) {
-                check("7 date evidence: the same line again is no change", true)
-            } else { check("7 date evidence: the same line again is no change", false) }
-        } else { check("7 date evidence: rewritten", false) }
+            if case .unchanged = PDFGenerator().classificationRewrite(of: new, sourceName: name, classification: "Box",
+                                                                     body: reading, textColumns: 1) {
+                check("7 header rewrite: the same class again is no change", true)
+            } else { check("7 header rewrite: the same class again is no change", false) }
+        } else { check("7 header rewrite: rewritten", false) }
 
         // This fixture exercises the actual compressed form when the bundled tools are available.
         if let data = try? Data(contentsOf: typed), case .success(let pages) = ReOCRPairs.validate(data),

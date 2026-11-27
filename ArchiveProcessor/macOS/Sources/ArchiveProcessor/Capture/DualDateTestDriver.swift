@@ -211,10 +211,19 @@ enum DualDateTestDriver {
               tagsOf(out("E1.jpg")).contains("1957") && sentWithTokens(out("E1.jpg")) == ["Sent With 1958-03"])
         check("enclosure continuation page: the same tags as its first page, nothing extra",
               tagsOf(out("E1c.jpg")) == tagsOf(out("E1.jpg")))
-        check("both enclosure pages carry the same dates, including the continuation's placeholder text page",
+        // W49.storage-drop-dead-copies: the dates are catalogue facts (`rememberCatalogueFields` builds them from the
+        // tags the processor holds for each page); page 2 carries no date lines.
+        func filedDates(_ n: String) -> (date: String?, sentWith: String?) {
+            let tags = processor.appliedGeneratedTags[u(n)]
+            return (tags.flatMap { EnclosureDates.ownDate(of: $0)?.display }, tags?.sentWith?.display)
+        }
+        func noDateLines(_ n: String) -> Bool {
+            guard let h = content(n)?.textPages.first?.header else { return false }
+            return h.documentDate == nil && h.sentWith == nil && h.dateEvidence == nil
+        }
+        check("both enclosure pages file the same dates, and neither page 2 (one a placeholder) carries a date line",
               ["E1.jpg", "E1c.jpg"].allSatisfy {
-                  let h = content($0)?.textPages.first?.header
-                  return h?.documentDate == "1957" && h?.sentWith == "Mar 1958" && h?.dateEvidence == nil
+                  filedDates($0) == ("1957", "Mar 1958") && noDateLines($0)
               } && content("E1c.jpg")?.strippedBody == "No text returned by model.")
         check("second enclosure: same letter date",
               tagsOf(out("E2.jpg")).contains("1956") && sentWithTokens(out("E2.jpg")) == ["Sent With 1958-03"])
@@ -240,10 +249,7 @@ enum DualDateTestDriver {
         check("MED-3: a page that stopped being an enclosure loses its Sent With tokens",
               sentWithTokens(out("E1.jpg")).isEmpty && sentWithTokens(out("E1c.jpg")).isEmpty)
         check("review clears Sent with from both pages and preserves their recorded own date",
-              ["E1.jpg", "E1c.jpg"].allSatisfy {
-                  let h = content($0)?.textPages.first?.header
-                  return h?.documentDate == "1957" && h?.sentWith == nil
-              })
+              ["E1.jpg", "E1c.jpg"].allSatisfy { filedDates($0) == ("1957", nil) && noDateLines($0) })
         check("MED-3: ...and its sidecar loses sent_with + enclosure_of",
               json("E1.jpg")["sent_with"] == nil && json("E1.jpg")["enclosure_of"] == nil)
         check("MED-3: an enclosure whose cover pages are unchanged keeps its letter date",
@@ -432,12 +438,14 @@ enum DualDateTestDriver {
         check("GeneratedTags round-trips sentWith + sentWithUncertain (Live retained manifest)",
               back?.sentWith == coded.sentWith && back?.sentWithUncertain == true)
 
-        // --- 7. PDF header lines strip via the shared parser. ---
+        // --- 7. Historical header lines (an older file's, kept by Improve OCR) strip via the shared parser. ---
+        // W49.storage-drop-dead-copies: new output carries its dates in the catalogue record, not these lines.
         let pdfURL = tmp.appendingPathComponent("header.pdf")
-        let sourceDates = EnclosureDates.pdfSourceDates(for: enc.with(year: "1957", sentWith: ArchiveDate(year: 1958, month: 3, day: 12)))
+        let dated = enc.with(year: "1957", sentWith: ArchiveDate(year: 1958, month: 3, day: 12))
+        let sourceDates = PDFSourceDates(documentDate: EnclosureDates.ownDate(of: dated)?.display,
+                                         sentWith: dated.sentWith?.display)
         check("source-date lines use Core's display form",
-              sourceDates?.headerLines == ["Document date: 1957", "Sent with: Mar 12, 1958"])
-        check("no dates → no lines", EnclosureDates.pdfSourceDates(for: GeneratedTags(subjectTags: ["x"])) == nil)
+              sourceDates.headerLines == ["Document date: 1957", "Sent with: Mar 12, 1958"])
         _ = try? PDFGenerator().generate(imageURL: tmp.appendingPathComponent("missing.jpg"),
                                          result: OCRResult(text: "Report on the harbour works.", classification: .documentStart,
                                                            errorMessage: nil, errorCode: nil),

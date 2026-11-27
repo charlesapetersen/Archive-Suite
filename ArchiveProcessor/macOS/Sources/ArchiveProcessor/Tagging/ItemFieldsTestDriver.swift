@@ -245,37 +245,41 @@ enum ItemFieldsTestDriver {
                                       byline: "Mary Jones; John Smith",
                                       publication: "The Sun", publicationDate: "1967-03-02"), "\(fields)")
         let gen = PDFGenerator()
+        // W49.storage-drop-dead-copies: no step adds item-field lines to a generated header any more (the catalogue
+        // record holds the fields). An older file can still carry them, and a class rewrite must keep them.
         let headerFields = PDFSourceDates(documentDate: "1967", dateEvidence: "image; page 1", itemFields: fields)
-        guard case .rewrite(let added) = gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg", fields: headerFields,
-                                                                body: text, textColumns: 1) else {
-            check("5 the rewrite adds the lines", false); return
-        }
+        let olderURL = tmp.appendingPathComponent("older.pdf")
+        _ = try? gen.generate(imageURL: image, result: result, model: model, outputURL: olderURL,
+                              originalFileName: "scan_001.jpg", sourceDates: headerFields, pageKind: .printed)
+        guard let added = try? Data(contentsOf: olderURL) else { check("5 an older pair with the lines", false); return }
         let back = PDFDocument(data: added)?.page(at: 1).map { PDFHeaderParser.parse($0) }
         var expected = oldHeader
         expected.dateEvidence = "image; page 1"
         expected.itemFields = fields
-        check("5 the rewrite adds them after the evidence line; every other line and the body read back unchanged",
+        check("5 an older file's lines parse after the evidence line; every other line and the body as generated",
               back?.header == expected && PDFGenerator.squashed(back?.body ?? "") == PDFGenerator.squashed(text)
               && back?.header?.documentDate == "1967", "\(String(describing: back))")
-        check("5 the same lines again: unchanged",
-              gen.taggedHeaderRewrite(of: added, sourceName: "scan_001.jpg", fields: headerFields, body: text,
-                                      textColumns: 1) == .unchanged)
-        if case .rewrite(let removed) = gen.taggedHeaderRewrite(of: added, sourceName: "scan_001.jpg", fields: PDFSourceDates(documentDate: "1967"),
-                                                             body: text, textColumns: 1) {
-            check("5 none removes stale lines", PDFDocument(data: removed)?.page(at: 1)
-                    .map { PDFHeaderParser.parse($0) }?.header == oldHeader)
-        } else { check("5 none removes stale lines", false) }
+        if case .rewrite(let boxed) = gen.classificationRewrite(of: added, sourceName: "scan_001.jpg", classification: "Box",
+                                                                body: text, textColumns: 1) {
+            var want = expected
+            want.classification = "Box"
+            check("5 a class rewrite keeps the older lines",
+                  PDFDocument(data: boxed)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header == want)
+        } else { check("5 a class rewrite keeps the older lines", false) }
         let long = PDFItemFields(documentKind: "report", publication: PDFItemFields.lineValue(String(repeating: "Long ", count: 40)))
-        if case .rewrite(let l) = gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg",
-                                                         fields: PDFSourceDates(documentDate: "1967", itemFields: long), body: text,
-                                                          textColumns: 2) {
+        let longURL = tmp.appendingPathComponent("long.pdf")
+        _ = try? gen.generate(imageURL: image, result: result, model: model, outputURL: longURL, originalFileName: "scan_001.jpg",
+                              textColumns: 2, sourceDates: PDFSourceDates(documentDate: "1967", itemFields: long), pageKind: .printed)
+        if let longData = try? Data(contentsOf: longURL),
+           case .rewrite(let l) = gen.classificationRewrite(of: longData, sourceName: "scan_001.jpg", classification: "Box",
+                                                            body: text, textColumns: 2) {
             let lp = PDFDocument(data: l)?.page(at: 1).map { PDFHeaderParser.parse($0) }
-            check("5 a long value is fitted to one line and reads back whole (two text columns)",
+            check("5 an older long value is kept fitted to one line and reads back whole (two text columns)",
                   lp?.header?.itemFields == long && PDFGenerator.squashed(lp?.body ?? "") == PDFGenerator.squashed(text),
                   "\(String(describing: lp?.header?.itemFields))")
-        } else { check("5 a long value is fitted to one line and reads back whole (two text columns)", false) }
-        if case .skipped = gen.taggedHeaderRewrite(of: original, sourceName: "scan_002.jpg", fields: headerFields,
-                                                   body: text, textColumns: 1) {
+        } else { check("5 an older long value is kept fitted to one line and reads back whole (two text columns)", false) }
+        if case .skipped = gen.classificationRewrite(of: original, sourceName: "scan_002.jpg", classification: "Box",
+                                                     body: text, textColumns: 1) {
             check("5 a header that names another file is left alone", true)
         } else { check("5 a header that names another file is left alone", false) }
 
@@ -286,15 +290,15 @@ enum ItemFieldsTestDriver {
         let nbsp = tmp.appendingPathComponent("nbsp.pdf")
         _ = try? PDFGenerator().generate(imageURL: image, result: result, model: model, outputURL: nbsp,
                                          originalFileName: nbspName,
-                                         sourceDates: PDFSourceDates(documentDate: "1918"), pageKind: .printed)
+                                         sourceDates: PDFSourceDates(documentDate: "1918", dateEvidence: "image; page 1",
+                                                                     itemFields: fields), pageKind: .printed)
         if let data = try? Data(contentsOf: nbsp),
-           case .rewrite(let dated) = gen.taggedHeaderRewrite(of: data, sourceName: nbspName,
-                                                            fields: PDFSourceDates(documentDate: "1918", dateEvidence: "image; page 1", itemFields: fields),
-                                                            body: text, textColumns: 1) {
+           case .rewrite(let dated) = gen.classificationRewrite(of: data, sourceName: nbspName, classification: "Box",
+                                                                body: text, textColumns: 1) {
             let bytes = String(decoding: dated, as: UTF8.self)
             let back = PDFDocument(data: dated)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header
-            check("5 a U+00A0 name: rewritten with both kinds of line, as PDF/A, with no unwritten object",
-                  back?.dateEvidence == "image; page 1" && back?.itemFields == fields
+            check("5 a U+00A0 name: rewritten keeping both kinds of line, as PDF/A, with no unwritten object",
+                  back?.classification == "Box" && back?.dateEvidence == "image; page 1" && back?.itemFields == fields
                   && bytes.contains("<pdfaid:part>2</pdfaid:part>") && !bytes.contains("0000000000 00000 n"),
                   "\(String(describing: back))")
             if let keep = ProcessInfo.processInfo.environment["ITEM_FIELDS_TEST_KEEP"] {
@@ -304,7 +308,7 @@ enum ItemFieldsTestDriver {
                 try? dated.write(to: dir.appendingPathComponent("nbsp-dated.pdf"))
                 try? Data(nbspName.utf8).write(to: dir.appendingPathComponent("nbsp-name.txt"))
             }
-        } else { check("5 a U+00A0 name: rewritten with both kinds of line, as PDF/A, with no unwritten object", false) }
+        } else { check("5 a U+00A0 name: rewritten keeping both kinds of line, as PDF/A, with no unwritten object", false) }
 
         // At render time (Live Capture's path): the lines after the source dates.
         let live = tmp.appendingPathComponent("live.pdf")
@@ -514,14 +518,13 @@ enum ItemFieldsTestDriver {
         }
         let ah = header("A"), a1 = PDFDocument(url: tmp.appendingPathComponent("gateway/A1.pdf"))?.page(at: 1)
             .flatMap { PDFHeaderParser.parse($0).header }
-        check("4 A: both pages' headers carry the filled fields, the title in title case",
-              ah?.itemFields == PDFItemFields(documentKind: "newspaper article", title: "Senate Acts on the Budget",
-                                              byline: "Mary Jones",
-                                              publication: "The Sun", publicationDate: "1967-03-02")
-              && a1?.itemFields == ah?.itemFields && ah?.originalFilename == "gateway-A0.jpg",
+        // W49.storage-drop-dead-copies: the fields are catalogue facts; no page 2 carries an item-field line.
+        check("4 A: neither page 2 carries an item-field or date line",
+              ah?.itemFields.isEmpty == true && a1?.itemFields.isEmpty == true && ah?.documentDate == nil
+              && a1?.documentDate == nil && ah?.originalFilename == "gateway-A0.jpg",
               "\(String(describing: ah)) \(String(describing: a1))")
-        check("4 L: the letter's header carries its kind and recipient place",
-              header("L")?.itemFields == PDFItemFields(documentKind: "letter", recipientPlace: "Boston, MA"))
+        check("4 L: the letter's page 2 carries no item-field line",
+              header("L") != nil && header("L")?.itemFields.isEmpty == true)
         let lf = json(gOut["L"])["item_fields"] as? [String: Any] ?? [:]
         check("4 L: the letter's recipient place filled", lf["kind"] as? String == "letter"
               && lf["recipient_place"] as? [String] == ["Boston, MA"] && lf["not_filled"] == nil, "\(lf)")
@@ -566,11 +569,8 @@ enum ItemFieldsTestDriver {
                                                             "publication_date": "lower"], "\(local)")
         let macHeader = PDFDocument(url: tmp.appendingPathComponent("mac/A0.pdf"))?.page(at: 1)
             .flatMap { PDFHeaderParser.parse($0).header }
-        check("4 Mac route: the PDF keeps confidence apart from the field values",
-              macHeader?.itemFields.documentKind == "report" && macHeader?.itemFields.byline == "Mary Jones"
-              && macHeader?.itemFields.publicationDate == "1967-03-02"
-              && macHeader?.itemFields.lowerConfidence == [.documentKind, .byline, .publicationDate],
-              "\(String(describing: macHeader))")
+        check("4 Mac route: page 2 carries no item-field line",
+              macHeader != nil && macHeader?.itemFields.isEmpty == true, "\(String(describing: macHeader))")
     }
 
     // MARK: 6. The Cost Estimate's figures

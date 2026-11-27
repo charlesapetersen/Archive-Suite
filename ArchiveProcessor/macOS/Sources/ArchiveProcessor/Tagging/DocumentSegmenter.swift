@@ -224,11 +224,4 @@ enum EnclosureDates {
             if tags.sentWith != nil && uncertain { tags.sentWithUncertain = true }
         }
     }
-
-    /// The source-date lines for a newly generated PDF's OCR-text header, from the tags known at
-    /// render time. `nil` when neither date is known.
-    static func pdfSourceDates(for tags: GeneratedTags) -> PDFSourceDates? {
-        let lines = PDFSourceDates(documentDate: ownDate(of: tags)?.display, sentWith: tags.sentWith?.display)
-        return lines.isEmpty ? nil : lines
-    }
 }

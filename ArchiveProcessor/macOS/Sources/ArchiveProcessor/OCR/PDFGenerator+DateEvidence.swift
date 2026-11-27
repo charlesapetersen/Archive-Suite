@@ -2,8 +2,9 @@ import Foundation
 import PDFKit
 import ArchiveCore
 
-/// Process Files renders each page before tagging. Add the source dates, dating evidence and item fields together
-/// once those values are known, keeping the image page and the rest of the text page.
+/// A review that changes a page's class after it was rendered rewrites the `Classification:` line, keeping the image page
+/// and the rest of the text page. Dates and item fields are catalogue facts (SPEC/catalogue-fields.md): no step adds them
+/// to a generated header after rendering (W49.storage-drop-dead-copies). Lines an older file already carries are kept.
 extension PDFGenerator {
     enum DateEvidenceRewrite: Equatable {
         /// The new file's bytes, verified to read back with every other header line and the body unchanged.
@@ -12,31 +13,6 @@ extension PDFGenerator {
         case unchanged
         /// The output could not be safely rewritten.
         case skipped(String)
-    }
-
-    /// Rebuild a generated pair's text page, or update a searchable page's XMP header. Absent fields clear old values.
-    /// Use the actual source filename since PDFKit can read a nonbreaking space back as a space.
-    func taggedHeaderRewrite(of pdf: Data, sourceName: String, fields: PDFSourceDates, body: String,
-                             textColumns: Int) -> DateEvidenceRewrite {
-        headerRewrite(of: pdf, sourceName: sourceName, body: body, textColumns: textColumns) {
-            $0.documentDate = fields.documentDate
-            $0.sentWith = fields.sentWith
-            $0.dateEvidence = fields.dateEvidence
-            $0.itemFields = fields.itemFields
-        }
-    }
-
-    /// A reclassification can change Sent with independently of the dating route's own date and evidence.
-    func reviewDateHeaderRewrite(of pdf: Data, sourceName: String, sentWith: String?,
-                                 ownDating: (date: String?, evidence: String?)?, body: String,
-                                 textColumns: Int) -> DateEvidenceRewrite {
-        headerRewrite(of: pdf, sourceName: sourceName, body: body, textColumns: textColumns) {
-            $0.sentWith = sentWith
-            if let ownDating {
-                $0.documentDate = ownDating.date
-                $0.dateEvidence = ownDating.evidence
-            }
-        }
     }
 
     /// W40.fix-processor-review-classification-stale — the bytes `pdf` should have so its text page's
