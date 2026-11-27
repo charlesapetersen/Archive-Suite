@@ -23,6 +23,9 @@ public struct ZoteroSource: Equatable, Sendable {
     public var container: [ContainerField: String] = [:]
     /// A link back to the document (Notes' `archivereader://` source link), sent as `URL`.
     public var link: String?
+    /// Why the PDF's catalogue record gave no facts (W49.storage-notes-zotero): the item carries only the file, its
+    /// container and link, and says so in `note`, rather than an earlier tag, header or correction.
+    public var catalogueUnavailable: String?
 
     public init(fileName: String, tags: DocumentTags? = nil, itemFields: PDFItemFields = PDFItemFields(),
                 sidecar: ZoteroSidecar? = nil, container: [ContainerField: String] = [:], link: String? = nil) {
@@ -193,6 +196,7 @@ public enum ZoteroExport {
         }
 
         if let link = source.link { item["URL"] = link }
+        if let reason = source.catalogueUnavailable { extra.append("Catalogue record unavailable: \(reason)") }
         extra.append("File: \(source.fileName)")
         item["note"] = extra.joined(separator: "\n")
         return item

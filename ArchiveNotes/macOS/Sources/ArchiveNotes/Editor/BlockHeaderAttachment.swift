@@ -484,12 +484,12 @@ final class BlockHeaderChipView: NSView {
     private func addToZotero() {
         let anchor = box.anchor
         Task { @MainActor [weak self] in
-            guard let source = await SourceArchiveInfo.shared?.zoteroSource(for: anchor) else {
+            guard let sources = await SourceArchiveInfo.shared?.zoteroSources(for: anchor) else {
                 self?.reportCopyFailure(action: "Add to Zotero")
                 return
             }
             do {
-                try await ZoteroConnector().save([source])
+                try await ZoteroConnector().save(sources)
                 self?.addButton?.title = "Added to Zotero"
             } catch {
                 self?.reportZoteroFailure(error as? ZoteroConnector.Failure ?? .notRunning)

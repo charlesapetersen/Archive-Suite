@@ -93,6 +93,25 @@ public struct CataloguePDFIdentity: Equatable, Sendable {
         return identity(inXMP: packet as Data)
     }
 
+    /// True only when the PDF at `url` opens without a download (an encrypted one with the empty password), has
+    /// pages, and its catalog's metadata, if any, is XMP with no catalogue identity element at all
+    /// (W49.storage-notes-zotero). A PDF this cannot read is not proven to predate the catalogue.
+    public static func provablyAbsent(at url: URL) -> Bool {
+        CorpusWalker.withDatalessMaterializationDisabled {
+            guard let document = CGPDFDocument(url as CFURL),
+                  !document.isEncrypted || document.isUnlocked || document.unlockWithPassword(""),
+                  document.numberOfPages > 0, let catalog = document.catalog else { return false }
+            var object: CGPDFObjectRef?
+            guard CGPDFDictionaryGetObject(catalog, "Metadata", &object) else { return true }
+            var stream: CGPDFStreamRef?
+            var format = CGPDFDataFormat.raw
+            guard CGPDFDictionaryGetStream(catalog, "Metadata", &stream), let stream,
+                  let packet = CGPDFStreamCopyData(stream, &format), format == .raw,
+                  let reader = parse(packet as Data) else { return false }
+            return reader.count == 0
+        }
+    }
+
     /// Reads from the already opened, verified file. Core Graphics reads at offsets, leaving its owner's position
     /// unchanged and avoiding a full in-memory copy of a multi-page scan.
     public static func identify(_ descriptor: Int32, at _: CatalogueAssociation.Occurrence) -> CatalogueReader.PDFIdentity? {

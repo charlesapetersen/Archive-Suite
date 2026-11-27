@@ -39,6 +39,17 @@ be looked at, Notes first asks "Is it the top folder of its archive?". No existi
 file can be deleted. Tests: `ReaderRootChooserTests` (scratch folders) (accepted: owner, 2026-11-20, call 24,
 chose the question as the remedy; an unmarked archive carries no sign to detect).
 
+## ⚠️ LIMIT (W49.storage-notes-zotero, 2026-11-27) — a source whose PDF cannot be read exports no tags
+
+Copy for Zotero, Add to Zotero and the year suggestion read a source's catalogue record (SPEC/containers.md §Zotero
+"Catalogue sources"), and gather an old file's tags, header and sidecar only when its PDF provably carries no
+catalogue identity, so that a PDF separated from its record never exports an earlier correction as current. A PDF
+whose content cannot be read cannot be shown to be old: a cloud file not downloaded, a PDF locked with a password,
+or one Core Graphics cannot open or whose metadata is not XML. Such a source exports its file name, container and
+link with the line `Catalogue record unavailable: …`, and offers no year. Downloading the file, or opening it
+without a password, makes it readable. (accepted: the identity is in the file's content, and catalogue reads never
+download, SPEC/catalogue.md §Scoped reads)
+
 ## ✅ FIXED (W49.notes-lines-after-html, 2026-11-19) — Returns after raw HTML are kept
 
 Owner call 20: keep what I type. Returns typed after text ending in raw HTML read from a file were dropped on save:

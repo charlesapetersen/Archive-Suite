@@ -303,8 +303,10 @@ find either way (Process Files always files through a catalogue run; Live Captur
 read the setting). What only the sidecar held:
 - **The low-confidence name mentions of an OCR-only or copy-source run** (`recordLocalNameMentions`) are written to the
   sidecar alone, so with the default they are not kept. (queued: W49.proc-local-names-catalogue)
-- **Notes' Copy / Add to Zotero reads a source's names from its sidecar** (`ZoteroSource.gather`), so for new output it
-  finds none there; the catalogue record has them. (queued: W49.storage-notes-zotero)
+- **Notes' Copy / Add to Zotero read a source's names from its sidecar** (`ZoteroSource.gather`). Fixed 2026-11-27:
+  they, the year suggestion and the Reader's export in catalogue mode now read the PDF's catalogue record
+  (`CatalogueSourceFacts`, SPEC/containers.md §Zotero "Catalogue sources"). (accepted: fixed history,
+  W49.storage-notes-zotero)
 - **A pre-OCRed run reads names and item fields only for the sidecar** (`wantsNameAndFieldReads`), because its text
   layer may be ABBYY's. (accepted: owner, 2026-10-30, no ABBYY text as input)
 - The default itself is the owner's call. (accepted: owner, 2026-11-24, W49.proc-catalogue-cutover; Settings redesign

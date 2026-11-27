@@ -446,6 +446,23 @@ into `note` as a line, never dropped.
   `Unknown` placeholder is no name; a sending place only with `quoted` evidence), else `author_name`, `recipient_name`,
   `author_location`; `recipient_location`, `publication_name` and `format` as written. Material that predates the apps
   carries only its tags and folders.
+- **Catalogue sources (W49.storage-notes-zotero).** A PDF with a catalogue companion (SPEC/catalogue.md) is described
+  by its record alone, read through `CatalogueSourceFacts` by Notes' Copy for Zotero, Add to Zotero and year
+  suggestion, and by the Reader's export when the folder uses catalogue companions: the date, sent-with date and
+  subjects; kind, title, byline, publication, printed date; senders, recipients and their places; the container from
+  the folders as above. Tags, the page-2 header, the sidecar and `.archivesuite/item-fields.json` are not read for it,
+  and a cleared field is absent. Notes reads the exact path its link names under the granted root, and the linked
+  page's document (a file link: one item per document, in page order); nothing is searched for by name. A split
+  document's owner elsewhere in the root is found by one walk of the root for an explicit export, never for the year
+  suggestion. When the record cannot be used (companion missing beside a PDF that carries a catalogue identity,
+  unreadable, newer, offline, ambiguous), the item carries only the file, its container and link, and the `note`
+  line `Catalogue record unavailable: <reason>`; no earlier value stands in. Only a PDF with no companion beside it
+  that opens and provably carries no catalogue identity (no catalog metadata, or XMP with no identity element) is
+  gathered from its tags, header and sidecar, including one the catalogue's strict read refuses (a symbolic or hard
+  link); a PDF that cannot be shown to lack one (unreadable, locked with a password, a malformed identity, not downloaded) is
+  unavailable. The record has no tagging-call `format`, so a document with no kind is a `document` with no genre.
+  The Reader with catalogue companions off keeps the legacy gathering for every file, as its list does. Notes' own
+  note metadata is never part of a source item. The export's status line counts the items, one per document.
 - **Type** by the item-field kind, the closest type in Zotero 10.0.9's schema (`W47.ct-zotero-types`): `letter` →
   `personal_communication` (Letter); `telegram` and `memo` → the same, genre (Letter Type) Telegram / Memo; `report`
   → `report` (Report); `speech` → `speech` (Presentation), genre (Presentation Type) Speech; `press release` →

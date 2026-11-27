@@ -6,6 +6,7 @@
 import Testing
 import Foundation
 import AppKit
+import PDFKit
 import ArchiveCore
 @testable import ArchiveNotes
 
@@ -26,7 +27,10 @@ struct SourceArchiveInfoTests {
         try ContainerFileStore.write(ContainerFile(runs: [ContainerRun(start: "0001.pdf", level: .folder, fields:
             ContainerFieldSet([.folder: ContainerValue("Folder 8", source: .user)]))]), directory: box, expecting: nil)
         let pdf = box.appendingPathComponent("0002.pdf")
-        try Data("scratch fixture".utf8).write(to: pdf)
+        // A real PDF with no catalogue identity: a file that predates the catalogue (W49.storage-notes-zotero).
+        let document = PDFDocument()
+        document.insert(PDFPage(), at: 0)
+        try #require(document.dataRepresentation()).write(to: pdf)
         try (pdf as NSURL).setResourceValue(["1959", "Trotskyism"], forKey: .tagNamesKey)
         try Data(#"{"author_name": "Max Shachtman", "recipient_name": "Albert Glotzer", "format": "Letter"}"#.utf8)
             .write(to: box.appendingPathComponent("0002.json"))
@@ -70,11 +74,70 @@ struct SourceArchiveInfoTests {
         #expect((item["note"] as? String)?.contains("Subjects: Trotskyism") == true)
 
         // W47.ct-zotero-tags: Add to Zotero sends the same source, with the subjects as tags.
-        let gathered = try #require(await info.zoteroSource(for: source))
-        let sent = try #require(ZoteroExport.connectorItems([gathered]).first)
+        let gathered = try #require(await info.zoteroSources(for: source))
+        let sent = try #require(ZoteroExport.connectorItems(gathered).first)
         #expect(sent["itemType"] as? String == "letter")
         #expect((sent["tags"] as? [[String: String]])?.compactMap { $0["tag"] } == ["Trotskyism"])
         #expect(sent["url"] as? String == source.link)
+    }
+
+    /// W49.storage-notes-zotero: a PDF with a catalogue companion is described by its record, read from the linked
+    /// page's document, the same in Copy for Zotero and Add to Zotero; its tags and sidecar are not read. Separated from
+    /// its companion it exports only the file and its container, saying why. The root may move between grants.
+    @Test("Copy and Add to Zotero read the linked page's catalogue record")
+    func catalogueRecord() async throws {
+        let fixture = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let fileID = UUID(), content = UUID(), letter = UUID(), clipping = UUID()
+        func field(_ value: String) -> String {
+            #"{"state":"value","value":\#(value),"fieldRevision":"\#(UUID())","origin":"user"}"#
+        }
+        let companion = fixture.pdf.deletingLastPathComponent()
+            .appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: "0002.pdf"))
+        try Data("""
+        {"schema":1,"fileID":"\(fileID)","contentRevision":"\(content)","revision":"\(UUID())","parents":[],
+         "pages":[{"id":"\(UUID())","physicalIndex":0,"documentID":"\(letter)","role":"searchable"},
+                  {"id":"\(UUID())","physicalIndex":1,"documentID":"\(clipping)","role":"searchable"}],
+         "documents":[{"id":"\(letter)","ownerFileID":"\(fileID)","fields":{"documentKind":\(field(#""letter""#)),
+             "documentDate":\(field(#"{"date":"1961-02","uncertain":true}"#)),
+             "recipients":\(field(#"["Record Recipient"]"#)),"subjects":\(field(#"["Record Subject"]"#))}},
+           {"id":"\(clipping)","ownerFileID":"\(fileID)","fields":{"title":\(field(#""Second document""#))}}],
+         "fileFields":{}}
+        """.utf8).write(to: companion)
+        let store = ReaderRootStore(defaults: scratchDefaults())
+        _ = store.grantRoot(fixture.root)
+        let info = SourceArchiveInfo(rootStore: store) { _, _ in .init(fileID: fileID, contentRevision: content, pageCount: 2) }
+        let source = anchor(fixture.marker, relative)
+
+        let json = try #require(await info.zoteroJSON(for: source))
+        let items = try #require(try JSONSerialization.jsonObject(with: json) as? [[String: Any]])
+        let item = try #require(items.count == 1 ? items.first : nil)
+        #expect(item["archive"] as? String == "Hoover Institution Archives")
+        #expect((item["recipient"] as? [[String: String]])?.first?["literal"] == "Record Recipient")
+        #expect((item["issued"] as? [String: Any])?["date-parts"] as? [[Int]] == [[1961, 2]])
+        #expect((item["issued"] as? [String: Any])?["circa"] as? Bool == true)
+        #expect((item["note"] as? String)?.contains("Trotskyism") == false, "the tag is not the record")
+        #expect(item["author"] == nil, "the sidecar's sender is not the record's")
+        let sent = try #require(await info.zoteroSources(for: source))
+        #expect(ZoteroExport.connectorItems(sent).first?["tags"] as? [[String: String]] == [["tag": "Record Subject"]])
+
+        let fileLink = SourceAnchor(link: DurableLink.readerReveal(rootGUID: fixture.marker.guid, relativePath: relative,
+                                                                   page: nil).url.absoluteString)
+        #expect(try #require(await info.zoteroSources(for: fileLink)).map(\.itemFields.title) == [nil, "Second document"])
+
+        let moved = fixture.root.deletingLastPathComponent().appendingPathComponent("Moved-\(UUID().uuidString)")
+        try FileManager.default.moveItem(at: fixture.root, to: moved)
+        defer { try? FileManager.default.removeItem(at: moved) }
+        _ = store.grantRoot(moved)
+        let movedCompanion = moved.appendingPathComponent(ContainerLookup.mainDirectoryName)
+            .appendingPathComponent("Hoover Institution Archives/Glotzer Papers/Box 17")
+            .appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: "0002.pdf"))
+        #expect(try #require(await info.zoteroSources(for: source)).first?.sidecar?.recipients == ["Record Recipient"])
+        try FileManager.default.removeItem(at: movedCompanion)
+        let detached = try #require(await info.zoteroSources(for: source)?.first)
+        #expect(detached.catalogueUnavailable == "the catalogue companion is missing")
+        #expect(detached.tags == nil && detached.sidecar == nil)
+        #expect(detached.container[.repository] == "Hoover Institution Archives")
     }
 
     @Test("A source not at its recorded path, or in a root not granted, gives nothing")

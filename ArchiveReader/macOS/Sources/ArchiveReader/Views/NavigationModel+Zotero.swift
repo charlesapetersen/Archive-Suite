@@ -8,7 +8,10 @@ import UniformTypeIdentifiers
 // (`ZoteroExport`): the container as the Container column shows it, the date from its tags, the page-2 header's item
 // fields and the people and places in the Processor's sidecar. The archive is only read; the file is saved where the
 // user chooses, outside the archive folder, and Zotero takes it with File ▸ Import. Selection ▸ Add to Zotero sends the
-// same items, with the subjects as tags, to the Zotero open on this Mac (W47.ct-zotero-tags).
+// same items, with the subjects as tags, to the Zotero open on this Mac (W47.ct-zotero-tags). A folder that uses
+// catalogue companions exports each PDF's catalogue record instead, through the read Notes makes for a source link
+// (`CatalogueSourceFacts`, W49.storage-notes-zotero): one item per document, and never an earlier tag, header,
+// sidecar or correction in place of a record that cannot be read.
 
 extension NavigationModel {
     /// `paths` nil exports the list's selection; the document window passes its open file, and `report` receives each
@@ -33,13 +36,18 @@ extension NavigationModel {
         statusMessage = "Exporting \(files.count) document\(files.count == 1 ? "" : "s") for Zotero…"
         report?(statusMessage)
         Task { [weak self] in
-            let written: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
-                Result { try ZoteroExport.export(gather()).write(to: destination, options: .atomic) }
+            // A file that holds several documents gives one item each (W49.storage-notes-zotero).
+            let written: Result<Int, Error> = await Task.detached(priority: .userInitiated) {
+                Result {
+                    let sources = gather()
+                    try ZoteroExport.export(sources).write(to: destination, options: .atomic)
+                    return sources.count
+                }
             }.value
             guard let self else { return }
             switch written {
-            case .success:
-                self.statusMessage = Self.zoteroExportedMessage(count: files.count, name: destination.lastPathComponent)
+            case .success(let count):
+                self.statusMessage = Self.zoteroExportedMessage(count: count, name: destination.lastPathComponent)
             case .failure(let error):
                 self.statusMessage = "Could not save \(destination.lastPathComponent): \(error.localizedDescription)"
             }
@@ -64,7 +72,7 @@ extension NavigationModel {
                 failure = error as? ZoteroConnector.Failure ?? .notRunning
             }
             guard let self else { return }
-            self.statusMessage = Self.zoteroAddedMessage(count: files.count, failure: failure)
+            self.statusMessage = Self.zoteroAddedMessage(count: sources.count, failure: failure)
             self.announce(self.statusMessage)
             report?(self.statusMessage)
         }
@@ -91,12 +99,44 @@ extension NavigationModel {
         let urls = files.map(\.url)
         // A file the catalog has not reached yet (a scan still settling) is read through the same lookup.
         let tree = containerTree?.url
-        return { Self.gatherZotero(sources, urls: urls, tree: tree) }
+        let catalogueRoot = library.usesCatalogue ? rootStore.root : nil
+        // The library's last pass lets a walk for a split document's owner skip every unchanged file's parse.
+        let memory = library.catalogueSnapshot?.memory
+        return { Self.gatherZotero(sources, urls: urls, tree: tree, catalogueRoot: catalogueRoot, memory: memory) }
+    }
+
+    /// The catalogue's sources for `urls` under the granted `root`: each file's record read again from disk, as
+    /// Notes reads a source link, with the container as the list shows it. Read only.
+    nonisolated static func gatherCatalogueZotero(_ sources: [ZoteroSource], urls: [URL], tree: URL?, root: URL,
+                                                  memory: CatalogueReader.ReadMemory? = nil,
+                                                  identifyPDF: @escaping CatalogueReader.IdentifyPDF
+                                                      = CataloguePDFIdentity.identify) -> [ZoteroSource] {
+        let lookup = tree.map(ContainerLookup.init(treeRoot:))
+        let scoped = root.startAccessingSecurityScopedResource()
+        defer { if scoped { root.stopAccessingSecurityScopedResource() } }
+        let rootPath = CorpusWalker.withDatalessMaterializationDisabled { CorpusWalker.discoveredPathPrefix(for: root) }
+            ?? root.standardizedFileURL.path
+        let relative = urls.map { ReaderCatalogueScan.relativePath(of: $0, under: rootPath) }
+        // An explicit export may walk the root once to find a split document's owner.
+        var resolved = CatalogueSourceFacts.resolve(relative.compactMap { $0.map { .init(relativePath: $0) } },
+                                                    grantedRoot: root, inventoryForForeignOwners: true,
+                                                    memory: memory, identifyPDF: identifyPDF).makeIterator()
+        return zip(sources, zip(urls, relative)).flatMap { source, file -> [ZoteroSource] in
+            let (url, path) = file
+            let resolution = path == nil ? .unavailable(.invalid(.root)) : resolved.next() ?? .unavailable(.invalid(.root))
+            let container = source.container.isEmpty ? lookup?.shown(for: url).mapValues(\.text) ?? [:] : source.container
+            return ZoteroSource.gather(resolution, pdf: url, container: container)
+        }
     }
 
     /// Fills each source from its file: the container (when the catalog had none), page 2's item fields, the sidecar,
     /// and the user's item-field values (W40.reader-item-field-edit), read once per folder. Read only.
-    nonisolated static func gatherZotero(_ sources: [ZoteroSource], urls: [URL], tree: URL?) -> [ZoteroSource] {
+    nonisolated static func gatherZotero(_ sources: [ZoteroSource], urls: [URL], tree: URL?,
+                                         catalogueRoot: URL? = nil,
+                                         memory: CatalogueReader.ReadMemory? = nil) -> [ZoteroSource] {
+        if let catalogueRoot {
+            return gatherCatalogueZotero(sources, urls: urls, tree: tree, root: catalogueRoot, memory: memory)
+        }
         let lookup = tree.map(ContainerLookup.init(treeRoot:))
         var corrections: [String: UserItemFields?] = [:]
         return zip(sources, urls).map { source, url -> ZoteroSource in

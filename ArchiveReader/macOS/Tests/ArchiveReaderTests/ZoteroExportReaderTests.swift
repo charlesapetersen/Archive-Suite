@@ -60,6 +60,47 @@ final class ZoteroExportReaderTests: XCTestCase {
         XCTAssertEqual(ZoteroExport.item(sources[0])["title"] as? String, "The Right Title")
     }
 
+    /// W49.storage-notes-zotero: a folder in catalogue mode exports each PDF's record, as Notes reads a source link;
+    /// the sidecar and the folder's corrections beside it are not read, and a file outside the root keeps its place.
+    func testCatalogueModeExportsTheRecordAloneInFileOrder() throws {
+        let box = root.appendingPathComponent("Box 17", isDirectory: true)
+        try FileManager.default.createDirectory(at: box, withIntermediateDirectories: true)
+        let fileID = UUID(), content = UUID(), document = UUID()
+        let pdf = box.appendingPathComponent("0001.pdf")
+        try Data("scratch fixture".utf8).write(to: pdf)
+        func field(_ value: String) -> String {
+            #"{"state":"value","value":\#(value),"fieldRevision":"\#(UUID())","origin":"user"}"#
+        }
+        try Data("""
+        {"schema":1,"fileID":"\(fileID)","contentRevision":"\(content)","revision":"\(UUID())","parents":[],
+         "pages":[{"id":"\(UUID())","physicalIndex":0,"documentID":"\(document)","role":"searchable"}],
+         "documents":[{"id":"\(document)","ownerFileID":"\(fileID)","fields":{"title":\(field(#""From the record""#)),
+           "senders":\(field(#"["Record Sender"]"#))}}],"fileFields":{}}
+        """.utf8).write(to: box.appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: "0001.pdf")))
+        try Data(#"{"author_name": "Stale Sender"}"#.utf8).write(to: box.appendingPathComponent("0001.json"))
+        var fields = UserItemFields()
+        fields.set(.title, to: "An Earlier Correction", for: "0001.pdf")
+        try ContainerFileStore.writeItemFields(fields, directory: box.resolvingSymlinksInPath(), expecting: nil)
+        let elsewhere = FileManager.default.temporaryDirectory.appendingPathComponent("zotero-elsewhere-\(UUID()).pdf")
+        try Data("scratch fixture".utf8).write(to: elsewhere)
+        defer { try? FileManager.default.removeItem(at: elsewhere) }
+
+        let identify: CatalogueReader.IdentifyPDF = { _, _ in .init(fileID: fileID, contentRevision: content, pageCount: 1) }
+        let rootPath = CorpusWalker.discoveredPathPrefix(for: root) ?? root.path
+        let inRoot = URL(fileURLWithPath: rootPath).appendingPathComponent("Box 17/0001.pdf")
+        let sources = NavigationModel.gatherCatalogueZotero(
+            [elsewhere, inRoot].map { ZoteroSource(fileName: $0.lastPathComponent) }, urls: [elsewhere, inRoot],
+            tree: nil, root: root, identifyPDF: identify)
+        XCTAssertEqual(sources.count, 2)
+        XCTAssertEqual(sources[0].fileName, elsewhere.lastPathComponent)
+        XCTAssertNotNil(sources[0].catalogueUnavailable, "a file outside the granted root has no record here")
+        let item = ZoteroExport.item(sources[1])
+        XCTAssertNil(sources[1].catalogueUnavailable)
+        XCTAssertEqual(item["title"] as? String, "From the record")
+        XCTAssertEqual((item["author"] as? [[String: String]])?.map { $0["literal"] }, ["Record Sender"])
+        XCTAssertFalse((item["note"] as? String ?? "").contains("Stale"))
+    }
+
     func testTheExportIsNeverSavedInsideTheArchive() throws {
         let inner = root.appendingPathComponent("Box 17", isDirectory: true)
         try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)

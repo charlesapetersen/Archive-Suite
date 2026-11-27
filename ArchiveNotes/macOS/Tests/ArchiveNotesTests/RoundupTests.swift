@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import PDFKit
 import ArchiveCore
 @testable import ArchiveNotes
 
@@ -105,8 +106,8 @@ struct RoundupTests {
         let marker = RootMarker(guid: UUID(), name: "Scratch Reader", kind: .reader, createdAt: Date())
         try JSONEncoder().encode(marker).write(to: root.appendingPathComponent(RootMarker.filename))
         let first = root.appendingPathComponent("first.pdf"), second = root.appendingPathComponent("second.pdf")
-        try Data("scratch".utf8).write(to: first)
-        try Data("scratch".utf8).write(to: second)
+        try scratchPDF().write(to: first)
+        try scratchPDF().write(to: second)
         try (first as NSURL).setResourceValue(["1968"], forKey: .tagNamesKey)
         try (second as NSURL).setResourceValue(["1968"], forKey: .tagNamesKey)
         func link(_ path: String, page: Int? = nil) -> String {
@@ -125,9 +126,50 @@ struct RoundupTests {
         #expect(await RoundupYearSuggestion.commonYear(links: ["not a Reader link"], roots: roots) == nil)
         let outside = root.deletingLastPathComponent().appendingPathComponent("roundup-outside-\(UUID()).pdf")
         defer { try? FileManager.default.removeItem(at: outside) }
-        try Data("outside scratch".utf8).write(to: outside)
+        try scratchPDF().write(to: outside)
         try (outside as NSURL).setResourceValue(["1968"], forKey: .tagNamesKey)
         try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("escape.pdf"), withDestinationURL: outside)
         #expect(await RoundupYearSuggestion.commonYear(links: [link("escape.pdf")], roots: roots) == nil)
+    }
+
+    /// W49.storage-notes-zotero: a PDF with a catalogue companion offers its record's year, never its Finder tag, and
+    /// a PDF separated from its companion offers none.
+    @Test("Year offer reads the catalogue record of each exact linked PDF")
+    func catalogueYears() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("notes-roundup-catalogue-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let marker = RootMarker(guid: UUID(), name: "Scratch Reader", kind: .reader, createdAt: Date())
+        try JSONEncoder().encode(marker).write(to: root.appendingPathComponent(RootMarker.filename))
+        let pdf = root.appendingPathComponent("letter.pdf")
+        try scratchPDF().write(to: pdf)
+        try (pdf as NSURL).setResourceValue(["1968"], forKey: .tagNamesKey)
+        let fileID = UUID(), content = UUID(), document = UUID()
+        let companion = root.appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: "letter.pdf"))
+        try Data("""
+        {"schema":1,"fileID":"\(fileID)","contentRevision":"\(content)","revision":"\(UUID())","parents":[],
+         "pages":[{"id":"\(UUID())","physicalIndex":0,"documentID":"\(document)","role":"searchable"}],
+         "documents":[{"id":"\(document)","ownerFileID":"\(fileID)","fields":{"documentDate":{"state":"value",
+           "value":{"date":"1970-05","uncertain":false},"fieldRevision":"\(UUID())","origin":"user"}}}],"fileFields":{}}
+        """.utf8).write(to: companion)
+        let identify: CatalogueReader.IdentifyPDF = { _, _ in .init(fileID: fileID, contentRevision: content, pageCount: 1) }
+        let links = [DurableLink.readerReveal(rootGUID: marker.guid, relativePath: "letter.pdf", page: 1).url.absoluteString]
+        let roots = [marker.guid: root]
+        #expect(RoundupYearSuggestion.readYear(links: links, roots: roots, identifyPDF: identify) == 1970)
+        try FileManager.default.removeItem(at: companion)
+        #expect(RoundupYearSuggestion.readYear(links: links, roots: roots, identifyPDF: identify) == nil,
+                "a detached PDF's tag is not its current date")
+        #expect(RoundupYearSuggestion.readYear(links: links, roots: roots, identifyPDF: { _, _ in nil }) == 1968,
+                "a file with no catalogue identity keeps its tags")
+        try Data("not a PDF".utf8).write(to: pdf)
+        #expect(RoundupYearSuggestion.readYear(links: links, roots: roots, identifyPDF: { _, _ in nil }) == nil,
+                "a file that cannot be shown to predate the catalogue offers no tag")
+    }
+
+    /// A real one-page PDF with no catalogue identity: a file that predates the catalogue.
+    private func scratchPDF() throws -> Data {
+        let document = PDFDocument()
+        document.insert(PDFPage(), at: 0)
+        return try #require(document.dataRepresentation())
     }
 }

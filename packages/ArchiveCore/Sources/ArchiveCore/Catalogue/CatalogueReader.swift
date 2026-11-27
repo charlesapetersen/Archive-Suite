@@ -63,8 +63,9 @@ public struct CatalogueReader: Sendable {
 
     /// Discover every PDF independent of Finder tags. Run this synchronous scan off the UI actor.
     /// Existing scan loops may use `snapshot(_:including:)` with their own inventory instead.
-    public func discover(including selectedPaths: [String] = []) -> Snapshot {
-        snapshot(including: selectedPaths) { rootEntry in
+    /// `memory` from an earlier pass of this root instance lets unchanged files skip their parse.
+    public func discover(including selectedPaths: [String] = [], remembering memory: ReadMemory? = nil) -> Snapshot {
+        snapshot(including: selectedPaths, remembered: usable(memory)) { rootEntry in
             let scan = CorpusWalker.scanFingerprints(root: root, options: .init(enumerationOptions: []),
                                                      followFileSymlinks: false)
             guard let prefix = scan.rootPath, prefix.utf8.elementsEqual(rootEntry.path.utf8) else {

@@ -162,8 +162,9 @@ ALLOW=(
   # sandbox's user-selected file and nothing derived from a scanned corpus URL. Before the write,
   # `zoteroDestinationRefusal` refuses any folder in or under the granted root, its JPEG tree, a sibling main/JPEG
   # folder and every selected file's folder, resolved through links and compared case-folded
-  # (`ZoteroExportReaderTests`). The archive itself is only read to gather the items.
-  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift${SEP}Result { try ZoteroExport.export(gather()).write(to: destination, options: .atomic) }"
+  # (`ZoteroExportReaderTests`). The archive itself is only read to gather the items (W49.storage-notes-zotero:
+  # the same write, now also counting the items gathered).
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift${SEP}try ZoteroExport.export(sources).write(to: destination, options: .atomic)"
 
   # ── rule 4 (raw POSIX write) ────────────────────────────────────────────────────────────────────
   # The audit ledger's append handle (already audited above as the ledger's own file).
