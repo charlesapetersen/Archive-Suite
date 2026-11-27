@@ -35,6 +35,17 @@ final class TagsWindowUITests: NotesFixtureUITestCase {
         field.typeText(text)
     }
 
+    /// Edit ▸ Undo with the Tags window in front, as the user would choose it; its title says what it undoes.
+    private func undoFromEditMenu() {
+        let edit = app.menuBars.menuBarItems["Edit"]
+        edit.click()
+        let undo = edit.menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Undo'")).firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5))
+        print("[tagswindow] Edit menu undo title: \(undo.title)")
+        XCTAssertTrue(undo.isEnabled, "Edit ▸ Undo should be enabled (title: \(undo.title))")
+        undo.click()
+    }
+
     private func status(_ window: XCUIElement) -> String {
         let s = window.staticTexts["tags.status"]
         return (s.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? s.label
@@ -88,12 +99,12 @@ final class TagsWindowUITests: NotesFixtureUITestCase {
             let renamed = row("Intel Corporation", in: tags)
             XCTAssertTrue(renamed.waitForExistence(timeout: 10), "the list follows the notes")
             renamed.click()
-            tags.typeKey("z", modifierFlags: .command)
+            undoFromEditMenu()
             XCTAssertTrue(pollUntil(timeout: 15) {
                 !self.tagsLine(a).contains("Intel Corporation") && !self.tagsLine(b).contains("Intel Corporation")
                     && self.tagsLine(a).localizedCaseInsensitiveContains("intel")
                     && self.tagsLine(b).localizedCaseInsensitiveContains("intel")
-            }, "⌘Z in the Tags window puts Intel back on both: \(tagsLine(a)) / \(tagsLine(b))")
+            }, "Edit ▸ Undo in the Tags window puts Intel back on both: \(tagsLine(a)) / \(tagsLine(b))")
 
             // (2) Remove from both after a confirmation that names the count, then ⌘Z.
             search(field, "Intel")
@@ -111,12 +122,12 @@ final class TagsWindowUITests: NotesFixtureUITestCase {
             XCTAssertTrue(tagsLine(b).localizedCaseInsensitiveContains("corporate culture"), "other tags stay")
             shot("removed", tags)
             // The list, not the search field, has the focus for ⌘Z (the search's typing was undone first otherwise).
-            tags.descendants(matching: .any)["tags.list"].click()
-            tags.typeKey("z", modifierFlags: .command)
+            tags.descendants(matching: .any).matching(identifier: "tags.list").firstMatch.click()
+            undoFromEditMenu()
             XCTAssertTrue(pollUntil(timeout: 15) {
                 self.tagsLine(a).localizedCaseInsensitiveContains("intel")
                     && self.tagsLine(b).localizedCaseInsensitiveContains("intel")
-            }, "⌘Z puts it back: \(tagsLine(a)) / \(tagsLine(b))")
+            }, "Edit ▸ Undo puts it back: \(tagsLine(a)) / \(tagsLine(b))")
             shot("undone", tags)
             tags.buttons[XCUIIdentifierCloseWindow].click()
         }

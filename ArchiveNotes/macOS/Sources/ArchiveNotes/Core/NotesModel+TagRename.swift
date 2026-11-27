@@ -7,7 +7,8 @@ import ArchiveCore
 // each, as the tag bar's edits). A rename into an existing subject merges into it. The change is then recorded in
 // each reachable archive's tag change log (`ArchiveCore.TagChangeLog`, SPEC/tag-format.md invariant 8) so the
 // Reader can offer it for its files; Notes writes nothing else in the archive. Undo puts back only what the rename
-// changed on each note, so an edit made since to another subject survives. Design: execution-plans/tag-rename-suite.md.
+// changed on each note, so an edit made since to another subject survives. Design: the W40.tag-rename-suite entry in
+// SUITE_TODO_DONE.md.
 
 /// What one rename, merge or remove did: each changed note's subjects before, the notes it could not save, and the log
 /// entries it recorded (withdrawn by its Undo).

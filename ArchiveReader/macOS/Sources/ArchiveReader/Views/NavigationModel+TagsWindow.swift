@@ -10,7 +10,7 @@ import ArchiveCoreUI
 // remove through `TagWriter.applyPlan` (a coordinated fresh read per file, one ledger group, one Undo) or, in
 // catalogue mode, through the catalogue journal as one operation. Each change is recorded for the other apps
 // (`recordTagChanges`) against that group or operation, so its Undo withdraws it and its Redo restores it.
-// The window writes nothing itself. Design: execution-plans/tag-rename-suite.md §"The Tags window".
+// The window writes nothing itself. Design: the W40.tag-window-core entry in SUITE_TODO_DONE.md.
 
 extension NavigationModel {
     /// The Tags window's model, made on first use and kept for the session.

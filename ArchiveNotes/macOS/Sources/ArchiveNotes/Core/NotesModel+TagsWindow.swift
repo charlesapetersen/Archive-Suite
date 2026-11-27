@@ -12,7 +12,7 @@ import ArchiveCoreUI
 // the plans are spelt that way too, and a note that already carries the target under another spelling has it
 // re-spelt, as Rename Tag… does. Like Rename Tag…, a change that only re-spells a tag is not recorded (Notes ignores
 // other apps' re-spellings too). The window writes nothing itself.
-// Design: execution-plans/tag-rename-suite.md §"The Tags window".
+// Design: the W40.tag-window-core entry in SUITE_TODO_DONE.md.
 
 extension NotesModel {
     /// The Tags window's model, made on first use and kept for the session.
@@ -60,7 +60,7 @@ extension NotesModel {
     /// Nil from `renameSubjects` means no note carries a source tag any more: nothing changed, nothing failed.
     func applyTagsWindowPlan(_ plan: TagChangePlan) async -> TagsWindowModel.Outcome {
         guard let outcome = await renameSubjects(plan.sources, to: plan.target ?? "") else { return .init(changed: 0) }
-        if !outcome.changed.isEmpty, let undo = tagsWindowUndo {
+        if !outcome.changed.isEmpty, let undo = tagsWindowUndo() {
             registerUndoOfRename(outcome, with: undo) { [weak self] step in self?.enqueueTagsWindowHistory(step) }
         }
         return .init(changed: outcome.changed.count, failed: outcome.failed.count)

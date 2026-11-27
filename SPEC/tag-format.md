@@ -595,7 +595,7 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    that has not applied a withdrawn entry drops it, and one that has is never reverted behind the user's back. Facet
    tokens (rule 4's `keepsExactCase` set) are never recorded nor applied. The Processor applies entries to its
    vocabularies without asking. A missing, read-only or unreadable record never stops the rename itself; the app
-   says the other apps were not told. Design: `execution-plans/tag-rename-suite.md`.
+   says the other apps were not told. Design: the W40.tag-rename-suite entry in `SUITE_TODO_DONE.md`.
 
 ---
 

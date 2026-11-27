@@ -1,7 +1,7 @@
 import SwiftUI
 import ArchiveCore
 
-/// The shared Tags window (W40.tag-window-core; design: execution-plans/tag-rename-suite.md §"The Tags window").
+/// The shared Tags window (W40.tag-window-core; design: the W40.tag-window-core entry in SUITE_TODO_DONE.md).
 /// Every subject tag in use with how many items carry it, searchable and sortable; Rename (into an existing tag it
 /// merges), Merge of several selected into one spelling, Remove from every item after a confirmation that names the
 /// count, Find Similar as a filter of the same list, and Show Items. The suite's own tokens are listed apart, read

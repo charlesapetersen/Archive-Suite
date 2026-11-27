@@ -8,7 +8,7 @@ import Foundation
 // value, applied to each item's FRESHLY READ tags inside that writer, so a tag added since the inventory was built
 // is never lost. Tags are one tag by `tagKey` (SPEC/tag-format.md invariant 4). Tokens the suite writes itself
 // (ratings, dates, read state, item type, colour names, field checks, the OCR flags) are listed apart and no plan
-// touches them (invariant 8). Design: execution-plans/tag-rename-suite.md §"The Tags window".
+// touches them (invariant 8). Design: the W40.tag-window-core entry in SUITE_TODO_DONE.md.
 
 /// Every tag carried by a set of items, by identity.
 public struct TagInventory: Sendable {

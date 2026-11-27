@@ -28,7 +28,7 @@ private struct NotesTagsWindowContent: View {
             }
         }
         // Edit ▸ Undo reads the NSWindow's undo manager, not the environment's (as the browser's delete does).
-        .background(NotesWindowAccessor { [model] window in model.tagsWindowUndo = window.undoManager })
+        .background(WindowUndoProbe(model: model))
         // The list follows the notes while the window shows; `$allItems` delivers the new list.
         .onReceive(model.$allItems) { [model] items in model.refreshTagsWindow(items) }
         .onAppear { [model, tags, openWindow] in
@@ -38,6 +38,20 @@ private struct NotesTagsWindowContent: View {
             }
         }
     }
+}
+
+/// Hands the model a way to find this window's undo manager when a change is made: the view's window is set only
+/// once it is attached, which a callback at creation can miss.
+private struct WindowUndoProbe: NSViewRepresentable {
+    let model: NotesModel
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        model.tagsWindowUndo = { [weak view] in view?.window?.undoManager }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 /// Tag Changes from Other Apps, as a section of the window: how many wait, and the Archive Notes window's sheet that

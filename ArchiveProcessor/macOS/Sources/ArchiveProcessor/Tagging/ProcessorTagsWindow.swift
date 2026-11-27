@@ -3,8 +3,8 @@ import SwiftUI
 import ArchiveCore
 import ArchiveCoreUI
 
-/// The Processor's Tags window (W40.tag-window-processor; design: execution-plans/tag-rename-suite.md §"The Tags
-/// window"), the suite's shared window over the Processor's two lists, since it keeps no library: the suggestions it
+/// The Processor's Tags window (W40.tag-window-processor; design: the W40.tag-window-core entry in
+/// SUITE_TODO_DONE.md), the suite's shared window over the Processor's two lists, since it keeps no library: the suggestions it
 /// offers while a tag is typed (the autocomplete vocabulary) and the subject list Automatic tagging chooses from
 /// (Settings ▸ Output). Rename, merge and remove edit both as one Undo step. Each is recorded in each archive the
 /// Processor knows (`ProcessorTagChanges.archives`), so the Reader offers it for the files and Notes for the notes;

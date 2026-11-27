@@ -108,8 +108,9 @@ final class NotesModel: ObservableObject {
 
     /// The Tags window's model, made on first use (`tagsWindow`).
     var tagsWindowModel: TagsWindowModel?
-    /// The Tags window's own undo manager (its NSWindow's: Edit ▸ Undo reads that one), where its changes go.
-    weak var tagsWindowUndo: UndoManager?
+    /// The Tags window's own undo manager (its NSWindow's: Edit ▸ Undo reads that one), where its changes go. Looked up
+    /// when a change is made, as the window may not be attached yet when the view is built.
+    var tagsWindowUndo: @MainActor () -> UndoManager? = { nil }
     /// The Tags window's Undo and Redo steps, one after another (`enqueueTagsWindowHistory`).
     var tagsWindowHistoryTail: Task<Void, Never>?
     /// What the Tags window asks of the Archive Notes window, which takes it when it shows (opened for it if closed):

@@ -7,7 +7,7 @@ import Foundation
 // after the user confirms, applies an entry to its own items with its own writer. Written through
 // `ContainerFileStore` (the `.archivesuite` descriptor, `flock`, the stamp check, links and newer documents
 // refused), so this adds no new way to write in the archive. Each app keeps the ids it has handled in its own
-// settings (`TagChangeHandled`). Design: execution-plans/tag-rename-suite.md.
+// settings (`TagChangeHandled`). Design: the W40.tag-rename-suite entry in SUITE_TODO_DONE.md.
 
 /// One tag changed by one app: every item that carried `from` (by `tagKey`) now carries `to`, or (an empty `to`,
 /// schema 2, W40.tag-window-reader) no longer carries it: a remove.

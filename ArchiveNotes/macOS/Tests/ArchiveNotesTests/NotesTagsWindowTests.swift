@@ -105,7 +105,7 @@ struct NotesTagsWindowTests {
         let x = try await makeItem(env, "Extract", kind: .extract, tags: ["civil rights"])
         let undo = UndoManager()
         undo.groupsByEvent = false
-        env.model.tagsWindowUndo = undo
+        env.model.tagsWindowUndo = { undo }
         let w = window(env)
         let entry = try #require(w.inventory.entry(for: "Civil Rights"))
         let plan = try #require(w.renamePlan(entry, to: "Movement"))
@@ -156,7 +156,7 @@ struct NotesTagsWindowTests {
         let x = try await makeItem(env, "Extract", kind: .extract, tags: ["draft"])
         let undo = UndoManager()
         undo.groupsByEvent = false
-        env.model.tagsWindowUndo = undo
+        env.model.tagsWindowUndo = { undo }
         let w = window(env)
         let entry = try #require(w.inventory.entry(for: "Draft"))
         let plan = try #require(w.removePlan([entry]))

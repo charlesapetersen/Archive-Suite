@@ -19244,3 +19244,30 @@ the same three lines and landing them separately would silently revert part of t
   <!-- /W49.proc-live-itemfields-probe -->
 - [x] **W49.proc-fix-live-names-sidecars-off — Live Capture's names with sidecars off: align the self-test and the names estimate [S]** · §Known limits are queued, accepted or asked (lane: processor) — SHIPPED 2026-11-26. The rule is the one f6d0cf31 (W49.storage-processor) chose on purpose: the catalogue record reads the names (`ProcessorCatalogueRecord.documentFields` fills senders, recipients and sending places from the entity read), so the names call runs with sidecars off. Process Files already does the same (`OCRProcessor+Tagging`: `wantsNameAndFieldReads = enableSegmentJSON || wantsCatalogueFacts`, so only pre-read text with sidecars off skips it), so the guard was not restored. The estimate already counted the call: Live's snapshot passes `sidecars: true` and the Process Files window and Settings footer pass `enableSegmentJSON || !preOCRedInput`, so no user-facing $0 remained. What was stale was `test-entity-feature.sh`: check 6 now expects the call on L, V and F with no sidecar written, plus a new check that L's catalogue record carries the quoted names. Check 3 is reworded to say that a zero estimate means the run reads no names or fields, and the `sidecars:` parameter of `CostEstimator.estimate` is documented that way. Processor build clean (no new warnings); `test-entity-feature.sh` ALL PASS. No money spent; no bench cache scratch.
   <!-- /W49.proc-fix-live-names-sidecars-off -->
+- [x] **W40.tag-window-notes — Notes gets the Tags window, over its notes and extracts [M · Tier-2]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) (lane: notes) (uses: build,vm) — SHIPPED 2026-11-26.
+  Built: Window ▸ Tags in Notes (and Tags ▸ Tags Window), the shared ArchiveCoreUI window over every note's and
+  extract's subjects as their front matter holds them (a hand-edited lower-case spelling shows as another spelling;
+  ratings and date facets listed apart, never changed), built off the main actor with its Find Similar groups and
+  following `$allItems` while it shows (`NotesTagsWindow`, `NotesModel+TagsWindow`). Rename, merge and remove run
+  through `renameSubjects` (`applyTagsWindowPlan`; a remove is a rename to nothing): front matter first, then the
+  Finder mirror, the notes as they are when the change runs (a note that lost the tag is not rewritten, one that took
+  it since is changed), plans spelt in Notes' title case. One Undo with Redo in the Tags window, on its own history
+  queue: the rename Undo/Redo registration moved from `NotesNavigationModel` to `NotesModel`
+  (`registerUndoOfRename(_:with:queue:)`), and the window's undo manager is looked up when a change runs (a callback
+  at creation missed it in the VM). Recorded for the other apps as Rename Tag… records, a remove as a schema 2 entry
+  with an empty `to`. Show Notes and Review… (Tag Changes from Other Apps, as a section) are pending requests on
+  `NotesModel` that the Archive Notes window takes when it shows, opened first if it was closed; Show Notes clears the
+  other filters so none hides the tagged notes. The Tags menu's Rename Tag…, Find Similar Tags… and Tag Changes sheets
+  stay as they were. Choices left as Notes' existing rules: a note carrying the target under another spelling has it
+  re-spelt (title case), and a change that only re-spells a tag is not recorded (Notes ignores other apps'
+  re-spellings too); Undo brings a hand-typed lower-case tag back title-cased, as every Notes write does.
+  Tier-2: independent review (Opus): no HIGH; MED fixed (the Undo history rode on the Archive Notes window's
+  navigation model, so it was lost once that window closed); LOWs fixed (Review… dropped when that window was closed;
+  Show Notes hidden by an active search or folder) or kept as above. Tests: NotesTagsWindowTests 6 (scratch stores and
+  archive: list, rename with Undo and Redo, merge, remove with its schema 2 entry and Undo, fresh state, Show Notes);
+  Notes unit suite 1344 green; VM UITests TagsWindowUITests (Tags ▸ Tags Window, rename on 2 notes and Edit ▸ Undo,
+  remove on 2 notes and Edit ▸ Undo; screenshots read) and TagRenameUITests green. execution-plans/tag-rename-suite.md
+  deleted with this, the last Tags window item; the code comments that cited it now point at the W40.tag-rename-suite
+  and W40.tag-window-core entries here. No migration: nothing to migrate. $0; bench cache: nothing created.
+  Commits: checkpoint 1 and this one.
+  <!-- /W40.tag-window-notes -->
