@@ -362,6 +362,9 @@ final class DocumentPaneKeysUITests: XCTestCase {
                 context.endPDFPage()
                 context.beginPDFPage(nil)
                 NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+                // The SPEC sentinel makes the file a pair; without it, an ordinary PDF of single pages
+                // (W40.reader-plain-pdf).
+                NSAttributedString(string: "Extracted text.", attributes: [.font: font]).draw(at: CGPoint(x: 72, y: 730))
                 NSAttributedString(string: "\(word) ocr text", attributes: [.font: font]).draw(at: CGPoint(x: 72, y: 680))
                 NSGraphicsContext.current = nil
                 context.endPDFPage()

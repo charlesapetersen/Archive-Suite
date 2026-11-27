@@ -306,8 +306,8 @@ keeps its text page (owner, 2026-11-17). Readers need nothing new; a file may mi
 - **Page roles** (Core `PDFPageRole.roles(of:)`): with a list whose count is the page count, a page with a header is
   `searchable`, and the pages without one pair up in order, image then text; an image left before a searchable page or
   at the end has no text page. With no list, or one whose count differs (the file was edited, and the list is
-  ignored), a file is pairs (even pages images, odd pages text) only when an odd page parses as a text page with a
-  header; otherwise it is an ordinary PDF not made by the Processor, and every page is `searchable` with no header:
+  ignored), a file is pairs (even pages images, odd pages text) only when one of its first eight odd pages (pages 2,
+  4, …, 16 counting from 1) parses as a text page with a header; otherwise it is an ordinary PDF not made by the Processor, and every page is `searchable` with no header:
   its own page, its text its own layer, no text page beside it (W40.reader-plain-pdf).
 - **Reading it.** `PDFHeaderParser.extract` parses each carried header with the same grammar as a text page
   (`parse(_ text:)`); the page's own text (its layer) is the body. `textPages` then holds every text page *and* every

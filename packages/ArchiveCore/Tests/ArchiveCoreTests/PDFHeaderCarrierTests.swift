@@ -110,6 +110,21 @@ final class PDFHeaderCarrierTests: XCTestCase {
         XCTAssertEqual(PDFPageRole.roles(of: try XCTUnwrap(PDFDocument(url: even))), [.searchable, .searchable])
     }
 
+    func testOnlyTheFirstOddPagesAreSearchedForAHeader() throws {
+        let last = PDFPageRole.headerSearchPages * 2 - 1
+        var pages = (0...(last + 2)).map { "Page \($0 + 1)" }
+        pages[last] = textPage
+        let within = try writePDF(pages)
+        defer { try? FileManager.default.removeItem(at: within) }
+        XCTAssertEqual(PDFPageRole.roles(of: try XCTUnwrap(PDFDocument(url: within))).first, .image)
+        pages[last] = "Page \(last + 1)"
+        pages[last + 2] = textPage
+        let beyond = try writePDF(pages)
+        defer { try? FileManager.default.removeItem(at: beyond) }
+        XCTAssertEqual(PDFPageRole.roles(of: try XCTUnwrap(PDFDocument(url: beyond))),
+                       Array(repeating: .searchable, count: pages.count))
+    }
+
     func testAListThatDoesNotFitIsReadLikeNoList() throws {
         let plain = try writePDF(["One", "Two", "Three"], carried: [header])
         defer { try? FileManager.default.removeItem(at: plain) }

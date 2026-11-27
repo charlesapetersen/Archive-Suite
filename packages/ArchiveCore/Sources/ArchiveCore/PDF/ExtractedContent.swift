@@ -172,10 +172,15 @@ public enum PDFPageRole: String, Sendable, Equatable {
         return uncarried(document)
     }
 
-    /// A file with no list that fits: pairs when an odd page has a SPEC header, else every page alone.
+    /// How many odd pages a file with no list is searched for a header. A Processor pair file has one on its first
+    /// text page; the bound keeps a long ordinary PDF (a 500-page dissertation) from reading every page's text each
+    /// time it opens or is searched.
+    static let headerSearchPages = 8
+
+    /// A file with no list that fits: pairs when one of its first odd pages has a SPEC header, else every page alone.
     static func uncarried(_ document: PDFDocument) -> [PDFPageRole] {
         let count = document.pageCount
-        let paired = stride(from: 1, to: count, by: 2).contains { index in
+        let paired = stride(from: 1, to: count, by: 2).prefix(headerSearchPages).contains { index in
             // The sentinel opens every header; a page without it is skipped before the line-order recovery.
             guard let page = document.page(at: index), page.string?.contains("Extracted text.") == true else { return false }
             return PDFHeaderParser.parse(page).header != nil

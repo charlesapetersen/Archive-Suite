@@ -84,7 +84,9 @@ import sys
 path, text = sys.argv[1:]
 text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 stream1 = ("BT\n/F1 20 Tf\n72 720 Td\n(" + text + " - image page) Tj\nET\n").encode("ascii")
-stream2 = ("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text: " + text
+# Page 2 opens with the SPEC sentinel on its own line, so the Reader reads the file as an image/text pair: a PDF
+# with no XMP list and no header on an odd page is an ordinary PDF of single pages (W40.reader-plain-pdf).
+stream2 = ("BT\n/F1 20 Tf\n72 720 Td\n(Extracted text.) Tj\n0 -40 Td\n(" + text
            + ". California archival records.) Tj\nET\n").encode("ascii")
 objects = [
     b"<< /Type /Catalog /Pages 2 0 R >>",
