@@ -504,8 +504,7 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
   ImproveOCRHandoff.swift     The archiveprocessor://improve-ocr link: inline ≤ 8 files, else a staged manifest
                               (inode, size, SHA-256). Reads files to hash them; writes nothing in the archive.
   ImproveOCRReceiptInbox.swift The Processor's receipts → which granted-root file to re-index; seen IDs in defaults.
-  TagSimilarity.swift         Pure near-duplicate subject clustering (normalize + length-scaled
-                              Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
+  (TagSimilarity.swift moved to ArchiveCore `Tags/` in W40.tag-rename-suite, shared with Notes.)
   LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort
                               (decorated: Int key columns, paths ranked only for full ties).
   ContainerCatalog.swift      W47.ct-reader-view: each listed file's container (box, folder, collection…) from the

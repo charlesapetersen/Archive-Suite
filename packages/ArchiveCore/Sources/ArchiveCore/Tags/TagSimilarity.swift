@@ -5,9 +5,9 @@ import Foundation
 // Pure, UI-free clustering of subject tags that look like typo / case / spacing variants of one
 // another (e.g. `Environment` vs `Environtment`, `Jerry Brown` vs `jerry brown`, `Economics ` vs
 // `Economics`). This NEVER mutates a file and never drives a write — it only *suggests* groups a
-// historian may want to merge via the app's existing corpus-wide rename (`NavigationModel.renameTag`,
-// which routes through the audited `TagWriter`). Kept dependency-free (no SwiftUI/AppKit) so it can
-// move into the shared `ArchiveCore` package at Archive Suite convergence.
+// historian may want to merge via the app's own rename (the Reader's `NavigationModel.renameTag`, which
+// routes through the audited `TagWriter`; Notes' `NotesModel.renameSubject`). Moved here from the Reader
+// so Notes and the shared Tags window use the same rule (W40.tag-rename-suite).
 //
 // The rule is deliberately CONSERVATIVE — a false grouping is just ignorable noise the user skips,
 // but we still keep them low so the list stays trustworthy:
@@ -19,12 +19,17 @@ import Foundation
 //     So short tokens like `tax`/`tab` or `1984`/`1985` are never grouped, but a one-character typo
 //     in a longer word is. Grouping is transitive (union-find): `A~B` and `B~C` land in one cluster.
 
-enum TagSimilarity {
+public enum TagSimilarity {
     /// A distinct subject tag paired with how many files carry it. The highest-count variant in a
     /// cluster is the suggested canonical form.
-    struct TagVariant: Sendable, Equatable {
-        let tag: String
-        let count: Int
+    public struct TagVariant: Sendable, Equatable {
+        public let tag: String
+        public let count: Int
+
+        public init(tag: String, count: Int) {
+            self.tag = tag
+            self.count = count
+        }
     }
 
     /// Group near-duplicate subject tags. `subjectCounts` maps each DISTINCT subject to its file
@@ -32,7 +37,7 @@ enum TagSimilarity {
     /// count desc (so `.first` is the suggested canonical), and clusters are sorted by total files
     /// desc (biggest blast-radius first). O(n²) over the distinct tag set — fine at a few thousand
     /// distinct subjects; pairs whose lengths differ by more than the cap are short-circuited.
-    static func clusters(subjectCounts: [String: Int]) -> [[TagVariant]] {
+    public static func clusters(subjectCounts: [String: Int]) -> [[TagVariant]] {
         // Deterministic, stable tag order so clusters are reproducible run to run.
         let tags = subjectCounts.keys.sorted()
         let n = tags.count
@@ -80,7 +85,7 @@ enum TagSimilarity {
 
     /// Lowercased, trimmed, internal-whitespace-collapsed. `split(whereSeparator:)` drops leading/
     /// trailing whitespace and collapses runs (default `omittingEmptySubsequences: true`).
-    static func normalize(_ s: String) -> String {
+    public static func normalize(_ s: String) -> String {
         s.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
@@ -98,7 +103,7 @@ enum TagSimilarity {
     }
 
     /// Standard two-row Levenshtein edit distance.
-    static func levenshtein(_ a: [Character], _ b: [Character]) -> Int {
+    public static func levenshtein(_ a: [Character], _ b: [Character]) -> Int {
         let m = a.count, n = b.count
         if m == 0 { return n }
         if n == 0 { return m }

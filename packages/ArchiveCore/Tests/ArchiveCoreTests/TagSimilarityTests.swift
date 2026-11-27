@@ -1,5 +1,5 @@
 import XCTest
-@testable import ArchiveReader
+@testable import ArchiveCore
 
 /// Pins the read-only near-duplicate subject-tag clustering (`TagSimilarity.clusters`): case/spacing
 /// variants always group, a real typo in a long tag groups, short distinct tags never group, grouping

@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCore
 
 /// Read-only near-duplicate subject-tag finder. Lists clusters of tags that look like typo / case /
 /// spacing variants of one another (from `TagSimilarity.clusters`), and lets the historian pick a
