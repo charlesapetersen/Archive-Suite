@@ -152,7 +152,10 @@ final class TagChangeLogTests: XCTestCase {
         let box = TagChangeLog.inbox(doc, app: TagChangeLog.notes, handled: [], applied: [],
                                      carried: [tagKey("CIVIL RIGHTS"), tagKey("Own tag")])
         XCTAssertEqual(box.offers, [carried], "matched by tagKey, own entries skipped")
-        XCTAssertEqual(box.settled, [absent.id])
+        XCTAssertEqual(box.settled, [], "a tag nothing carries now may be carried later: passed over, not settled")
+        let later = TagChangeLog.inbox(doc, app: TagChangeLog.notes, handled: [], applied: [],
+                                       carried: [tagKey("Nobody")])
+        XCTAssertEqual(later.offers, [absent])
         XCTAssertTrue(box.withdrawals.isEmpty)
     }
 
@@ -163,7 +166,7 @@ final class TagChangeLogTests: XCTestCase {
         XCTAssertEqual(box.offers, [ab, bc])
     }
 
-    func testInboxSettlesWithdrawnAndHandledAndReportsWithdrawalsOfAppliedOnes() {
+    func testInboxPassesOverWithdrawnAndSkipsHandledAndReportsWithdrawalsOfAppliedOnes() {
         var withdrawnUnseen = change("A tag", "B tag"); withdrawnUnseen.withdrawn = true
         var withdrawnApplied = change("C tag", "D tag"); withdrawnApplied.withdrawn = true
         let handled = change("E tag", "F tag")
@@ -172,8 +175,11 @@ final class TagChangeLogTests: XCTestCase {
                                      handled: [withdrawnApplied.id, handled.id], applied: [withdrawnApplied.id],
                                      carried: [tagKey("A tag"), tagKey("D tag"), tagKey("E tag")])
         XCTAssertEqual(box.offers, [])
-        XCTAssertEqual(box.settled, [withdrawnUnseen.id])
+        XCTAssertEqual(box.settled, [], "withdrawn but never applied: passed over, since a Redo may restore it")
         XCTAssertEqual(box.withdrawals, [withdrawnApplied])
+        var redone = withdrawnUnseen; redone.withdrawn = false
+        XCTAssertEqual(TagChangeLog.inbox(TagChangeDocument(changes: [redone]), app: TagChangeLog.notes, handled: [],
+                                          applied: [], carried: [tagKey("A tag")]).offers, [redone])
     }
 
     func testInboxSettlesARespellingForAnAppThatIgnoresIt() {

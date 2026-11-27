@@ -401,6 +401,76 @@ final class NotesNavigationModel: ObservableObject {
         return failed
     }
 
+    // MARK: Rename or merge a subject across the library (W40.tag-rename-suite)
+
+    /// Renames every subject in `olds` to `typed` on every note and extract carrying one, recording it for the other
+    /// apps, as one Undo step. Merging is renaming into a subject already in use.
+    @discardableResult
+    func renameSubjects(_ olds: [String], to typed: String, undo: UndoManager?) async -> SubjectRenameOutcome? {
+        guard let outcome = await model.renameSubjects(olds, to: typed), !outcome.changed.isEmpty else { return nil }
+        if let undo { registerUndoOfRename(outcome, with: undo) }
+        return outcome
+    }
+
+    /// Applies another app's recorded change here, as one Undo step (not recorded again).
+    @discardableResult
+    func applyTagChange(_ offer: TagChangeOffer, undo: UndoManager?) async -> SubjectRenameOutcome? {
+        guard let outcome = await model.applyTagChange(offer), !outcome.changed.isEmpty else { return nil }
+        if let undo { registerUndoOfRename(outcome, with: undo) }
+        return outcome
+    }
+
+    /// Edit ▸ Undo Rename Tag: puts back what the rename changed on each note (`NotesModel.undoRename`); Redo renames
+    /// those notes again and clears the withdrawal of the recorded change. Each step registers its opposite at once,
+    /// while the manager is undoing or redoing, and its work runs after the step before it (`enqueueDeleteHistory`), so
+    /// a quick Undo-Redo-Undo always finds its step and never runs ahead of one still saving.
+    private func registerUndoOfRename(_ outcome: SubjectRenameOutcome, with undo: UndoManager) {
+        let step = RenameHistoryStep()
+        step.outcome = outcome
+        registerUndoOfRename(step, name: Self.renameActionName(outcome), with: undo)
+    }
+
+    private func registerUndoOfRename(_ step: RenameHistoryStep, name: String, with undo: UndoManager) {
+        undo.registerUndo(withTarget: model) { [weak self, weak undo] model in
+            guard let self, let undo else { return }
+            self.registerRedoOfRename(step, name: name, with: undo)
+            self.enqueueDeleteHistory {
+                guard let outcome = step.outcome else { return }
+                step.restored = await model.undoRename(outcome)
+            }
+        }
+        undo.setActionName(name)
+    }
+
+    private func registerRedoOfRename(_ step: RenameHistoryStep, name: String, with undo: UndoManager) {
+        undo.registerUndo(withTarget: model) { [weak self, weak undo] model in
+            guard let self, let undo else { return }
+            let next = RenameHistoryStep()
+            self.registerUndoOfRename(next, name: name, with: undo)
+            self.enqueueDeleteHistory {
+                guard let outcome = step.outcome, !step.restored.isEmpty,
+                      var redone = await model.renameSubjects(outcome.from, to: outcome.to, only: step.restored,
+                                                              recording: false)
+                else { return }
+                redone.recorded = outcome.recorded
+                await model.withdrawTagChanges(Set(outcome.recorded), false)
+                next.outcome = redone
+            }
+        }
+        undo.setActionName(name)
+    }
+
+    /// One rename's Undo history: the rename it undoes (filled in once a Redo has run) and the notes its Undo put back.
+    private final class RenameHistoryStep {
+        var outcome: SubjectRenameOutcome?
+        var restored: Set<UUID> = []
+    }
+    // Queued on `enqueueDeleteHistory`, so Undo and Redo of renames and of deletes run one after another.
+
+    private static func renameActionName(_ outcome: SubjectRenameOutcome) -> String {
+        outcome.from.count > 1 ? "Merge Tags" : "Rename Tag"
+    }
+
     private func reportBulkTagFailure(_ failed: Int, of total: Int, verb: String) {
         guard failed > 0, total > 1 else { return }
         model.statusMessage = "Couldn't \(verb) \(failed) of \(total) notes. The others were saved."
@@ -878,7 +948,7 @@ final class NotesNavigationModel: ObservableObject {
         }
     }
 
-    /// Waits for the queued Undo and Redo steps of deletes to finish (tests).
+    /// Waits for the queued Undo and Redo steps of deletes and tag renames to finish (tests).
     func deleteHistorySettled() async { await deleteHistoryTail?.value }
 
     /// **Replicate** items into `target` (⌥-drag / "Add to Folder…"): add a membership, leaving every

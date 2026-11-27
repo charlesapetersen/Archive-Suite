@@ -566,6 +566,41 @@ struct ExtractCommands: Commands {
     }
 }
 
+/// Tags menu (W40.tag-rename-suite): rename or merge a subject across every note and extract, near-duplicates, and the
+/// renames other apps recorded in the archive. The focused window's sheets (`NotesTagRenameSheets`).
+struct TagCommands: Commands {
+    @FocusedValue(\.tagSheetAction) private var tags
+
+    var body: some Commands {
+        CommandMenu("Tags") {
+            Button("Rename Tag\u{2026}") { tags?.open(.rename(from: tags?.selectedSubject, to: "")) }
+                .disabled(tags == nil)
+            Button("Find Similar Tags\u{2026}") { tags?.open(.similar) }
+                .disabled(tags == nil)
+            Divider()
+            Button("Tag Changes from Other Apps\u{2026}") { tags?.open(.changes) }
+                .disabled(tags == nil)
+        }
+    }
+}
+
+struct TagSheetAction {
+    /// The first subject of the selected note, to seed Rename Tag….
+    var selectedSubject: String?
+    let open: @MainActor (NotesTagSheet) -> Void
+}
+
+struct TagSheetActionKey: FocusedValueKey {
+    typealias Value = TagSheetAction
+}
+
+extension FocusedValues {
+    var tagSheetAction: TagSheetAction? {
+        get { self[TagSheetActionKey.self] }
+        set { self[TagSheetActionKey.self] = newValue }
+    }
+}
+
 #if DEBUG
 /// Debug menu: insert a test source block to exercise the chip rendering + round-trip.
 struct DebugBlockCommands: Commands {

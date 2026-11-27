@@ -66,9 +66,12 @@ newer `schemaVersion` is never interpreted nor overwritten; an unreadable file i
 ### Each app's handled list
 
 Each app keeps, in its own settings, the ids of the entries it has handled for each archive root (keyed by the root
-marker's guid, so a moved archive keeps its list): applied, skipped, or its own. An entry is pending for an app when
-it is from another app, not withdrawn, not handled, and some item of this app carries `from`. An entry no item
-carries is marked handled without asking.
+marker's guid, so a moved archive keeps its list; Notes also by its library's guid, so a change skipped in one library
+is still offered in another): applied or skipped. An entry is offered when it is from another app, not withdrawn, not
+handled, and some item of this app carries `from` (a chain `A`→`B`, `B`→`C` is followed). One nothing carries yet, or
+withdrawn, is passed over without being marked, so a later tag or a Redo still brings it; only an entry that can never
+apply (a facet token; a re-spelling, for Notes) is marked handled without asking. An Apply that could not save every
+item leaves the entry offered. Notes reads only once its library has settled.
 
 ### When an app opens, or the other app is closed
 
@@ -85,7 +88,8 @@ The Processor has no items, so its vocabularies follow without asking (§Process
 ### Undo across apps
 
 Undo in the app that made the change reverts its own items, as today, and marks the entry `withdrawn`; Redo clears
-the mark. An app that has not yet applied the entry no longer offers it. An app that already applied it is not
+the mark. An app that has not yet applied the entry no longer offers it (and offers it again after the Redo). In the
+Reader's catalogue mode the catalogue journal holds the Undo, which does not withdraw the entry (KNOWN_ISSUES). An app that already applied it is not
 reverted behind the user's back: undoing a merge in one app cannot know which of the other app's items carried which
 tag, and the other app's own Edit ▸ Undo still holds its step if the user wants it. Its sheet shows the withdrawn
 entry once as a notice ("The Reader undid renaming “A” to “B”; your notes keep “B”. Use Rename Tag… to change them

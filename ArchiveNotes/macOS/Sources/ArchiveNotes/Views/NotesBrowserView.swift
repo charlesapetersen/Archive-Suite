@@ -41,7 +41,10 @@ struct NotesBrowserView: View {
     @State private var window: NSWindow?
     @State private var didConfigureWindow = false
     @State private var selectedTemplateID: UUID?
+    /// Tags ▸ Rename Tag…, Find Similar Tags… or Tag Changes from Other Apps… (W40.tag-rename-suite).
+    @State private var tagSheet: NotesTagSheet?
     @EnvironmentObject private var flushRegistry: EditorFlushRegistry
+    @EnvironmentObject private var previewState: SourceBlockPreviewState
     @Environment(\.openWindow) private var openWindow
     @Environment(\.undoManager) private var undoManager
 
@@ -144,6 +147,16 @@ struct NotesBrowserView: View {
         .sheet(item: $nav.advancedSearchRequest) { request in
             NotesAdvancedSearchSheet(nav: nav, request: request)
         }
+        .focusedSceneValue(\.tagSheetAction, TagSheetAction(selectedSubject: selectedSubject,
+                                                             open: { tagSheet = $0 }))
+        .sheet(item: $tagSheet) { sheet in tagSheetView(sheet) }
+        // Other apps' tag changes: read when the library is settled and whenever an archive is granted or lost, and
+        // offered in the Notes window only (the Extracts window shares the same notes).
+        .task(id: model.isIndexReady) {
+            model.archiveRoots = { [previewState] in previewState.reachableArchiveRoots() }
+            await offerTagChanges()
+        }
+        .onChange(of: previewState.archiveAccessRevision) { Task { await offerTagChanges() } }
         // File ▸ New Template… with no window open opened this one for it; the Extracts window leaves it alone.
         .onReceive(model.$pendingNewTemplate) { pending in
             guard pending, nav.windowKind == .note else { return }
@@ -170,6 +183,34 @@ struct NotesBrowserView: View {
                   nav.pendingDeletion?.id == pending.id, !Task.isCancelled else { return }
             await presentDeletion(pending, in: window)
         }
+    }
+
+    /// The first subject of the one selected note or extract, to seed Rename Tag….
+    private var selectedSubject: String? {
+        guard nav.selection.count == 1, let id = nav.selection.first else { return nil }
+        return model.allItems.first { $0.id == id }?.managedTags.first
+    }
+
+    @ViewBuilder
+    private func tagSheetView(_ sheet: NotesTagSheet) -> some View {
+        switch sheet {
+        case .rename(let from, let to):
+            // Opened from Find Similar Tags (a seeded new name), it goes back to that list when done.
+            NotesRenameTagSheet(model: model, nav: nav, from: from, to: to, undoManager: undoManager,
+                                onDone: to.isEmpty ? {} : { DispatchQueue.main.async { tagSheet = .similar } })
+        case .similar:
+            NotesSimilarTagsSheet(model: model) { variant, keep in
+                tagSheet = .rename(from: variant, to: keep)
+            }
+        case .changes:
+            NotesTagChangesSheet(model: model, nav: nav, undoManager: undoManager)
+        }
+    }
+
+    private func offerTagChanges() async {
+        guard model.isIndexReady, nav.windowKind == .note else { return }
+        await model.refreshTagChangeInbox()
+        if tagSheet == nil, !model.tagChangeOffers.isEmpty { tagSheet = .changes }
     }
 
     /// AppKit's sheet completion lets each prompt finish before the queue advances.

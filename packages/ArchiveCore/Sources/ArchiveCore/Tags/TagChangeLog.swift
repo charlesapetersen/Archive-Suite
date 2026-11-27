@@ -60,8 +60,9 @@ public enum TagChangeLog {
     /// The newest entries kept; older ones are dropped when one is added.
     public static let maxEntries = 2_000
     public static let reader = "reader", notes = "notes", processor = "processor"
-    /// Times a writer re-reads and tries again when another writer changed the document in between.
-    static let attempts = 5
+    /// Times a writer re-reads and tries again, after a short random wait, when another writer changed the document
+    /// in between.
+    static let attempts = 20
 
     public static func url(in root: URL) -> URL {
         root.appendingPathComponent(ContainerFile.folderName, isDirectory: true).appendingPathComponent(fileName)
@@ -111,8 +112,9 @@ public enum TagChangeLog {
     /// What an app has to do with the log when it opens: the entries to offer (Apply or Skip), the withdrawals of
     /// entries it applied (told once), and the entries it settles without asking. `carried` is the `tagKey` of
     /// every subject on its items. Entries are taken oldest first against that set as each offer would change it,
-    /// so `A`→`B` then `B`→`C` offers both. Settled without asking: a withdrawn entry it never applied, one no item
-    /// carries, and a re-spelling when `ignoresRespelling` (Notes title-cases every subject anyway).
+    /// so `A`→`B` then `B`→`C` offers both. Settled without asking: an entry it can never apply (a facet token, and a
+    /// re-spelling when `ignoresRespelling`: Notes title-cases every subject anyway). Passed over without settling: a
+    /// withdrawn entry it never applied (a Redo may restore it) and one no item carries now.
     public static func inbox(_ doc: TagChangeDocument, app: String, handled: Set<UUID>, applied: Set<UUID>,
                              carried: Set<String>, ignoresRespelling: Bool = false) -> TagChangeInbox {
         var box = TagChangeInbox()
@@ -123,11 +125,13 @@ public enum TagChangeLog {
                 continue
             }
             guard !handled.contains(change.id) else { continue }
-            guard isRecordable(from: change.from, to: change.to), !change.withdrawn,
-                  keys.contains(tagKey(change.from)), !(ignoresRespelling && change.isRespelling) else {
+            // Settled for good only when it can never apply here. A withdrawn entry may be redone, and a tag nothing
+            // carries now may be carried later (or the library was not loaded yet), so those are only passed over.
+            guard isRecordable(from: change.from, to: change.to), !(ignoresRespelling && change.isRespelling) else {
                 box.settled.append(change.id)
                 continue
             }
+            guard !change.withdrawn, keys.contains(tagKey(change.from)) else { continue }
             box.offers.append(change)
             if !change.isRespelling { keys.remove(tagKey(change.from)) }
             keys.insert(tagKey(change.to))
@@ -163,6 +167,7 @@ public enum TagChangeLog {
                                              expecting: stamp)
                 return
             } catch ContainerWriteError.changedSinceRead where attempt < attempts {
+                usleep(UInt32.random(in: 2_000...20_000))
                 continue
             }
         }

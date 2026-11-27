@@ -209,6 +209,14 @@ final class ReaderRootStore: ObservableObject {
         knownRoots[guid]
     }
 
+    /// Every granted root that opens now, with its guid (`root(for:)` for each, so each scope is started and kept):
+    /// where Notes records a tag rename and reads the other apps' (W40.tag-rename-suite). A read; writes nothing.
+    func reachableRoots() -> [(guid: UUID, url: URL)] {
+        knownRoots.keys.sorted { $0.uuidString < $1.uuidString }.compactMap { guid in
+            root(for: guid).map { (guid, $0) }
+        }
+    }
+
     /// Look up a Reader root by its marker GUID.
     /// Starts the security scope if not already active; returns `nil` on miss.
     ///

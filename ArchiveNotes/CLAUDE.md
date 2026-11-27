@@ -15,7 +15,10 @@ per-file descriptions and backstory are in [`REFERENCE.md`](REFERENCE.md), read 
   W49.notes-store-format; detail in REFERENCE.md). The archive corpus is **read‑only** —
   durable‑link resolution and page rendering only; no tag writes, no moves, no deletes on corpus files. ⚠️ That
   holds **by code discipline, not by the OS**: a granted archive root *is* writable from Notes. Nothing may write
-  there; treat any code near a corpus URL as Tier-2.
+  there; treat any code near a corpus URL as Tier-2. The two exceptions are suite files, each through one ArchiveCore
+  seam: the root marker (`RootMarker`, when a root is granted) and the tag change log
+  `<root>/.archivesuite/tag-changes.json` (`TagChangeLog`, after a rename or merge and its Undo; W40.tag-rename-suite,
+  SPEC/tag-format.md invariant 8).
 - The **only** Finder‑tag writer is `NotesTagProjector` (W2), which mirrors title-cased front‑matter
   `tags` (subjects), the canonical Quality facet `Q1`–`Q3`, **and date into the existing
   Year/Month/Day/Decade facets** onto the note's own `.md` file via `ArchiveCore.CoordinatedTagWriter` —

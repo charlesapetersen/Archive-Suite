@@ -126,6 +126,11 @@ macOS/Sources/ArchiveNotes/
                                    symlink can't leave the granted root by either door — the exact path or
                                    a basename match, which is skipped (walk continues) if it escapes (W23.l1)
   Core/
+    NotesModel+TagRename.swift     Tags ▸ Rename Tag… and Merge over every note and extract (renameSubjects:
+                                   one rewriteSubjects transaction per note, front matter then mirror; undoRename
+                                   puts back only what it changed), recorded in each reachable archive's
+                                   ArchiveCore TagChangeLog; other apps' changes read into tagChangeOffers,
+                                   applied or skipped (W40.tag-rename-suite)
     NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
                                    (+ index/root in the app path); @Published folder tree + scope;
                                    async create/rename/move/delete folders + selection scope (W6-S2);
@@ -392,6 +397,9 @@ macOS/Sources/ArchiveNotes/
                                    pasteboardWriterForRow, id-only) + accent-glyph replicant title styling (W6-S5)
     QualityControl.swift           Inspector facet buttons plus compact borderless list menu; both call
                                    the existing quality setter (W9.d4)
+    NotesTagRenameSheets.swift     Tags menu sheets: Rename Tag…, Find Similar Tags… (ArchiveCore TagSimilarity),
+                                   Tag Changes from Other Apps…; they only choose, the navigation model writes
+                                   with one Undo (W40.tag-rename-suite)
     NoteBulkInspector.swift        The inspector with several notes selected: Quality and Tags (add on Return,
                                    ✕ removes) for them all, each note saved on its own; `NoteBulkTags` counts
                                    the tags across them, also for the row menu's Remove Tag (W49.notes-multiselect-actions)

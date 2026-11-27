@@ -434,6 +434,9 @@ final class SourceBlockPreviewState: ObservableObject {
     /// hand — the other of the two entry points `ReaderRootChooser` exists for (W26.notesabsence-fu2).
     private let chooser: ReaderRootChooser
 
+    /// The archives Notes can reach now (`ReaderRootStore.reachableRoots`), for the tag change log.
+    func reachableArchiveRoots() -> [(guid: UUID, url: URL)] { rootStore.reachableRoots() }
+
     init() {
         let store = ReaderRootStore(defaults: Self.rootGrantDefaults)
         self.rootStore = store

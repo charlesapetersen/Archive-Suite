@@ -80,6 +80,7 @@ struct ArchiveNotesApp: App {
             SourceBlockCommands()
             ZoteroCommands()
             ExtractCommands()
+            TagCommands()
             LayoutCommands()
             AdvancedSearchCommands()
             DeleteCommands()

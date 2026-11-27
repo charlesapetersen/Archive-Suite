@@ -91,6 +91,18 @@ final class NotesModel: ObservableObject {
     /// items after a folder delete). The view surfaces it and clears it.
     @Published var statusMessage: String?
 
+    // MARK: Tag changes across the apps (W40.tag-rename-suite; `NotesModel+TagRename`)
+
+    /// The archives Notes can reach now, each with its root marker guid: where a rename is recorded and where other
+    /// apps' changes are read. Set by the app from its Reader root store; empty in a model nobody wired.
+    var archiveRoots: @MainActor () -> [(guid: UUID, url: URL)] = { [] }
+    /// Where the handled lists are kept: nil is the app's own settings; tests pass a throwaway suite.
+    var tagChangeDefaultsSuite: String?
+    /// Which library the handled lists belong to; nil is the library's guid (tests set their own).
+    var tagChangeLibraryKey: String?
+    /// Other apps' changes waiting for the user's Apply or Skip, and withdrawals of ones Notes applied.
+    @Published var tagChangeOffers: [TagChangeOffer] = []
+
     // MARK: In-app navigation (W7-S3 jump-to-source; also consumes external archivenotes:// opens)
 
     /// A request to reveal an item (and optionally scroll to a block) in the window that features its
@@ -258,6 +270,10 @@ final class NotesModel: ObservableObject {
     /// The library this launch opened, or nil when none is (or for an injected test store). A switch restarts the
     /// app (`StoreFolderChooser`), so this never changes while it runs.
     var libraryURL: URL? { rootStore?.root }
+    /// The library's own identity, for the per-library tag change lists (W40.tag-rename-suite).
+    var libraryGUID: UUID? { rootStore?.marker?.guid }
+    /// A library is open and its first index pass has settled (always, for a model handed its stores).
+    var isLibrarySettled: Bool { ownsDataLayer ? rootStore?.root != nil && isIndexReady : true }
 
     /// Whether there is a library to make notes in. An injected (test) store always counts as one.
     var isLibraryOpen: Bool { ownsDataLayer ? rootStore?.root != nil : true }
@@ -1307,6 +1323,47 @@ final class NotesModel: ObservableObject {
         return await mutateItem(id, "remove the note's tag", projectSubjects: true) {
             $0.tags = NotesTagVocabulary.normalizedSubjects($0.tags).filter { $0 != token }
         }
+    }
+
+    /// Rewrites `id`'s subjects with `transform` in one atomic transaction on its latest front matter, then mirrors
+    /// them, as the tag bar's edits do; for a rename or merge across notes (`NotesModel+TagRename`). `transform` sees
+    /// the subjects as they are on disk and must be pure; a note it leaves as it was is not rewritten. Returns the
+    /// subjects before and after once the front matter is saved (even when the Finder mirror then failed, which it
+    /// reports, since the front matter is the truth an Undo must put back); nil when nothing was saved.
+    func rewriteSubjects(of id: UUID, _ action: String,
+                         _ transform: @escaping @Sendable ([String]) -> [String])
+        async -> (before: [String], after: [String], mirrored: Bool)? {
+        guard let noteStore else { return nil }
+        let tx: ItemTransaction
+        let seen = SubjectsSeen()
+        do {
+            let current = try await noteStore.load(id)
+            if NotesTagVocabulary.normalizedSubjects(transform(current.tags)) == current.tags {
+                return (current.tags, current.tags, true)
+            }
+            tx = try await noteStore.withItem(id, projectSubjects: Self.projectSubjectTags) { item in
+                seen.value = item.tags
+                item.tags = NotesTagVocabulary.normalizedSubjects(transform(item.tags))
+                item.modified = Date()
+            }
+        } catch {
+            report(error, action)
+            return nil
+        }
+        // Saved from here on: a later failure is reported, never taken for an unsaved note.
+        do {
+            let indexTx = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
+            if let index { try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)]) }
+        } catch { report(error, action) }
+        if let failure = tx.subjectProjectionError {
+            report(NoteStore.StoreError.writeFailed(failure), "project the note's tags (retry the tag edit)")
+        }
+        return (seen.value, tx.item.tags, tx.subjectProjectionError == nil)
+    }
+
+    /// What `rewriteSubjects`' transaction saw; written once, inside it, and read after it returns.
+    private final class SubjectsSeen: @unchecked Sendable {
+        var value: [String] = []
     }
 
     nonisolated private static func projectSubjectTags(
