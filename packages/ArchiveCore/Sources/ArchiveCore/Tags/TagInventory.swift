@@ -89,6 +89,9 @@ public struct TagInventory: Sendable, Equatable {
         byKey[tagKey(tag.trimmingCharacters(in: .whitespacesAndNewlines))]
     }
 
+    /// The entry with this `tagKey` (an `Entry.id`).
+    public func entry(forKey key: String) -> Entry? { byKey[key] }
+
     /// The near-duplicate groups among the subjects (`TagSimilarity`), each a list of entries, most carried first.
     /// Two spellings of one tag are one entry already, so a group here is always two or more different tags.
     public func similarClusters() -> [[Entry]] {

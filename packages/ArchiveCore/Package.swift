@@ -13,5 +13,6 @@ let package = Package(
         .target(name: "ArchiveCore"),
         .target(name: "ArchiveCoreUI", dependencies: ["ArchiveCore"]),
         .testTarget(name: "ArchiveCoreTests", dependencies: ["ArchiveCore"]),
+        .testTarget(name: "ArchiveCoreUITests", dependencies: ["ArchiveCore", "ArchiveCoreUI"]),
     ]
 )
