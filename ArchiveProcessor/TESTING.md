@@ -504,6 +504,9 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-tagging-failure.sh`** — a failed tagging CALL (W49.proc-fix-s042): a 500, a timeout, a non-JSON reply and
   an error JSON with a 200 are named in the status line and the log and not counted as tagged; a Redo clears them.
   In the VM, `journey-bulk-ocr.sh --route fake --fail-tags N,M` does the same through Process Files.
+- **`repro-live-tagging-failure.sh`** — the same in Live Capture (W49.proc-fix-s045): one tagging call gets a 500;
+  the refused document's row and the Finish summary name it with its reason, the control stays clean, both PDFs
+  file with their OCR text. Headless, scratch paths, $0.
 
 **File & tag safety (no undo → Tier-2 territory)**
 - **`scripts/lint-write-surface.sh`** — source-level backstop for Processor's write boundary: direct

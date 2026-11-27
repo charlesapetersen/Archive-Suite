@@ -95,12 +95,15 @@ protocol ProcessableItem: Identifiable {
     var availableActions: [ItemAction] { get }
     /// Finder tags applied to the output (Files pane). Defaulted empty so Live's `SegmentItem` can omit it.
     var appliedTags: [String] { get }
+    /// An amber note on an item that did file: Live's failed tagging call (W49.proc-fix-s045). Defaulted nil.
+    var warningMessage: String? { get }
 }
 
 extension ProcessableItem {
     // `Identifiable` conformance from the stable per-item key.
     var id: String { itemID }
     var appliedTags: [String] { [] }
+    var warningMessage: String? { nil }
 }
 
 /// The row is action-source-agnostic: each pane supplies a handler that performs an action on an item id.

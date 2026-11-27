@@ -27,6 +27,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var failureKind: FailureKind? = nil
         var errorMessage: String? = nil
         var errorCode: String? = nil
+        /// W49.proc-fix-s045 — why the document's tagging call gave no tags (`StagedSegment.taggingFailure`).
+        var taggingFailure: String? = nil
         /// `succeededNoText`: complete output with some or all pages image-only. The amber row offers
         /// per-document Retry, while bulk "Retry failed" counts only documents that cannot be filed.
         enum Phase: String {
@@ -83,6 +85,11 @@ final class LiveCaptureProcessor: ObservableObject {
         var catalogueRecords: [Data]? = nil
         var preservationCopies: [ProcessorPreservationFiling]? = nil
         var catalogueDestination: CatalogueDestination? = nil
+        /// W49.proc-fix-s045 — why the automatic tagging call gave no tags (a refusal after `NetworkSession`'s
+        /// retries, or a reply that was not the tag JSON). The document is still filed, with its OCR text and the
+        /// fallback tags; this is what the row and the Finish summary name it by. nil when the call answered or
+        /// none was made.
+        var taggingFailure: String? = nil
 
         var numberedSlots: Int {
             pdfURLs.count == 1 && imageURLs.count > 1 ? imageURLs.count : pdfURLs.count
@@ -1045,6 +1052,7 @@ final class LiveCaptureProcessor: ObservableObject {
             }
             groupRotationOverride[gid] = rotation
             setStatusDetail(gid, kind: nil, error: nil)   // clear the stale reason line
+            if let idx = statuses.firstIndex(where: { $0.id == gid }) { statuses[idx].taggingFailure = nil }
             setPhase(gid, .ocr)
             toReprocess.append(gid)
         }
@@ -1391,9 +1399,10 @@ final class LiveCaptureProcessor: ObservableObject {
         // card it still offers used to be discarded without a word. A box or folder stays untagged: without
         // its app colour, a phone year or Q would make its label photo read as a rated document.
         let humanOnly = config.taggingMode == .none
-        var tags = humanOnly
-            ? GeneratedTags(subjectTags: mac?.subjects ?? [])
+        let computed = humanOnly
+            ? (tags: GeneratedTags(subjectTags: mac?.subjects ?? []), failure: nil)
             : await computeTags(group: group, segment: segment, mac: mac, config: config)
+        var tags = computed.tags
         // B8: a Clear during the tagging call ends here, before the names and dating calls below spend anything or
         // re-read the settings of a session that is gone (W46.date-route-other-paths).
         guard clearGeneration == startedGeneration else { return }
@@ -1506,6 +1515,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // `retained[]`, so rotation-review regeneration now re-reads the live map instead of replaying a
         // snapshot of it. Falls back to the pinned value if the map was emptied.
         outcome.collectionKey = groupCollectionKey[groupId] ?? collectionKey
+        outcome.taggingFailure = computed.failure
 
         staged.append(outcome)
         // Retain the write inputs so an end-of-session rotation review can regenerate this segment.
@@ -1591,6 +1601,10 @@ final class LiveCaptureProcessor: ObservableObject {
             setStatusDetail(groupId, kind: nil, error: nil)
             setPhase(groupId, .staged)
         }
+        // W49.proc-fix-s045 — beside whichever label the output earned: a document filed without its subjects.
+        if let idx = statuses.firstIndex(where: { $0.id == groupId }) {
+            statuses[idx].taggingFailure = outcome.taggingFailure
+        }
     }
 
     /// A page whose OCR request got no reading at all: a rejected request (HTTP or a provider-specific code),
@@ -1622,21 +1636,25 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// Compute the segment's subject/color tags (may hit the LLM). Date/quality are layered on later.
-    private func computeTags(group: CaptureGroup, segment: DocumentSegment,
-                             mac: MacSegmentTags?, config: SessionProcessingConfig) async -> GeneratedTags {
+    /// W49.proc-fix-s045 — `failure` is why the automatic tagging call gave no tags, as in Process Files
+    /// (W49.proc-fix-s042); the tags are then the old fallback, so the document still files with its text and date.
+    private func computeTags(group: CaptureGroup, segment: DocumentSegment, mac: MacSegmentTags?,
+                             config: SessionProcessingConfig) async -> (tags: GeneratedTags, failure: String?) {
         if group.type != .document {
             // Box/Folder → color tag (TagGenerator returns Box/Red or Folder/Purple with no LLM call).
-            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.textProvider,
-                                                     model: config.textModel, thinkingLevel: nil, apiKey: config.textAPIKey,
-                                                     vocabulary: [], gatewayConfig: config.textGateway, localAgent: config.textLocalAgent)
+            return (await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.textProvider,
+                                                      model: config.textModel, thinkingLevel: nil, apiKey: config.textAPIKey,
+                                                      vocabulary: [], gatewayConfig: config.textGateway,
+                                                      localAgent: config.textLocalAgent), nil)
         }
-        if let subs = mac?.subjects, !subs.isEmpty { return GeneratedTags(subjectTags: subs) }   // Mac-tagged → no LLM
+        if let subs = mac?.subjects, !subs.isEmpty { return (GeneratedTags(subjectTags: subs), nil) }   // Mac-tagged → no LLM
         if config.taggingMode == .automatic {
-            return await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: config.textProvider,
-                                                     model: config.textModel, thinkingLevel: nil, apiKey: config.textAPIKey,
-                                                     vocabulary: config.tagVocabulary, gatewayConfig: config.textGateway, localAgent: config.textLocalAgent)
+            return await TagGenerator().generateTagsReporting(
+                for: segment, nearbySegments: [], provider: config.textProvider, model: config.textModel,
+                thinkingLevel: nil, apiKey: config.textAPIKey, vocabulary: config.tagVocabulary,
+                gatewayConfig: config.textGateway, localAgent: config.textLocalAgent)
         }
-        return GeneratedTags()   // manual mode, no Mac subjects → date/quality only
+        return (GeneratedTags(), nil)   // manual mode, no Mac subjects → date/quality only
     }
 
     /// The resolved settings the names policy and the dating route read, loaded once per session config.
@@ -2635,6 +2653,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 // rather than keep `outcome.collectionKey`, which was fixed before the write above suspended.
                 var fresh = outcome
                 fresh.collectionKey = self.liveCollectionKey(for: outcome.groupId)
+                // W49.proc-fix-s045 — the rewrite reuses the tags kept from the first pass and asks nothing again.
+                fresh.taggingFailure = self.staged[idx].taggingFailure
                 self.staged[idx] = fresh
                 // W3.cap-r3-fu6 — the record is new, so its LABEL has to be re-derived too. Replacing the
                 // record and keeping the old label let the two disagree in both directions (see
@@ -2884,6 +2904,11 @@ final class LiveCaptureProcessor: ObservableObject {
             let filedUntagged = self.staged
                 .filter { filedGroups.contains($0.groupId) }
                 .reduce(0) { $0 + ($1.untaggedOutputs?.count ?? 0) }
+            // W49.proc-fix-s045 — filed documents whose tagging call failed, by the file name they landed under.
+            let taggingFailures = self.staged.compactMap { seg -> String? in
+                guard filedGroups.contains(seg.groupId), let reason = seg.taggingFailure else { return nil }
+                return "\(outcome.firstPDFs[seg.groupId]?.fileName ?? seg.groupId): \(reason)"
+            }
 
             // Pair filing copies out of staging. Keep those copies until the destination receipt and
             // duplicate-rejection ledger both exist, then retire only the verified groups' working PDFs.
@@ -3003,6 +3028,10 @@ final class LiveCaptureProcessor: ObservableObject {
                 let n = filedUntagged
                 self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
                     + " ⚠️ \(n) filed file\(n == 1 ? "" : "s") could NOT be tagged — \(n == 1 ? "it is" : "they are") in the collection, but \(n == 1 ? "it carries" : "they carry") NO Finder tags, so tag searches in the Reader will not find \(n == 1 ? "it" : "them"). Re-tag \(n == 1 ? "it" : "them") from the output folder (Process Files → re-tag), or check the folder's permissions before the next session."
+            }
+            if !taggingFailures.isEmpty {
+                self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
+                    + " " + Self.taggingFailureNote(taggingFailures)
             }
             if let containerProblem {
                 self.finalizeSummary = (self.finalizeSummary ?? outcome.summary) + " ⚠️ " + containerProblem
@@ -3418,6 +3447,15 @@ final class LiveCaptureProcessor: ObservableObject {
         return FinalizeOutcome(summary: summary, failedMoves: failedMoves, movedFiles: movedFiles,
                                filedGroupIds: filedGroupIds, allFiled: allFiled, firstPDFs: firstPDFs,
                                filedNames: filedNames, filedExports: filedExports)
+    }
+
+    /// W49.proc-fix-s045 — the Finish warning for filed documents whose tagging call failed, each named with its reason.
+    nonisolated static func taggingFailureNote(_ named: [String]) -> String {
+        let n = named.count
+        return "⚠️ \(n) filed document\(n == 1 ? "'s tagging call" : "s' tagging calls") failed"
+            + " (\(OCRProcessor.namesForWarning(named))), so \(n == 1 ? "it has" : "they have") no subject tags"
+            + " from the model. \(n == 1 ? "Its" : "Their") text and date were filed; re-tag \(n == 1 ? "it" : "them")"
+            + " from the output folder (Process Files → re-tag)."
     }
 
     nonisolated private static func imageOnlyFilingNote(pageCount: Int) -> String {

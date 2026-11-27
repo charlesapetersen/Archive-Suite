@@ -262,12 +262,11 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
   [Verification record](../verification/evidence/processor/W49.proc-s046-verify.md)
   (accepted: fixed in W49.proc-s046-review-toggle, 3d07b226).
 
-## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
+## FIXED (S-045, 2026-11-26) — Live Capture names a document whose tagging call failed
 
-- A refused tagging request leaves the filed PDF with its OCR text and phone-entered date but without model
-  subjects. The Processing row shows success, and Finish gives no warning. Reproduced on scratch PDFs at
-  `7252c39b` in `LiveCaptureProcessor.computeTags` and independently confirmed at `645c7845` (W49.proc-s045-check).
-  [Evidence](../verification/evidence/processor/W49.proc-s045-verify.md). (queued: W49.proc-fix-s045)
+- A refused tagging request still files the PDF with its OCR text and date and no model subjects, but its row now
+  says so with the reason, and Finish adds a ⚠️ note naming the filed file and the reason.
+  [Evidence](../verification/evidence/processor/W49.proc-fix-s045.md). (accepted: fixed in W49.proc-fix-s045)
 
 ## FIXED (S-049, 2026-11-21) — the README describes the folder intake prompt
 

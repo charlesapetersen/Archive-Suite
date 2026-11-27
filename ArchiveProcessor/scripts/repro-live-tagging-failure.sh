@@ -1,5 +1,6 @@
 #!/bin/bash
-# S-045 on scratch JPEGs with an injected gateway, no key, network or window.
+# S-045 on scratch JPEGs with an injected gateway, no key, network or window. Since W49.proc-fix-s045 it is that fix's
+# regression: it fails unless the refused document is named with its reason in its row and in Finish.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,7 +21,7 @@ ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     processor_test_start pid "$bin" -reviewRotation NO \
     -rotationDefaultMigratedV1 YES -contextRemovedMigratedV1 YES >"$work/app.log" 2>&1
 
-for ((i=0; i<40; i++)); do
+for ((i=0; i<150; i++)); do
     if [ "$(processor_test_child_state "$pid")" = exited ]; then
         result=0
         wait "$pid" || result=$?

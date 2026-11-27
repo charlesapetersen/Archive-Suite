@@ -157,6 +157,13 @@ struct ProcessableItemRow: View {
                     .padding(.leading, 22)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // W49.proc-fix-s045 — beside the line above: the document filed, but its tagging call failed.
+            if let warning = item.warningMessage, !isFailed {
+                Text(warning)
+                    .font(.caption2).foregroundStyle(.orange)
+                    .padding(.leading, 22)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if isExpanded { expandedDetail }
         }
@@ -216,6 +223,11 @@ struct ProcessableItemRow: View {
         }
         if case .failed(let kind) = item.state { return kind.label }
         return nil
+    }
+
+    private var isFailed: Bool {
+        if case .failed = item.state { return true }
+        return false
     }
 
     private var classificationBackground: Color {

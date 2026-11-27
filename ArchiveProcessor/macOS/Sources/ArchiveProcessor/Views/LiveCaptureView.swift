@@ -1492,6 +1492,7 @@ struct SegmentItem: ProcessableItem {
     let errorCode: String?
     let providerModel: String?
     let availableActions: [ItemAction]
+    let warningMessage: String?
 
     init(status s: LiveCaptureProcessor.SegmentStatus, ocrText: String?, providerModel: String?,
          expanded: Bool, finalizing: Bool) {
@@ -1507,6 +1508,9 @@ struct SegmentItem: ProcessableItem {
         self.errorCode = s.errorCode
         self.providerModel = providerModel
         self.availableActions = expanded ? Self.actions(for: st, finalizing: finalizing) : []
+        self.warningMessage = s.taggingFailure.map {
+            "No subject tags from the model: its tagging call failed (\($0)). Its text and date will still be filed."
+        }
     }
 
     static func state(for s: LiveCaptureProcessor.SegmentStatus) -> ItemState {

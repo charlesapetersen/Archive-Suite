@@ -5,6 +5,8 @@ import Foundation
 import PDFKit
 
 /// Drives Live Capture from page receipt through Skip and Finish on synthetic pages.
+/// W49.proc-fix-s045 — the regression for S-045: the refused document is named with its reason in its row and in the
+/// Finish summary, and the control document stays clean.
 @MainActor
 enum LiveCaptureTaggingFailureTestDriver {
     nonisolated static let envKey = "LIVECAPTURE_TAGGING_FAILURE_TEST"
@@ -164,6 +166,14 @@ enum LiveCaptureTaggingFailureTestDriver {
                                   providerModel: config.retryBackendDescription, expanded: true, finalizing: false)
             lines.append("\(id) staged Finder tags: \(try MacOSTagger.readTags(from: pdf).sorted())")
             lines.append("\(id) row: \(row.title), \(row.state), error=\(row.errorMessage ?? "nil"), code=\(row.errorCode ?? "nil"), actions=\(row.availableActions)")
+            lines.append("\(id) row warning: \(row.warningMessage ?? "nil")")
+            if id == "REFUSED-MEMO" {
+                guard row.state == .succeeded, row.warningMessage?.contains("HTTP 500") == true else {
+                    throw ProbeError("the refused document's row does not name its failed tagging call")
+                }
+            } else if row.warningMessage != nil || status.taggingFailure != nil {
+                throw ProbeError("the control document's row carries a tagging warning")
+            }
             lines.append("\(id) session status: \(session.statusMessage)")
         }
         let requests = await gateway.statuses
@@ -209,6 +219,14 @@ enum LiveCaptureTaggingFailureTestDriver {
         let summary = processor.finalizeSummary ?? ""
         lines.append("Finish summary: \(summary)")
         lines.append("Finish shows warning: \(LiveCaptureProcessor.summaryReportsProblem(summary))")
+        // The control files first, as 000001; the refused document as 000002.
+        guard !summary.contains("000001 S045.pdf") else { throw ProbeError("Finish named the control document") }
+        if !macFields {
+            guard LiveCaptureProcessor.summaryReportsProblem(summary), summary.contains("tagging call failed"),
+                  summary.contains("(000002 S045.pdf: "), summary.contains("HTTP 500") else {
+                throw ProbeError("Finish does not name the refused document and its reason: \(summary)")
+            }
+        }
         let folder = out.appendingPathComponent("S045", isDirectory: true)
         let pdfs = try fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "pdf" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
@@ -237,8 +255,9 @@ enum LiveCaptureTaggingFailureTestDriver {
         return lines.joined(separator: "\n")
     }
 
+    /// Up to 60 s: a cold first launch after a build can take longer than 10 s to stage the first document.
     private static func wait(for operation: String, until ready: () -> Bool) async throws {
-        for _ in 0..<400 {
+        for _ in 0..<2400 {
             if ready() { return }
             try await Task.sleep(for: .milliseconds(25))
         }
