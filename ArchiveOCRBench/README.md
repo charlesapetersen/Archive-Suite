@@ -19,7 +19,9 @@ What the bench has measured, as one page you can read and share. It has seven pa
    passes them to `difficulty.analyse`), so Gemini 3.7 and the cluster runs other than FarmShare's Qwen3.6 27B are not in part 5.
 2. **Segmentation.** How well each approach splits a box of photographs into documents, on the two locked test
    boxes (Stanton and RG 165, 363 pages): pages in the exact document with no checking, against price; and, in a
-   table, the checks per 100 pages each needs, the pages right after checking, and the errors left unflagged.
+   checking chart (`#seg-check-canvas`, `W49.bench-seg-check-chart`, grouping and labelling coincident routes such
+   as Claude only and Claude with ChatGPT) and table, the checks per 100 pages each needs, the pages right after
+   checking, and the errors left unflagged.
 3. **Handwriting on the Mac.** The on-device handwriting readers the Vision OCR lab measured on its own 19
    handwritten truth pages, as missed and added words. A different truth set and score from part 1; the pick and
    runner-up are also on part 1's charts as Mac routes, scored by NES (W41.mac-local-hw).

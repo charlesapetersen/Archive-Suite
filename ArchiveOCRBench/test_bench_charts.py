@@ -63,6 +63,24 @@ class BenchChartsTests(unittest.TestCase):
         self.assertIn('id="fs-news-chart"', html)
         self.assertIn("renderNews()", html)
 
+    def test_segmentation_checking_chart_covers_all_routes_and_identifies_shared_points(self):
+        d = json.loads((ROOT / "data" / "panel-data.json").read_text())
+        seg = d["segmentation"]
+        self.assertEqual(len(seg), 15)
+        groups = {}
+        for row in seg:
+            self.assertIsNotNone(row["checks"])
+            self.assertIsNotNone(row["after"])
+            key = (round(row["checks"], 1), round(row["after"], 1))
+            groups.setdefault(key, []).append(row["name"])
+        self.assertIn((10.2, 98.5), groups)
+        self.assertEqual(sorted(groups[(10.2, 98.5)]), ["Claude and ChatGPT together", "Claude only"])
+        self.assertIn((86.8, 100.0), groups)
+        self.assertEqual(len(groups[(86.8, 100.0)]), 3)
+        html = (ROOT / "site" / "index.html").read_text()
+        self.assertIn('id="seg-check-canvas"', html)
+        self.assertIn("renderSegCheck()", html)
+
 
 if __name__ == "__main__":
     unittest.main()

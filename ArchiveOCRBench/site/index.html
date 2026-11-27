@@ -124,6 +124,8 @@ footer p { font-size: 13px; }
   </section>
   <section class="panel" id="seg-table">
     <div class="head"><h2>With checking</h2><span class="meta">each approach at its flag level frozen for the 98% bar</span></div>
+    <p class="note" id="seg-check-note"></p>
+    <div class="plot" style="height:360px"><canvas id="seg-check-canvas" role="img" aria-label="Segmentation with checking: checks per 100 pages against pages right after checking for every segmentation approach"></canvas></div>
     <div class="tbl"><table><thead><tr><th>#</th><th>Approach</th><th>No checking</th><th>Checks per 100 pages</th><th>Right after checking</th><th>Unflagged errors</th><th>Per 1,000</th><th>Batch</th></tr></thead><tbody id="seg-rows"></tbody></table></div>
     <p class="note">Full manual asks about every boundary and costs nothing; it is the floor. Prices are API list and batch prices per 1,000 pages, from tokens measured over all five boxes. Claude and ChatGPT ran on their subscriptions, so theirs are what the same requests would cost on the API. Gemini 3.8 Flash is at an introductory price until 31 Dec 2026; at the later price its $3.61 becomes $7.22 ($3.61 by batch). GLM-5.3 Flash, GPT-5.6 Luna and Qwen3.5 Flash were the cheap models that survived a one-box screen; all three did worse off that box. Qwen3.5 27B on FarmShare is the open-weight model that cleans the corpus labels a small Mac model will be trained on; it ran on Stanford's GPUs, which bill nothing, but it is too large for the Mac, so it is priced at OpenRouter's rate for its measured tokens (seven-page windows at stride 3, from its FarmShare run on the Deaver box), and its confidences are too even to flag on, so reaching 98% means checking every gap, as Full manual does. Every error count here is small, so one or two errors either way is noise, and a zero on 363 pages is not a promise of zero. The fine-tuned Qwen3.5 4B and 2B are small models trained on the owner's corpus with that teacher's cleaned labels, so they can run on an 8 or 16 GB Mac and are free; these are their FarmShare figures at full precision, and the Mac's own 4-bit and 8-bit figures are in <code>seg-students.md</code>. Sources: <code>options.md</code>, <code>cheap-models.md</code>, <code>seg-teacher.md</code> and <code>seg-students.md</code> in <code>ArchiveProcessor/segbench-results/</code>.</p>
   </section>
@@ -78673,6 +78675,101 @@ document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num 
   '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? (a.std ? money(a.std) + ' (OpenRouter rate)' : 'free, fits on the Mac') : a.mac ? 'free, on your Mac' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
 charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
 
+// W49.bench-seg-check-chart: checks per 100 pages vs pages right after checking for every segmentation route,
+// grouping and labelling approaches that fall on the same point (e.g. Claude only and Claude with ChatGPT).
+const segCheckMap = new Map();
+SEG.filter(a => a.checks != null && a.after != null).forEach(a => {
+  const k = a.checks.toFixed(1) + '|' + a.after.toFixed(1);
+  if (!segCheckMap.has(k)) segCheckMap.set(k, { x: a.checks, y: a.after, items: [] });
+  segCheckMap.get(k).items.push(a);
+});
+const segCheckP = [...segCheckMap.values()];
+segCheckP.forEach(p => {
+  p.label = p.items.map(a => a.num).join(', ');
+  p.front = !segCheckP.some(q => q !== p && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y));
+});
+const segShared = segCheckP.filter(p => p.items.length > 1);
+const segBestCheck = segCheckP.filter(p => p.front).sort((a, b) => a.x - b.x);
+document.getElementById('seg-check-note').textContent =
+  'Each point plots one or more approaches from the table below (numbered #1–#' + SEG.length + '; fewer checks and higher accuracy are better). ' +
+  'Best-value frontier: ' + segBestCheck.map(p => p.items.map(a => a.name).join(' / ') + ' (' + p.x.toFixed(1) + ' checks, ' + p.y.toFixed(1) + '%)').join('; ') + '. ' +
+  (segShared.length ? 'Routes sharing one point: ' + segShared.map(p => p.items.map(a => '#' + a.num + ' ' + a.name).join(' & ') + ' at (' + p.x.toFixed(1) + ' checks, ' + p.y.toFixed(1) + '%)').join('; ') + '.' : '');
+
+let segCheckChart = null;
+function renderSegCheck() {
+  const cv = document.getElementById('seg-check-canvas');
+  if (!cv || !segCheckP.length) return;
+  if (segCheckChart) segCheckChart.destroy();
+  const acc = css('--accent'), oth = css('--other'), surf = css('--panel'), grid = css('--grid'), mut = css('--muted'), sec = css('--fg-2'), ink = css('--fg');
+  const front = segCheckP.filter(p => p.front).sort((a, b) => a.x - b.x);
+  const yMin = Math.floor(Math.min(...segCheckP.map(p => p.y)) - 0.5);
+  const styleOf = p => {
+    if (p.items.some(a => !a.mac && !a.farmshare)) return 'circle';
+    if (p.items.some(a => a.mac)) return 'rectRot';
+    return 'rect';
+  };
+  const lblPlugin = {
+    id: 'segCheckLbl',
+    afterDatasetsDraw(ch) {
+      const x = ch.scales.x, y = ch.scales.y, g = ch.ctx;
+      g.save(); g.font = '11px ' + css('--mono'); g.textBaseline = 'middle';
+      const boxes = segCheckP.map(p => { const px = x.getPixelForValue(p.x), py = y.getPixelForValue(p.y); return { x0: px - 7, x1: px + 7, y0: py - 7, y1: py + 7 }; });
+      const hit = b => boxes.some(o => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
+      segCheckP.slice().sort((a, b) => (b.front - a.front) || (b.items.length - a.items.length)).forEach(p => {
+        const px = x.getPixelForValue(p.x), py = y.getPixelForValue(p.y);
+        const t = p.items.length > 1 ? p.label + ' (' + p.items.length + ')' : p.label;
+        const w = g.measureText(t).width;
+        const tries = [[9, 10], [9, -10], [-9 - w, 10], [-9 - w, -10], [-w / 2, 16], [-w / 2, -16], [12, 0], [-12 - w, 0]];
+        let pick = tries[0];
+        for (const [dx, dy] of tries) {
+          const b = { x0: px + dx - 1, x1: px + dx + w + 1, y0: py + dy - 6, y1: py + dy + 6 };
+          if (!hit(b) && b.x1 < x.right + 14 && b.x0 > x.left - 4 && b.y0 >= y.top - 4 && b.y1 <= y.bottom + 4) { pick = [dx, dy]; break; }
+        }
+        boxes.push({ x0: px + pick[0] - 1, x1: px + pick[0] + w + 1, y0: py + pick[1] - 6, y1: py + pick[1] + 6 });
+        g.fillStyle = p.front ? ink : sec; g.textAlign = 'left'; g.fillText(t, px + pick[0], py + pick[1]);
+      });
+      g.restore();
+    }
+  };
+  segCheckChart = new Chart(cv, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        { data: front, showLine: true, borderColor: acc, borderWidth: 1.5, pointRadius: 0, pointHitRadius: 0, order: 2 },
+        { data: segCheckP, order: 1, pointRadius: c => c.raw && c.raw.items.length > 1 ? 7 : 5.5, pointHoverRadius: 8.5,
+          pointStyle: c => c.raw ? styleOf(c.raw) : 'circle',
+          backgroundColor: c => c.raw ? (c.raw.front ? acc : oth) : oth,
+          borderColor: surf, pointBorderWidth: 1.5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 20, top: 8 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: i => i.datasetIndex === 1,
+          callbacks: {
+            title: i => {
+              const p = i[0].raw;
+              return p.x.toFixed(1) + ' checks / 100 pages · ' + p.y.toFixed(1) + '% right after checking';
+            },
+            label: i => i.raw.items.map(a => '#' + a.num + ' ' + a.name + ' (' + a.unflagged + ' unflagged' +
+              (a.std ? ', ' + money(a.std) + '/1k' : a.mac ? ', free on Mac' : a.farmshare ? ', free on Mac/cluster' : ', manual') + ')')
+          }
+        }
+      },
+      scales: {
+        x: { min: 0, max: 95, title: { display: true, text: 'Checks per 100 pages (fewer is less checking)', color: sec },
+          grid: { color: grid }, border: { color: grid }, ticks: { color: mut, stepSize: 10 } },
+        y: { min: yMin, max: 100.5, title: { display: true, text: 'Pages right after checking (%)', color: sec },
+          grid: { color: grid }, border: { display: false },
+          ticks: { color: mut, stepSize: 1, callback: v => v <= 100 ? v + '%' : '' } }
+      }
+    },
+    plugins: [lblPlugin]
+  });
+}
+
 const publicSeg = DATA.public_segmentation || [];
 const publicSegNames = {'all-new': 'Every page starts a document', 'no-boundaries': 'Whole box is one document',
   'rule-cues-sketch': 'Rule sketch + Apple Vision', 'rule-cues': 'Rules fitted on owner development boxes + Apple Vision',
@@ -79755,7 +79852,7 @@ if (PB) {
 }
 
 Chart.defaults.font.family = css('--body');
-const renderAll = () => { render(); renderNews(); renderDifficulty(); };
+const renderAll = () => { render(); renderSegCheck(); renderNews(); renderDifficulty(); };
 renderAll();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll); } catch (e) {}
 new MutationObserver(renderAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
