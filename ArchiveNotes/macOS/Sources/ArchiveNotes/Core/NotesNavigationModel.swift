@@ -468,7 +468,7 @@ final class NotesNavigationModel: ObservableObject {
     // Queued on `enqueueDeleteHistory`, so Undo and Redo of renames and of deletes run one after another.
 
     private static func renameActionName(_ outcome: SubjectRenameOutcome) -> String {
-        outcome.from.count > 1 ? "Merge Tags" : "Rename Tag"
+        outcome.isRemoval ? "Remove Tag" : outcome.from.count > 1 ? "Merge Tags" : "Rename Tag"
     }
 
     private func reportBulkTagFailure(_ failed: Int, of total: Int, verb: String) {

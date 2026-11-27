@@ -98,7 +98,8 @@ final class TagInventoryTests: XCTestCase {
         XCTAssertEqual(plan.itemIDs, ["a", "b"])
         XCTAssertEqual(plan.applied(to: ["Labor", "Q2", "Unread"]), ["Q2", "Unread"])
         XCTAssertEqual(plan.applied(to: ["labor"]), [])
-        XCTAssertTrue(plan.logEntries(app: TagChangeLog.reader).isEmpty, "a remove is not recorded in schema 1")
+        XCTAssertEqual(plan.logEntries(app: TagChangeLog.reader).map { "\($0.from)>\($0.to)" }, ["Labor>"],
+                       "a remove is recorded with an empty to (schema 2)")
         XCTAssertEqual(plan.summary(noun: .file), "Remove “Labor” from 2 files")
     }
 

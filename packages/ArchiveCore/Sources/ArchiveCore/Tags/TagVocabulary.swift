@@ -205,6 +205,20 @@ public final class TagVocabulary: @unchecked Sendable {
         return changed
     }
 
+    /// Follows a remove recorded by another app (W40.tag-window-reader): `tag` is no longer offered. A later harvest
+    /// of files that still carry it brings it back, as for a rename.
+    /// - Returns: true when anything changed.
+    @discardableResult
+    public func remove(_ tag: String) -> Bool {
+        let tag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !tag.isEmpty else { return false }
+        lock.lock()
+        let changed = names.removeValue(forKey: tagKey(tag)) != nil
+        lock.unlock()
+        if changed { scheduleSave() }
+        return changed
+    }
+
     // MARK: - Roots
 
     /// Would harvesting this root be a legitimate archive walk, or the invasive `$HOME` sweep the owner's

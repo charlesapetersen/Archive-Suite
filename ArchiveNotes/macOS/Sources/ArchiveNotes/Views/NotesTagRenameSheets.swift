@@ -186,7 +186,8 @@ struct NotesTagChangesSheet: View {
                     .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("an.tagChanges.none")
             } else {
-                Text("Apply renames a tag on your notes as Rename Tag… would; Skip leaves them as they are. "
+                Text("Apply makes the same change on your notes (a rename as Rename Tag… would, or a removed tag taken off); "
+                     + "Skip leaves them as they are. "
                      + "Either way it is not asked again.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 ScrollView {

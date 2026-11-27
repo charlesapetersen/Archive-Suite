@@ -9,12 +9,13 @@ import ArchiveCore
 // Reader can offer it for its files; Notes writes nothing else in the archive. Undo puts back only what the rename
 // changed on each note, so an edit made since to another subject survives. Design: execution-plans/tag-rename-suite.md.
 
-/// What one rename or merge did: each changed note's subjects before, the notes it could not save, and the log
+/// What one rename, merge or remove did: each changed note's subjects before, the notes it could not save, and the log
 /// entries it recorded (withdrawn by its Undo).
 struct SubjectRenameOutcome: Sendable, Equatable {
-    /// The subjects renamed, as asked, and the subject they became, title-cased.
+    /// The subjects renamed, as asked, and the subject they became, title-cased; empty for a remove.
     let from: [String]
     let to: String
+    var isRemoval: Bool { to.isEmpty }
     /// Each note the rename saved, with its subjects just before.
     var changed: [UUID: [String]] = [:]
     var failed: [UUID] = []
@@ -48,17 +49,18 @@ extension NotesModel {
     }
 
     /// Renames every subject in `olds` to `typed` on every note and extract carrying one (by `tagKey`); into an
-    /// existing subject it merges. `only` restricts it to those notes (a Redo). Records the change in each reachable
-    /// archive unless `recording` is false (applying another app's change, which is already in the log). Nil when
-    /// there was nothing to do.
+    /// existing subject it merges; an empty `typed` removes them (a remove another app recorded, schema 2). `only`
+    /// restricts it to those notes (a Redo). Records the change in each reachable archive unless `recording` is false
+    /// (applying another app's change, which is already in the log). Nil when there was nothing to do.
     func renameSubjects(_ olds: [String], to typed: String, only: Set<UUID>? = nil,
                         recording: Bool = true) async -> SubjectRenameOutcome? {
-        guard let target = subjectSpelling(for: typed) else { return nil }
+        let removing = typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard let target = removing ? "" : subjectSpelling(for: typed) else { return nil }
         let targetKey = tagKey(target)
         let oldKeys = Set(olds.map { tagKey($0.trimmingCharacters(in: .whitespacesAndNewlines)) }).subtracting([""])
         // Only facet-free subjects: a rating or date facet in front matter is a subject too, but the suite's own
         // tokens are never renamed (invariant 8).
-        guard !oldKeys.isEmpty, !keepsExactCase(target),
+        guard !oldKeys.isEmpty, removing || !keepsExactCase(target),
               olds.allSatisfy({ !keepsExactCase($0) }) else { return nil }
         let holders = allItems.filter { item in
             (only?.contains(item.id) ?? true) && item.managedTags.contains { oldKeys.contains(tagKey($0)) }
@@ -78,7 +80,7 @@ extension NotesModel {
         if recording, !outcome.changed.isEmpty {
             let entries = olds.filter { tagKey($0) != targetKey }.map {
                 TagChange(app: TagChangeLog.notes, from: $0, to: target)
-            }
+            }.filter(TagChangeLog.isRecordable)
             let (recorded, why) = await recordTagChanges(entries)
             outcome.recorded = recorded
             outcome.notRecorded = why
@@ -107,16 +109,18 @@ extension NotesModel {
         }
         await reloadItems()
         await withdrawTagChanges(Set(outcome.recorded), true)
-        statusMessage = failed == 0 ? "Undid renaming to “\(outcome.to)”."
-            : "Undid renaming to “\(outcome.to)”; \(failed) note\(failed == 1 ? "" : "s") could not be saved."
+        let what = outcome.isRemoval ? "removing “\(outcome.from.joined(separator: "”, “"))”" : "renaming to “\(outcome.to)”"
+        statusMessage = failed == 0 ? "Undid \(what)."
+            : "Undid \(what); \(failed) note\(failed == 1 ? "" : "s") could not be saved."
         return restored
     }
 
     /// A note's subjects with every one keyed in `from` replaced by `to` (once, where the first stood), or as they
-    /// were when none is.
+    /// were when none is. An empty `to` removes them.
     nonisolated static func renamed(_ tags: [String], from keys: Set<String>, to target: String,
                                     targetKey: String) -> [String] {
         guard tags.contains(where: { keys.contains(tagKey($0)) }) else { return tags }
+        if target.isEmpty { return tags.filter { !keys.contains(tagKey($0)) } }
         var out: [String] = []
         var placed = false
         for tag in tags {
@@ -132,7 +136,9 @@ extension NotesModel {
 
     private static func renameStatus(_ o: SubjectRenameOutcome) -> String {
         let n = o.changed.count
-        var s = "Renamed to “\(o.to)” on \(n) note\(n == 1 ? "" : "s")"
+        var s = o.isRemoval
+            ? "Removed “\(o.from.joined(separator: "”, “"))” from \(n) note\(n == 1 ? "" : "s")"
+            : "Renamed to “\(o.to)” on \(n) note\(n == 1 ? "" : "s")"
         s += o.failed.isEmpty ? "." : "; \(o.failed.count) could not be saved."
         if !o.unmirrored.isEmpty { s += " \(o.unmirrored.count) kept the old Finder tag; edit a tag there to retry." }
         if let why = o.notRecorded { s += " The other apps were not told: \(why)" }
@@ -204,6 +210,14 @@ struct TagChangeOffer: Identifiable, Sendable, Equatable {
 
     var summary: String {
         let when = change.at.formatted(date: .abbreviated, time: .omitted)
+        if isWithdrawal, change.isRemoval {
+            return "\(change.appName.capitalizedFirst) undid removing “\(change.from)”. Your notes stay without it; "
+                + "add it again where you want it."
+        }
+        if change.isRemoval {
+            return "\(change.appName.capitalizedFirst) removed “\(change.from)” from its items on \(when). "
+                + "\(count) note\(count == 1 ? "" : "s") carr\(count == 1 ? "ies" : "y") it."
+        }
         if isWithdrawal {
             return "\(change.appName.capitalizedFirst) undid renaming “\(change.from)” to “\(change.to)”. Your notes keep "
                 + "“\(NotesTagVocabulary.titleCased(change.to))”; use Rename Tag… to change them back."

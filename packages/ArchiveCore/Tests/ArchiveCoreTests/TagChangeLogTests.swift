@@ -84,7 +84,7 @@ final class TagChangeLogTests: XCTestCase {
     func testANewerLogIsNeitherReadNorOverwritten() throws {
         let suite = root.appendingPathComponent(ContainerFile.folderName)
         try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: false)
-        let bytes = Data(#"{"schemaVersion": 2, "changes": [], "future": true}"#.utf8)
+        let bytes = Data(#"{"schemaVersion": 3, "changes": [], "future": true}"#.utf8)
         try bytes.write(to: TagChangeLog.url(in: root))
         XCTAssertEqual(TagChangeLog.load(root: root), .newer)
         XCTAssertThrowsError(try TagChangeLog.record([change("A tag", "B tag")], root: root))
@@ -140,6 +140,62 @@ final class TagChangeLogTests: XCTestCase {
         private var n = 0
         func add() { lock.lock(); n += 1; lock.unlock() }
         var count: Int { lock.lock(); defer { lock.unlock() }; return n }
+    }
+
+    // MARK: Removes (schema 2, W40.tag-window-reader)
+
+    func testARemoveIsRecordedWithAnEmptyToAndAFacetRemoveIsNot() throws {
+        try TagChangeLog.record([change("Q1", ""), change("  ", ""), change("Draft", "")], root: root)
+        XCTAssertEqual(changes().map(\.from), ["Draft"])
+        XCTAssertTrue(changes()[0].isRemoval)
+        XCTAssertFalse(changes()[0].isRespelling)
+        let bytes = try String(contentsOf: TagChangeLog.url(in: root), encoding: .utf8)
+        XCTAssertTrue(bytes.contains(#""schemaVersion" : 2"#) || bytes.contains(#""schemaVersion":2"#), bytes)
+    }
+
+    func testASchemaOneLogIsReadAndAppendedToAsSchemaTwo() throws {
+        let suite = root.appendingPathComponent(ContainerFile.folderName)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: false)
+        let old = change("A tag", "B tag")
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+        var json = try JSONSerialization.jsonObject(with: enc.encode(TagChangeDocument(changes: [old]))) as! [String: Any]
+        json["schemaVersion"] = 1
+        try JSONSerialization.data(withJSONObject: json).write(to: TagChangeLog.url(in: root))
+        guard case .loaded(let doc, _) = TagChangeLog.load(root: root) else { return XCTFail("a schema 1 log reads") }
+        XCTAssertEqual(doc.changes.map(\.from), ["A tag"])
+        try TagChangeLog.record([change("C tag", "")], root: root)
+        XCTAssertEqual(changes().map(\.from), ["A tag", "C tag"])
+    }
+
+    func testInboxOffersARemoveOfACarriedTagAndFollowsAChainIntoIt() {
+        let rename = change("Alpha tag", "Beta tag"), remove = change("Beta tag", ""), facet = change("Q2", "")
+        let box = TagChangeLog.inbox(TagChangeDocument(changes: [rename, remove, facet]), app: TagChangeLog.notes,
+                                     handled: [], applied: [], carried: [tagKey("Alpha tag")])
+        XCTAssertEqual(box.offers, [rename, remove])
+        XCTAssertEqual(box.settled, [facet.id], "a facet remove can never apply")
+        let after = TagChangeLog.inbox(TagChangeDocument(changes: [remove, change("Beta tag", "Gamma tag")]),
+                                       app: TagChangeLog.notes, handled: [], applied: [], carried: [tagKey("Beta tag")])
+        XCTAssertEqual(after.offers.count, 1, "after the remove nothing carries the tag, so the later rename waits")
+        XCTAssertEqual(TagChangeLog.inbox(TagChangeDocument(changes: [remove]), app: TagChangeLog.notes, handled: [],
+                                          applied: [], carried: [tagKey("Other")]).offers, [], "nothing carries it")
+    }
+
+    func testFollowDropsARemovedTagAndPutsItBackOnAWithdrawal() throws {
+        let vocab = TagVocabulary(fileURL: root.appendingPathComponent("vocab.json"))
+        vocab.add(rawTags: ["Draft", "Labor"])
+        let remove = change("draft", "")
+        let first = TagChangeLog.follow(TagChangeDocument(changes: [remove]), app: TagChangeLog.processor, handled: [],
+                                        applied: [], vocabulary: vocab, controlled: ["Draft", "Oil"])
+        XCTAssertEqual(first.controlled, ["Oil"])
+        XCTAssertEqual(first.applied, [remove.id])
+        XCTAssertEqual(vocab.snapshot(), ["Labor"])
+        var undone = remove; undone.withdrawn = true
+        let back = TagChangeLog.follow(TagChangeDocument(changes: [undone]), app: TagChangeLog.processor,
+                                       handled: [remove.id], applied: [remove.id], vocabulary: vocab, controlled: ["Oil"])
+        XCTAssertEqual(back.controlled, ["Oil", "draft"])
+        XCTAssertEqual(back.unapplied, [remove.id])
+        XCTAssertTrue(vocab.snapshot().contains { isSameTag($0, "Draft") })
+        XCTAssertFalse(vocab.remove("Nobody"))
     }
 
     // MARK: The inbox

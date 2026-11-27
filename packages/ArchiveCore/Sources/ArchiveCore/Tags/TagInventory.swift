@@ -229,12 +229,10 @@ public struct TagChangePlan: Sendable, Equatable {
         return out == tags ? nil : out
     }
 
-    /// The entries this change adds to the suite's change log (`TagChangeLog`), one per source tag: a rename or
-    /// merge only. The writer records them only when it changed an item. A remove is not recorded yet (schema 1 has no remove; design note §"The Tags window").
+    /// The entries this change adds to the suite's change log (`TagChangeLog`), one per source tag; a remove's have an
+    /// empty `to` (schema 2). The writer records them only when it changed an item.
     public func logEntries(app: String, at date: Date = Date()) -> [TagChange] {
-        guard let target else { return [] }
-        return sources.filter { TagChangeLog.isRecordable(from: $0, to: target) }
-            .map { TagChange(at: date, app: app, from: $0, to: target) }
+        sources.map { TagChange(at: date, app: app, from: $0, to: target ?? "") }.filter(TagChangeLog.isRecordable)
     }
 
     /// How the change reads in a confirmation or a status line, for an item noun ("file", "note").

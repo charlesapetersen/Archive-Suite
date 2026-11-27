@@ -581,14 +581,16 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    a stale swatch, which is also what a new user, with no colour chosen, gets). A subject string equal to
    a colour name is **never** promoted to a color label (`colorIsAuthoritative` path). Reader writes
    `.labelNumberKey` only when a delta changes color.
-8. **A rename or merge carries across the apps through a record, never through another app's writer**
+8. **A rename, merge or remove carries across the apps through a record, never through another app's writer**
    (W40.tag-rename-suite, owner 2026-11-06). The app that renames a subject writes its own items, then appends one
    entry per tag changed (`id`, `at`, `app`, `from`, `to`, `withdrawn`) to
    `<archive root>/.archivesuite/tag-changes.json` through ArchiveCore `TagChangeLog` (the `ContainerFileStore`
-   lock, stamp, link and size rules; `schemaVersion` 1; the newest 2,000 entries). Every other app reads it and,
+   lock, stamp, link and size rules; `schemaVersion` 2; the newest 2,000 entries). Every other app reads it and,
    **only after the user confirms**, applies an entry to its own items with its own writer: every item carrying a
    tag with `from`'s `tagKey` (rule 4) carries `to` instead, spelled by that app's rule (the Reader as recorded,
-   or the library spelling of an existing tag; Notes title-cased). Each app keeps its own list of entries it has
+   or the library spelling of an existing tag; Notes title-cased). An empty `to` is a remove (schema 2,
+   W40.tag-window-reader): every item carrying `from` no longer carries it. A schema 1 build reads a schema 2 log as
+   newer and leaves it alone, so no build settles a remove it cannot apply. Each app keeps its own list of entries it has
    handled per root marker guid. Undo in the recording app marks its entries `withdrawn` (Redo clears it); an app
    that has not applied a withdrawn entry drops it, and one that has is never reverted behind the user's back. Facet
    tokens (rule 4's `keepsExactCase` set) are never recorded nor applied. The Processor applies entries to its

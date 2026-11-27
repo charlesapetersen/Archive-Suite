@@ -2,14 +2,15 @@ import Foundation
 
 // MARK: - The suite's tag change log (W40.tag-rename-suite, Tier-2; SPEC/tag-format.md invariant 8)
 //
-// A rename or merge made in one app reaches the others as a record, never through another app's writer:
+// A rename, merge or remove made in one app reaches the others as a record, never through another app's writer:
 // `<archive root>/.archivesuite/tag-changes.json`, one entry per tag changed. Every other app reads it and, only
 // after the user confirms, applies an entry to its own items with its own writer. Written through
 // `ContainerFileStore` (the `.archivesuite` descriptor, `flock`, the stamp check, links and newer documents
 // refused), so this adds no new way to write in the archive. Each app keeps the ids it has handled in its own
 // settings (`TagChangeHandled`). Design: execution-plans/tag-rename-suite.md.
 
-/// One tag changed by one app: every item that carried `from` (by `tagKey`) now carries `to`.
+/// One tag changed by one app: every item that carried `from` (by `tagKey`) now carries `to`, or (an empty `to`,
+/// schema 2, W40.tag-window-reader) no longer carries it: a remove.
 public struct TagChange: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let at: Date
@@ -30,7 +31,10 @@ public struct TagChange: Codable, Equatable, Sendable, Identifiable {
     }
 
     /// A case-only change: the same tag, spelled anew.
-    public var isRespelling: Bool { tagKey(from) == tagKey(to) }
+    public var isRespelling: Bool { !isRemoval && tagKey(from) == tagKey(to) }
+
+    /// The tag was removed from every item (an empty `to`).
+    public var isRemoval: Bool { to.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     /// The app's name as the user sees it.
     public var appName: String {
@@ -44,8 +48,11 @@ public struct TagChange: Codable, Equatable, Sendable, Identifiable {
 }
 
 /// The document on disk. A new field needs a `schemaVersion` bump: this build's writer drops what it does not read.
+/// Schema 2 (W40.tag-window-reader) adds the remove, an entry with an empty `to`: a schema 1 build would settle one
+/// without applying it, so it reads a schema 2 log as newer and leaves it alone. No migration: a schema 1 log reads
+/// as it is, and nothing the apps made is kept (owner, 2026-08-01).
 public struct TagChangeDocument: Codable, Equatable, Sendable {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
     public var schemaVersion: Int
     public var changes: [TagChange]
 
@@ -81,11 +88,19 @@ public enum TagChangeLog {
         return !f.isEmpty && !t.isEmpty && f != t && !keepsExactCase(f) && !keepsExactCase(t)
     }
 
+    /// Whether `change` may be recorded or applied: a rename `isRecordable(from:to:)` allows, or the remove of a
+    /// subject that is not a facet token.
+    public static func isRecordable(_ change: TagChange) -> Bool {
+        guard change.isRemoval else { return isRecordable(from: change.from, to: change.to) }
+        let f = change.from.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !f.isEmpty && !keepsExactCase(f)
+    }
+
     /// Appends `changes` (those `isRecordable` allows) to the log at `root`, keeping the newest `maxEntries`.
     /// Re-reads and tries again when another writer got in between. Throws `ContainerWriteError`; the caller has
     /// already changed its own items and only reports that the other apps were not told. Call it off the main thread.
     public static func record(_ changes: [TagChange], root: URL) throws {
-        let kept = changes.filter { isRecordable(from: $0.from, to: $0.to) }
+        let kept = changes.filter(isRecordable)
         guard !kept.isEmpty else { return }
         try update(root: root) { doc in
             let known = Set(doc.changes.map(\.id))
@@ -127,14 +142,14 @@ public enum TagChangeLog {
             guard !handled.contains(change.id) else { continue }
             // Settled for good only when it can never apply here. A withdrawn entry may be redone, and a tag nothing
             // carries now may be carried later (or the library was not loaded yet), so those are only passed over.
-            guard isRecordable(from: change.from, to: change.to), !(ignoresRespelling && change.isRespelling) else {
+            guard isRecordable(change), !(ignoresRespelling && change.isRespelling) else {
                 box.settled.append(change.id)
                 continue
             }
             guard !change.withdrawn, keys.contains(tagKey(change.from)) else { continue }
             box.offers.append(change)
             if !change.isRespelling { keys.remove(tagKey(change.from)) }
-            keys.insert(tagKey(change.to))
+            if !change.isRemoval { keys.insert(tagKey(change.to)) }
         }
         return box
     }
@@ -175,14 +190,14 @@ public enum TagChangeLog {
     }
 
     /// Applies every unhandled entry of other apps in `doc` to `vocabulary` and `controlled`, oldest first, with no
-    /// question: a vocabulary is a list of spellings, not of anyone's items. A withdrawal of an entry applied before
+    /// question: a vocabulary is a list of spellings, not of anyone's items. A remove drops `from` from both. A withdrawal of an entry applied before
     /// puts `from` back in both (`to` stays: it may be in use by then). Returns the new controlled list, the ids to add
     /// to the handled and applied lists, and the withdrawals put back, which the caller removes from both lists so a
     /// later Redo applies again.
     public static func follow(_ doc: TagChangeDocument, app: String, handled: Set<UUID>, applied: Set<UUID>,
                               vocabulary: TagVocabulary, controlled: [String]) -> TagChangeFollow {
         var result = TagChangeFollow(controlled: controlled)
-        for change in doc.changes where change.app != app && isRecordable(from: change.from, to: change.to) {
+        for change in doc.changes where change.app != app && isRecordable(change) {
             if change.withdrawn {
                 guard applied.contains(change.id) else { continue }   // never applied: nothing to put back
                 vocabulary.add(rawTags: [change.from])
@@ -194,8 +209,14 @@ public enum TagChangeLog {
                 continue
             }
             guard !handled.contains(change.id) else { continue }
-            vocabulary.rename(from: change.from, to: change.to)
-            result.controlled = renamed(result.controlled, from: change.from, to: change.to)
+            if change.isRemoval {
+                vocabulary.remove(change.from)
+                let fromKey = tagKey(change.from.trimmingCharacters(in: .whitespacesAndNewlines))
+                result.controlled.removeAll { tagKey($0.trimmingCharacters(in: .whitespacesAndNewlines)) == fromKey }
+            } else {
+                vocabulary.rename(from: change.from, to: change.to)
+                result.controlled = renamed(result.controlled, from: change.from, to: change.to)
+            }
             result.handled.append(change.id)
             result.applied.append(change.id)
         }

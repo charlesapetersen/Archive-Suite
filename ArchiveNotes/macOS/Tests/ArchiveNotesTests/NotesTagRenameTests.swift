@@ -236,6 +236,49 @@ struct NotesTagRenameTests {
         #expect(try await tags(env, a) == ["Civil Rights Movement"], "never reverted behind the user's back")
     }
 
+    @Test("another app's remove (schema 2) is offered, takes the subject off every note, and Undo and Redo work")
+    func removeFromAnotherAppAppliesWithUndo() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let a = try await makeItem(env, "Alpha", tags: ["Draft", "Labor"])
+        let b = try await makeItem(env, "Beta", kind: .extract, tags: ["draft"])
+        let c = try await makeItem(env, "Gamma", tags: ["Final"])
+        let removal = TagChange(app: TagChangeLog.reader, from: "Draft", to: "")
+        try TagChangeLog.record([removal], root: env.archive)
+        await env.model.refreshTagChangeInbox()
+        let offer = try #require(env.model.tagChangeOffers.first)
+        #expect(offer.count == 2 && !offer.isWithdrawal)
+        #expect(offer.summary.hasPrefix("The Reader removed “Draft” from its items"))
+
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        let outcome = try #require(await env.nav.applyTagChange(offer, undo: undo))
+        undo.endUndoGrouping()
+        #expect(outcome.isRemoval && undo.undoActionName == "Remove Tag")
+        #expect(try await tags(env, a) == ["Labor"])
+        #expect(try await tags(env, b) == [])
+        #expect(try await tags(env, c) == ["Final"])
+        #expect(try await !finderTags(env, a).contains("Draft"))
+        #expect(log(env).count == 1, "applying it records nothing new")
+        await env.model.refreshTagChangeInbox()
+        #expect(env.model.tagChangeOffers.isEmpty)
+
+        undo.undo()
+        await env.nav.deleteHistorySettled()
+        #expect(Set(try await tags(env, a)) == ["Draft", "Labor"])
+        #expect(try await tags(env, b) == ["Draft"], "put back in Notes' spelling")
+        undo.redo()
+        await env.nav.deleteHistorySettled()
+        #expect(try await tags(env, a) == ["Labor"])
+        #expect(try await tags(env, b) == [])
+
+        // The Reader undoes its remove: told once, nothing changes.
+        try TagChangeLog.setWithdrawn([removal.id], true, root: env.archive)
+        await env.model.refreshTagChangeInbox()
+        let notice = try #require(env.model.tagChangeOffers.first)
+        #expect(notice.isWithdrawal && notice.summary.contains("undid removing"))
+    }
+
     @Test("Skip leaves the notes alone and is not asked again; a change withdrawn before it was applied is dropped")
     func skipAndWithdrawnBeforeApplying() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
