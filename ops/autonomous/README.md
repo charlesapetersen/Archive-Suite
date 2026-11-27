@@ -1316,6 +1316,12 @@ write leaves the plan unchanged, and a second successful run is a no-op. Prove t
 `python3 ops/autonomous/tests/prove-plan-archive.py`. Since 2026-11-20 `compact-plan.sh` runs it every
 cycle as Pass 4. The 2026-11-08 trigger was 166,365 B, including 76,427 B of HOLD (85 completed entries).
 
+- **Pass 5 — `## E2E findings`** (`W49.plan-e2e-archive`, 2026-11-27): keeps the newest `E2E_KEEP=2` PASS
+  reports inline and archives older PASS reports verbatim to `.maintenance/AUTONOMOUS_E2E_ARCHIVE.md`
+  (gitignored, under the shared plan lock). A FAIL report and its derived fix items stay inline until every
+  derived fix tag is recorded `[x]` in `SUITE_TODO.md` or `SUITE_TODO_DONE.md` (and not open `[ ]` in the
+  plan or tracker); unrecognized entries stay inline. Proven by `tests/prove-compact.sh` (Case Q).
+
 ### 2026-08-04 — this compactor silently no-op'd for weeks. Read this before editing it.
 
 Owner: *"token use is the real bottleneck for development, not build speed."* The plan had reached **462 KB /

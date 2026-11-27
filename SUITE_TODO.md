@@ -52,12 +52,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 
 
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
-- [ ] **W49.plan-e2e-archive — the plan's E2E findings section is never compacted [S · ops]** (lane: suite) (uses: light)
-  Found by doc-fix 2026-11-25: `## E2E findings` in `.maintenance/AUTONOMOUS_PLAN.md` is 15.5 KB of eight raw PASS
-  reports, about 2 KB more each Live-Capture E2E, and `compact-plan.sh` never touches that region, so the
-  orientation total keeps climbing back over its budget. Add a compactor pass that moves all but the newest two
-  PASS reports verbatim to a gitignored `AUTONOMOUS_E2E_ARCHIVE.md` (a FAIL report and its derived fix items
-  stay until that item ships), with `prove-compact` checks; autonomous-setup changes are Tier-2.
 
 ## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
 

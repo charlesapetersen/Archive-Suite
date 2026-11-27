@@ -382,6 +382,264 @@ chk "P an unrecorded backticked item stayed in the plan"     "grep -q 'WB.orphan
 chk "P the OPEN item stayed inline"                          "grep -q 'WBOPEN' '$op'"
 chk "P no conservation failure"                              "! grep -qi 'conservation FAIL' '$SANDBOX/outP.txt'"
 
+# ---------- Case Q: Pass 5 (W49.plan-e2e-archive) — E2E findings archival ----------
+# Keep newest two PASS reports inline; archive older PASS reports verbatim to AUTONOMOUS_E2E_ARCHIVE.md.
+# A FAIL report and its derived fix items stay inline until every derived fix item is shipped in the trackers.
+# Use a sandbox path containing a space to mirror the primary checkout (`.../Archive Suite`).
+QDIR="$SANDBOX/e2e archive with space"
+mkdir -p "$QDIR"
+qplan="$QDIR/plan.md"
+qarch="$QDIR/AUTONOMOUS_E2E_ARCHIVE.md"
+qtodo="$QDIR/SUITE_TODO.md"
+qdone="$QDIR/SUITE_TODO_DONE.md"
+
+cat > "$qplan" <<'EOF'
+# P
+
+RUN STATUS: IN_PROGRESS
+
+## PRIME DIRECTIVES
+- never touch real corpus
+
+## RESUME PROTOCOL
+1. read this plan
+
+## WORK QUEUE
+- [ ] **W49.e2e-fix1** — fix timeout from E2E fail
+- [ ] **W49.e2e-fix2** — fix second failure item
+- [x] **W49.e2e-fix0** — already shipped fix
+
+## HOLD QUEUE
+- [ ] **W49.gate-ok** — owner gate
+
+## E2E findings (append raw report excerpts + derived fix items here)
+
+### 2026-11-26 · W49.pass-newest-1 · Android LAN
+
+```text
+[e2e] RESULT: PASS ✅  (newest 1)
+### fake heading inside fence must not split
+## Session Log fake inside fence must not close region
+```
+
+### 2026-11-25 · W49.fail-open · Android LAN — FAIL
+
+```text
+[e2e] RESULT: FAIL (timeout waiting for DONE.txt)
+```
+
+Derived fix items:
+- [ ] **W49.e2e-fix1** — fix timeout from E2E fail
+
+### 2026-11-24 · W49.pass-newest-2 · Android LAN
+
+Android-to-Mac round trip passed. All phone capture checks passed.
+
+### 2026-11-23 · W49.fail-raw · Android LAN — FAIL
+
+```text
+[assert] FAIL — missing token
+```
+
+### 2026-11-22 · W49.fail-partial · Android LAN — FAIL
+
+Derived fix: W49.e2e-fix0, W49.e2e-fix2
+
+### 2026-11-21 · W49.fail-shipped · Android LAN — FAIL
+
+```text
+[e2e] RESULT: FAIL (old resolved failure)
+```
+
+Derived fix items:
+- [ ] **W49.e2e-fix0** — already shipped fix
+
+### 2026-11-20 · W49.pass-old-3 · Android LAN
+
+```text
+[e2e] RESULT: PASS ✅  (old 3)
+```
+
+### 2026-10-11 · W40.a3 · Android-to-Mac round trip passed
+
+```text
+[e2e] RESULT: PASS ✅  (old 4)
+```
+**W1.0 baseline (3 passes, all PASS):**
+- Pass 1: PASS — baseline preserved verbatim
+## Session Log
+- SLOG entry 1
+
+## Daemon Report
+
+(preamble)
+EOF
+
+cat > "$qtodo" <<'EOF'
+## Open
+- [ ] **W49.e2e-fix1** — fix timeout from E2E fail
+- [ ] **W49.e2e-fix2** — fix second failure item
+EOF
+cat > "$qdone" <<'EOF'
+## Done
+- [x] **W49.e2e-fix0** — already shipped fix
+EOF
+
+awk '/^## Session Log$/{p=1;next} p&&/^## /{p=0} p' "$qplan" > "$QDIR/preQ-slog.txt"
+section "$qplan" "Daemon Report" > "$QDIR/preQ-dr.txt"
+AUTONOMOUS_PLAN="$qplan" AUTONOMOUS_E2E_ARCHIVE="$qarch" \
+  AUTONOMOUS_SESSION_ARCHIVE="$QDIR/slog-arch.md" AUTONOMOUS_DR_ARCHIVE="$QDIR/dr-arch.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$QDIR/wq-arch.md" AUTONOMOUS_SUITE_TODO="$qtodo" AUTONOMOUS_SUITE_TODO_DONE="$qdone" \
+  bash "$SCRIPT" "$QDIR" >"$QDIR/outQ1.txt" 2>&1
+qrc=$?
+chk "Q1 exit 0 on spaced path"                         "[ '$qrc' = 0 ]"
+chk "Q1 newest PASS 1 kept inline"                     "grep -q 'W49.pass-newest-1' '$qplan'"
+chk "Q1 fenced ### and ## stayed inside newest PASS 1" "grep -q '### fake heading inside fence' '$qplan' && grep -q '## Session Log fake inside fence' '$qplan'"
+chk "Q1 newest PASS 2 (prose-only passed) kept inline" "grep -q 'W49.pass-newest-2' '$qplan'"
+chk "Q1 older PASS 3 archived verbatim"                "grep -q 'W49.pass-old-3' '$qarch' && ! grep -q 'W49.pass-old-3' '$qplan'"
+chk "Q1 oldest PASS 4 + W1.0 baseline archived"        "grep -q 'W40.a3' '$qarch' && grep -q 'W1.0 baseline' '$qarch' && ! grep -q 'W1.0 baseline' '$qplan'"
+chk "Q1 FAIL with open fix stays inline"               "grep -q 'W49.fail-open' '$qplan' && ! grep -q 'W49.fail-open' '$qarch'"
+chk "Q1 FAIL with no fix item stays inline"            "grep -q 'W49.fail-raw' '$qplan' && ! grep -q 'W49.fail-raw' '$qarch'"
+chk "Q1 FAIL with partially shipped fixes stays inline" "grep -q 'W49.fail-partial' '$qplan' && ! grep -q 'W49.fail-partial' '$qarch'"
+chk "Q1 FAIL whose derived fix shipped is archived"    "grep -q 'W49.fail-shipped' '$qarch' && ! grep -q 'W49.fail-shipped' '$qplan'"
+chk "Q1 non-blank-preceded Session Log survived"       "grep -q '^## Session Log$' '$qplan' && diff -q '$QDIR/preQ-slog.txt' <(awk '/^## Session Log\$/{p=1;next} p&&/^## /{p=0} p' '$qplan') >/dev/null"
+chk "Q1 Daemon Report survived byte-identical"         "diff -q '$QDIR/preQ-dr.txt' <(section '$qplan' 'Daemon Report') >/dev/null"
+
+# Q2: idempotency on second run
+cp "$qplan" "$QDIR/afterQ1.md"
+cp "$qarch" "$QDIR/archQ1.md"
+AUTONOMOUS_PLAN="$qplan" AUTONOMOUS_E2E_ARCHIVE="$qarch" \
+  AUTONOMOUS_SESSION_ARCHIVE="$QDIR/slog-arch.md" AUTONOMOUS_DR_ARCHIVE="$QDIR/dr-arch.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$QDIR/wq-arch.md" AUTONOMOUS_SUITE_TODO="$qtodo" AUTONOMOUS_SUITE_TODO_DONE="$qdone" \
+  bash "$SCRIPT" "$QDIR" >"$QDIR/outQ2.txt" 2>&1
+chk "Q2 idempotent (plan unchanged on 2nd run)"        "diff -q '$QDIR/afterQ1.md' '$qplan' >/dev/null"
+chk "Q2 idempotent (archive unchanged on 2nd run)"     "diff -q '$QDIR/archQ1.md' '$qarch' >/dev/null"
+
+# Q3: once W49.e2e-fix1 ships in trackers + WORK QUEUE, W49.fail-open archives verbatim
+perl -pi -e 's/- \[ \] \*\*W49\.e2e-fix1\*\*/- [x] **W49.e2e-fix1**/' "$qplan" "$qtodo"
+echo "- [x] **W49.e2e-fix1** — fix timeout from E2E fail" >> "$qdone"
+# Note: restore the [ ] inside E2E findings to prove shipping in trackers+WQ suffices even if E2E bullet stays [ ]
+perl -0pi -e 's/(### 2026-11-25 · W49\.fail-open.*?Derived fix items:\n)- \[x\]/$1- [ ]/s' "$qplan"
+AUTONOMOUS_PLAN="$qplan" AUTONOMOUS_E2E_ARCHIVE="$qarch" \
+  AUTONOMOUS_SESSION_ARCHIVE="$QDIR/slog-arch.md" AUTONOMOUS_DR_ARCHIVE="$QDIR/dr-arch.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$QDIR/wq-arch.md" AUTONOMOUS_SUITE_TODO="$qtodo" AUTONOMOUS_SUITE_TODO_DONE="$qdone" \
+  bash "$SCRIPT" "$QDIR" >"$QDIR/outQ3.txt" 2>&1
+chk "Q3 newly shipped FAIL report archived verbatim"   "grep -q 'W49.fail-open' '$qarch' && ! grep -q 'W49.fail-open' '$qplan'"
+chk "Q3 newest two PASS reports still stay inline"     "grep -q 'W49.pass-newest-1' '$qplan' && grep -q 'W49.pass-newest-2' '$qplan'"
+
+# Q4: archive write failure aborts BEFORE modifying plan, exits nonzero
+qplan4="$QDIR/plan4.md"
+cat > "$qplan4" <<'EOF'
+# P
+
+RUN STATUS: IN_PROGRESS
+
+## PRIME DIRECTIVES
+- x
+
+## RESUME PROTOCOL
+1. y
+
+## WORK QUEUE
+- [ ] **W49.open** — open
+
+## E2E findings
+
+### 2026-11-26 · W49.p1
+[e2e] RESULT: PASS ✅
+
+### 2026-11-25 · W49.p2
+[e2e] RESULT: PASS ✅
+
+### 2026-11-24 · W49.p3
+[e2e] RESULT: PASS ✅
+
+## Session Log
+- SLOG entry 1
+EOF
+cp "$qplan4" "$QDIR/preQ4.md"
+mkdir -p "$QDIR/e2e-arch-is-dir"
+AUTONOMOUS_PLAN="$qplan4" AUTONOMOUS_E2E_ARCHIVE="$QDIR/e2e-arch-is-dir" \
+  AUTONOMOUS_SESSION_ARCHIVE="$QDIR/slog-arch.md" AUTONOMOUS_DR_ARCHIVE="$QDIR/dr-arch.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$QDIR/wq-arch.md" \
+  bash "$SCRIPT" "$QDIR" >"$QDIR/outQ4.txt" 2>&1
+q4rc=$?
+chk "Q4 archive failure exits nonzero"                 "[ '$q4rc' != 0 ]"
+chk "Q4 archive failure leaves plan byte-identical"    "diff -q '$QDIR/preQ4.md' '$qplan4' >/dev/null"
+chk "Q4 archive failure logs pass5 abort"              "grep -q 'Pass 5 (E2E findings) exited nonzero' '$QDIR/outQ4.txt'"
+
+# Q5: Tier-2 adversarial regressions — hyphenated tags with fail/pass, ANSI FAIL after [assert] PASS,
+# trailing period in Derived fix, newest PASS citing shipped fix, ~~~ inside ``` fence, unlisted ## section.
+qplan5="$QDIR/plan5.md"
+qarch5="$QDIR/e2e-arch5.md"
+cat > "$qplan5" <<'EOF'
+# P
+
+RUN STATUS: IN_PROGRESS
+
+## PRIME DIRECTIVES
+- x
+
+## RESUME PROTOCOL
+1. y
+
+## WORK QUEUE
+- [x] **W49.e2e-fix0** — shipped fix
+- [ ] **W49.open** — open
+
+## E2E findings
+
+### 2026-11-27 · W49.proc-request-failure-codes · Android LAN
+
+Verification re-run for fix item W49.e2e-fix0 — passed.
+
+```text
+~~~
+[e2e] RESULT: PASS ✅
+```
+
+### 2026-11-26 · W40.token-pass · Android LAN
+
+```text
+[assert] PASS — tokens OK
+^[[35m[e2e]^[[0m FAIL: MISSING screencap for doc2
+```
+
+### 2026-11-25 · W49.pass-two · Android LAN
+
+[e2e] RESULT: PASS ✅
+
+### 2026-11-24 · W49.fail-trailing-dot · Android LAN — FAIL
+
+Derived fix: W49.e2e-fix0.
+
+### 2026-11-23 · W49.proc-request-failure-codes · older PASS
+
+[e2e] RESULT: PASS ✅
+## UNLISTED CUSTOM SECTION
+- custom line must never be archived
+## Session Log
+- SLOG entry 1
+
+## Daemon Report
+
+(preamble)
+EOF
+# Replace literal ^[ with real ESC byte (0x1b) for ANSI escape test
+perl -pi -e 's/\^\[\[/\x1b[/g' "$qplan5"
+AUTONOMOUS_PLAN="$qplan5" AUTONOMOUS_E2E_ARCHIVE="$qarch5" \
+  AUTONOMOUS_SESSION_ARCHIVE="$QDIR/slog-arch5.md" AUTONOMOUS_DR_ARCHIVE="$QDIR/dr-arch5.md" \
+  AUTONOMOUS_QUEUE_ARCHIVE="$QDIR/wq-arch5.md" AUTONOMOUS_SUITE_TODO="$qtodo" AUTONOMOUS_SUITE_TODO_DONE="$qdone" \
+  bash "$SCRIPT" "$QDIR" >"$QDIR/outQ5.txt" 2>&1
+q5rc=$?
+chk "Q5 exit 0"                                        "[ '$q5rc' = 0 ]"
+chk "Q5 newest PASS with failure tag + shipped-fix ref + ~~~ stays inline" "grep -q '2026-11-27 · W49.proc-request-failure-codes' '$qplan5'"
+chk "Q5 W40.token-pass with ANSI FAIL after [assert] PASS stays inline"    "grep -q '2026-11-26 · W40.token-pass' '$qplan5' && ! grep -q 'W40.token-pass' '$qarch5'"
+chk "Q5 second newest PASS stays inline"               "grep -q '2026-11-25 · W49.pass-two' '$qplan5'"
+chk "Q5 shipped FAIL with trailing period archived"    "grep -q 'W49.fail-trailing-dot' '$qarch5' && ! grep -q 'W49.fail-trailing-dot' '$qplan5'"
+chk "Q5 older PASS with failure tag archived"          "grep -q '2026-11-23 · W49.proc-request-failure-codes' '$qarch5' && ! grep -q '2026-11-23 · W49.proc-request-failure-codes' '$qplan5'"
+chk "Q5 unlisted non-blank ## section survived inline" "grep -q '^## UNLISTED CUSTOM SECTION' '$qplan5' && grep -q 'custom line must never be archived' '$qplan5' && ! grep -q 'UNLISTED CUSTOM SECTION' '$qarch5'"
+
 echo ""
 echo "=================== $PASS passed, $FAIL failed ==================="
 [ "$FAIL" = 0 ]

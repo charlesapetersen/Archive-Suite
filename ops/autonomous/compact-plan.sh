@@ -15,10 +15,12 @@
 # the old wording, a session would have concluded the queue bloat was out of scope and gone looking for new
 # machinery instead of the unreachable threshold that was actually the bug.
 #
-# THREE PASSES, each region-bounded: 1 = Session Log, 2 = Daemon Report, 3 = WORK QUEUE completed items.
+# FIVE PASSES, each region-bounded: 1 = Session Log, 2 = Daemon Report, 3 = WORK QUEUE completed items,
+# 4 = answered HOLD gates (via plan-edit.py), 5 = E2E findings (keep newest E2E_KEEP=2 PASS reports +
+# any FAIL report whose derived fix items have not shipped).
 # SAFE BY CONSTRUCTION:
 #   * each pass operates ONLY inside its own region (bounded below by the next '## ' header); the
-#     DIRECTIVES / RESUME PROTOCOL / E2E / HOLD QUEUE regions are never touched by any pass;
+#     DIRECTIVES / RESUME PROTOCOL / open HOLD QUEUE regions are never touched by any pass;
 #   * builds the result in a temp file and VALIDATES every live anchor survives (and that the entire
 #     pre-log region is byte-identical) BEFORE replacing the plan;
 #   * keeps a .bak of the pre-compaction plan; BAILS (leaving the plan untouched) on any anomaly;
@@ -651,6 +653,419 @@ if [ -f "$PLAN_EDIT" ] && [ -f "$PLAN" ] && grep -q '^## HOLD QUEUE' "$PLAN"; th
     ABORTED="$ABORTED pass4"
   fi
 fi
+
+# ===== Pass 5: E2E findings archival (W49.plan-e2e-archive, 2026-11-27) =====
+# `## E2E findings` accumulates ~2 KB per Live-Capture E2E PASS report (15.5 KB across 8 PASS reports
+# by 2026-11-25). Keep the newest $E2E_KEEP (default 2) PASS reports inline and move older PASS reports
+# verbatim to gitignored AUTONOMOUS_E2E_ARCHIVE.md beside the plan. A FAIL report and its derived fix
+# items stay inline until every derived fix item is independently recorded [x] in SUITE_TODO.md or
+# SUITE_TODO_DONE.md (and not open [ ] in WORK QUEUE / HOLD QUEUE / SUITE_TODO.md). Unrecognized entries
+# stay inline conservatively. Runs under the same plan lock as plan-edit.py; guarded archive append
+# precedes atomic replacement, with anchor + line-conservation + pre/post-region checks.
+E2E_ARCHIVE="${AUTONOMOUS_E2E_ARCHIVE:-$(dirname "$PLAN")/AUTONOMOUS_E2E_ARCHIVE.md}"
+E2E_KEEP="${E2E_KEEP:-2}"
+(
+  [ -f "$PLAN" ] || exit 0
+  grep -qE '^## E2E findings' "$PLAN" || { echo "compact-plan: no '## E2E findings' header — skip E2E"; exit 0; }
+  python3 - "$PLAN" "$E2E_ARCHIVE" "$E2E_KEEP" "$REPO" "$SEC_HEADER_RE" "$DR_HEADER_RE" <<'PY'
+import datetime
+import fcntl
+import os
+from pathlib import Path
+import re
+import shutil
+import sys
+import tempfile
+
+plan = Path(sys.argv[1]).resolve()
+archive = Path(sys.argv[2])
+try:
+    e2e_keep = int(sys.argv[3])
+except ValueError:
+    e2e_keep = 2
+if e2e_keep < 1:
+    e2e_keep = 2
+repo = Path(sys.argv[4])
+sec_header_re = re.compile(sys.argv[5])
+dr_header_re = re.compile(sys.argv[6], re.M)
+
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+FILE_EXT_RE = re.compile(
+    r"\.(?:txt|log|md|sh|py|swift|pdf|jpg|jpeg|png|json|csv|tsv|yml|yaml|bak|"
+    r"kt|java|xml|plist|gradle|apk|h|m|c|cpp|rb|js|ts|html|css|dmg|zip|tar|gz|out|err)$",
+    re.I,
+)
+FENCE_OPEN_RE = re.compile(r"^\s*(`{3,}|~{3,})")
+CHECKBOX_RE = re.compile(r"^(\s*)[-*]\s+\[([ xX])\]\s*(.*)$")
+PROSE_FIX_RE = re.compile(
+    r"\b(?:derived\s+fix|fix\s+items?|filed\s+fix|filed\s+as|tracked\s+as)\b", re.I
+)
+NO_PROSE_FIX_RE = re.compile(r"\bno\s+(?:derived\s+fix|fix\s+items?)\b", re.I)
+PROSE_TAG_RE = re.compile(
+    r"(?<![A-Za-z0-9._-])[A-Z][A-Za-z0-9_-]*\.[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?"
+)
+WAVE_TAG_PREFIX_RE = re.compile(r"^[A-Z]+[0-9]+\.")
+HEADING_TAG_RE = re.compile(
+    r"(?<![A-Za-z0-9._-])[A-Za-z][A-Za-z0-9_-]*\.[A-Za-z0-9][A-Za-z0-9._-]*(?![A-Za-z0-9_-])"
+)
+FAIL_HEADING_RE = re.compile(
+    r"(?<![A-Za-z0-9._-])(?:fail|failed|failure)(?![A-Za-z0-9._-])", re.I
+)
+NEGATED_PASS_RE = re.compile(
+    r"\b(?:not|never|did\s+not|didn't|failed\s+to|cannot|can't)\s+pass(?:ed)?\b", re.I
+)
+FAIL_BODY_RE = re.compile(
+    r"\[(?:e2e|assert)\]\s*(?:RESULT:\s*)?FAIL\b|"
+    r"\bRESULT:\s*FAIL\b|"
+    r"❌|"
+    r"\b(?:MISSING\s+screencap|STALE\s+screencaps|NO\s+TUNNELS)\b|"
+    r"\b(?:round[- ]trip|e2e|checks?)\s+failed\b",
+    re.I,
+)
+PASS_BODY_RE = re.compile(
+    r"\[(?:e2e|assert)\]\s*(?:RESULT:\s*)?PASS\b|\bRESULT:\s*PASS\b"
+)
+PASS_HEADING_RE = re.compile(
+    r"(?<![A-Za-z0-9._-])(?:pass|passed)(?![A-Za-z0-9._-])", re.I
+)
+PASS_SUMMARY_RE = re.compile(
+    r"\b(?:round[- ]trip passed|checks passed|all pass)\b", re.I
+)
+
+
+def update_fence(line, fence_state):
+    """Track CommonMark fence delimiter char and length; closing fences have no info string."""
+    if fence_state is None:
+        m = FENCE_OPEN_RE.match(line)
+        if m:
+            tok = m.group(1)
+            return (tok[0], len(tok)), True
+        return None, False
+    ch, n = fence_state
+    if re.match(r"^\s*" + re.escape(ch) + r"{" + str(n) + r",}\s*$", line):
+        return None, True
+    return fence_state, False
+
+
+def extract_checkbox_tag(rest):
+    rest = re.sub(r"^\*+\s*", "", rest)
+    rest = re.sub(r"^`", "", rest)
+    m = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", rest)
+    if not m:
+        return None
+    tag = m.group(0).rstrip(".")
+    if "." not in tag or FILE_EXT_RE.search(tag):
+        return None
+    return tag
+
+
+def collect_tracker_tags(todo_path, done_path, plan_lines):
+    done_tags = set()
+    open_tags = set()
+
+    for path, collect_open in ((todo_path, True), (done_path, False)):
+        if not path or not path.is_file():
+            continue
+        fence = None
+        for line in path.read_text(encoding="utf-8", errors="surrogateescape").splitlines():
+            fence, toggled = update_fence(line, fence)
+            if toggled or fence is not None:
+                continue
+            m = CHECKBOX_RE.match(line)
+            if not m:
+                continue
+            indent, state, rest = m.group(1), m.group(2), m.group(3)
+            tag = extract_checkbox_tag(rest)
+            if not tag:
+                continue
+            if state in ("x", "X") and indent == "":
+                done_tags.add(tag)
+            elif state == " " and collect_open:
+                open_tags.add(tag)
+
+    # Also scan WORK QUEUE and HOLD QUEUE in the plan for open [ ] items (never E2E findings itself).
+    fence = None
+    section_name = None
+    for line in plan_lines:
+        fence, toggled = update_fence(line, fence)
+        if toggled or fence is not None:
+            continue
+        if line.startswith("## "):
+            if line.startswith("## WORK QUEUE"):
+                section_name = "WQ"
+            elif line.startswith("## HOLD QUEUE"):
+                section_name = "HOLD"
+            else:
+                section_name = None
+            continue
+        if section_name in ("WQ", "HOLD"):
+            m = CHECKBOX_RE.match(line)
+            if m and m.group(2) == " ":
+                tag = extract_checkbox_tag(m.group(3))
+                if tag:
+                    open_tags.add(tag)
+
+    return done_tags - open_tags, done_tags | open_tags
+
+
+def count_queue_open(plan_lines):
+    fence = None
+    section_name = None
+    count = 0
+    for line in plan_lines:
+        fence, toggled = update_fence(line, fence)
+        if toggled or fence is not None:
+            continue
+        if line.startswith("## "):
+            if line.startswith("## WORK QUEUE") or line.startswith("## HOLD QUEUE"):
+                section_name = "Q"
+            else:
+                section_name = None
+            continue
+        if section_name == "Q":
+            m = CHECKBOX_RE.match(line)
+            if m and m.group(2) == " ":
+                count += 1
+    return count
+
+
+def classify_entry(entry_lines, known_tags):
+    heading = ANSI_RE.sub("", entry_lines[0])
+    heading_notags = HEADING_TAG_RE.sub(" ", heading)
+    full_text = ANSI_RE.sub("", "".join(entry_lines))
+    derived_tags = []
+    has_open_cb = False
+    has_untagged_open_cb = False
+    fence = None
+    for line in entry_lines[1:]:
+        fence, toggled = update_fence(line, fence)
+        if toggled or fence is not None:
+            continue
+        m = CHECKBOX_RE.match(line)
+        if m:
+            state, rest = m.group(2), m.group(3)
+            tag = extract_checkbox_tag(rest)
+            if tag:
+                derived_tags.append(tag)
+            elif state == " ":
+                has_untagged_open_cb = True
+            if state == " ":
+                has_open_cb = True
+        elif PROSE_FIX_RE.search(line) and not NO_PROSE_FIX_RE.search(line):
+            for tok in PROSE_TAG_RE.findall(line):
+                tok = tok.rstrip(".")
+                if "." not in tok or FILE_EXT_RE.search(tok):
+                    continue
+                if re.fullmatch(r"[A-Z]\.[A-Z]", tok):
+                    continue
+                if WAVE_TAG_PREFIX_RE.match(tok) or tok in known_tags:
+                    derived_tags.append(tok)
+
+    is_fail = (
+        bool(FAIL_HEADING_RE.search(heading_notags))
+        or bool(NEGATED_PASS_RE.search(full_text))
+        or bool(FAIL_BODY_RE.search(full_text))
+        or has_open_cb
+    )
+    if is_fail:
+        return "fail", derived_tags, has_untagged_open_cb
+    is_pass = (
+        bool(PASS_BODY_RE.search(full_text))
+        or bool(PASS_HEADING_RE.search(heading_notags))
+        or bool(PASS_SUMMARY_RE.search(full_text))
+    )
+    if is_pass:
+        return "pass", [], False
+    return "unknown", [], False
+
+
+with plan.with_name(plan.name + ".lock").open("a+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    raw = plan.read_text(encoding="utf-8", errors="surrogateescape")
+    lines = raw.splitlines(keepends=True)
+
+    # Locate the `## E2E findings` region (fence-aware; closes at ANY unfenced column-0 `## `).
+    fence = None
+    hdr_idx = None
+    end_idx = len(lines)
+    for i, line in enumerate(lines):
+        fence, toggled = update_fence(line, fence)
+        if toggled or fence is not None:
+            continue
+        if hdr_idx is None:
+            if line.startswith("## E2E findings"):
+                hdr_idx = i
+        elif line.startswith("## "):
+            end_idx = i
+            break
+
+    if hdr_idx is None:
+        print("compact-plan: no '## E2E findings' header — skip E2E")
+        sys.exit(0)
+
+    region = lines[hdr_idx + 1 : end_idx]
+
+    # Split region into preamble + unfenced `### ` report blocks.
+    preamble = []
+    entries = []
+    current = None
+    fence = None
+    for line in region:
+        was_fenced = fence is not None
+        fence, toggled = update_fence(line, fence)
+        if not was_fenced and not toggled and line.startswith("### "):
+            if current is not None:
+                entries.append(current)
+            current = [line]
+        else:
+            if current is None:
+                preamble.append(line)
+            else:
+                current.append(line)
+    if current is not None:
+        entries.append(current)
+
+    if not entries:
+        print("compact-plan: E2E findings has 0 report entries — no-op")
+        sys.exit(0)
+
+    todo_path = Path(os.environ.get("AUTONOMOUS_SUITE_TODO") or (repo / "SUITE_TODO.md"))
+    done_path = Path(os.environ.get("AUTONOMOUS_SUITE_TODO_DONE") or (repo / "SUITE_TODO_DONE.md"))
+    shipped_tags, known_tags = collect_tracker_tags(todo_path, done_path, lines)
+
+    kept_entries = []
+    dropped_entries = []
+    pass_seen = 0
+    pass_kept = 0
+    pass_archived = 0
+    fail_kept = 0
+    fail_archived = 0
+
+    for entry in entries:
+        kind, derived_tags, has_untagged_open_cb = classify_entry(entry, known_tags)
+        if kind == "pass":
+            pass_seen += 1
+            if pass_seen <= e2e_keep:
+                kept_entries.append(entry)
+                pass_kept += 1
+            else:
+                dropped_entries.append(entry)
+                pass_archived += 1
+        elif kind == "fail":
+            if (
+                not has_untagged_open_cb
+                and len(derived_tags) > 0
+                and all(t in shipped_tags for t in derived_tags)
+            ):
+                dropped_entries.append(entry)
+                fail_archived += 1
+            else:
+                kept_entries.append(entry)
+                fail_kept += 1
+        else:
+            kept_entries.append(entry)
+
+    if not dropped_entries:
+        print(
+            f"compact-plan: E2E findings has {pass_seen} PASS report(s) (keep {e2e_keep}), "
+            f"{fail_kept} active FAIL report(s) — no-op"
+        )
+        sys.exit(0)
+
+    kept_lines = (
+        lines[: hdr_idx + 1]
+        + preamble
+        + [l for entry in kept_entries for l in entry]
+        + lines[end_idx:]
+    )
+    dropped_lines = [l for entry in dropped_entries for l in entry]
+
+    # VALIDATE before committing anything.
+    if len(kept_lines) + len(dropped_lines) != len(lines):
+        print(
+            f"compact-plan: E2E line conservation FAIL (kept {len(kept_lines)} + "
+            f"dropped {len(dropped_lines)} != orig {len(lines)}) — abort, plan untouched"
+        )
+        sys.exit(1)
+    if len(dropped_lines) <= 0 or len(kept_lines) >= len(lines):
+        print("compact-plan: E2E no line reduction — abort, plan untouched")
+        sys.exit(1)
+
+    kept_text = "".join(kept_lines)
+    required_anchors = [
+        r"^## PRIME DIRECTIVES",
+        r"^## RESUME PROTOCOL",
+        r"^## WORK QUEUE",
+        r"^## Session Log",
+        r"^## E2E findings",
+        r"^RUN STATUS:",
+    ]
+    for pat in required_anchors:
+        if not re.search(pat, kept_text, re.M):
+            print(f"compact-plan: E2E VALIDATION FAIL ({pat} missing) — abort, plan untouched")
+            sys.exit(1)
+    if dr_header_re.search(raw) and not dr_header_re.search(kept_text):
+        print("compact-plan: E2E Daemon Report lost — abort, plan untouched")
+        sys.exit(1)
+    if kept_lines[: hdr_idx + 1] != lines[: hdr_idx + 1]:
+        print("compact-plan: E2E pre-region changed — abort, plan untouched")
+        sys.exit(1)
+    tail_len = len(lines) - end_idx
+    if tail_len > 0 and kept_lines[-tail_len:] != lines[end_idx:]:
+        print("compact-plan: E2E post-region changed — abort, plan untouched")
+        sys.exit(1)
+    if count_queue_open(kept_lines) != count_queue_open(lines):
+        print("compact-plan: E2E open queue count changed — abort, plan untouched")
+        sys.exit(1)
+
+    # Commit: back up plan, guarded archive append (before replace), atomic replace.
+    try:
+        shutil.copyfile(plan, plan.with_name(plan.name + ".bak"))
+    except OSError as exc:
+        print(f"compact-plan: E2E backup failed ({exc}) — abort, plan untouched")
+        sys.exit(1)
+
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    dropped_text = "".join(dropped_lines)
+    if dropped_text and not dropped_text.endswith("\n"):
+        dropped_text += "\n"
+    header = (
+        f"\n<!-- {stamp} archived {len(dropped_entries)} E2E findings report(s) "
+        f"({pass_archived} PASS, {fail_archived} shipped FAIL) from AUTONOMOUS_PLAN.md "
+        f"(kept {pass_kept} PASS, {fail_kept} active FAIL inline) -->\n"
+    )
+    try:
+        with archive.open("a", encoding="utf-8", errors="surrogateescape") as out:
+            out.write(header)
+            out.write(dropped_text)
+            out.flush()
+            os.fsync(out.fileno())
+    except OSError as exc:
+        print(f"compact-plan: E2E archive write failed ({exc}) — abort, plan untouched")
+        sys.exit(1)
+
+    tmp_path = None
+    try:
+        fd, tmp_path = tempfile.mkstemp(prefix=plan.name + ".e2e.", dir=plan.parent)
+        with os.fdopen(fd, "w", encoding="utf-8", errors="surrogateescape") as out:
+            out.write(kept_text)
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(tmp_path, plan.stat().st_mode)
+        os.replace(tmp_path, plan)
+    except OSError as exc:
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        print(f"compact-plan: E2E replace failed ({exc}) — abort, plan untouched")
+        sys.exit(1)
+
+    print(
+        f"compact-plan: archived {len(dropped_entries)} E2E findings report(s) "
+        f"({pass_archived} PASS, {fail_archived} shipped FAIL; kept {pass_kept} PASS, "
+        f"{fail_kept} active FAIL); plan {len(lines)} -> {len(kept_lines)} lines; archive={archive}"
+    )
+PY
+) || { echo "compact-plan: Pass 5 (E2E findings) exited nonzero — plan left untouched by Pass 5 (see message above)"; ABORTED="$ABORTED pass5"; }
 
 # ===== CEILING RECONCILIATION (2026-08-12, BUG 5) — is this script even CAPABLE of holding the plan? =====
 # prove-compact.sh asserts the CONSTANTS half of BUG 5's sum (it runs on fixtures and must not read the real
