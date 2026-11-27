@@ -587,6 +587,8 @@ Views/
                               selection's PDFs and companions, with the split owners and members, enclosure owners,
                               preserved originals and folder records they need, into a new folder outside the archive
                               (ArchiveCore CatalogueExport, off main; all or nothing). Catalogue folders only.
+                              W49.storage-export-share: Selection ▸ Export Sharing Copy… is the same export with
+                              derived records that leave out read state, flags, colour, quality and checks.
   NavigationModel+ContainerEdits.swift  W47.ct-reader-edit: each edit read fresh, worked out and written off main
                               with the read's stamp (ContainerFileStore), one at a time; links inside the tree refused.
                               W47.ct-reader-edit-undo: each edit returns a ContainerUndoStep (what every file held,

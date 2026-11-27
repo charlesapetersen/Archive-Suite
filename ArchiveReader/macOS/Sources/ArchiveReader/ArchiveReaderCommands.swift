@@ -276,6 +276,10 @@ struct ArchiveReaderCommands: Commands {
                 if let nav { nav.exportWithCatalogue() } else { docTags?.exportWithCatalogue() }
             }
             .disabled(noTagTarget)
+            Button(ReaderCommand.exportSharingCopy.title) {
+                if let nav { nav.exportWithCatalogue(sharing: true) } else { docTags?.exportWithCatalogue(sharing: true) }
+            }
+            .disabled(noTagTarget)
             Divider()
             Button(ReaderCommand.selectRun.title) { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)

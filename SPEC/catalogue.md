@@ -304,6 +304,17 @@ Its ancestors are compared by device and inode.
 folder's name and root instance (no machine path), and each file's role (`selected`, `document` or
 `enclosure`), IDs, revision and SHA-256 digests. It also lists the context records and preservation files
 that were copied. Opened as a root of its own, the folder is a separate occurrence: its records never
-update the archive's, and later archive edits do not update it. Each companion travels whole,
-including read state, flags, colour, quality and checks. A disclosure-limited copy for sharing is a
-separate open question (`W49.storage-export-share`).
+update the archive's, and later archive edits do not update it. `contents` is `whole-records` for this
+export: each companion travels whole, including read state, flags, colour, quality and checks.
+
+A sharing copy (owner, 2026-11-27, `W49.storage-export-share`; Reader: Selection ▸ Export Sharing Copy…) is
+the same export with `contents: "disclosure-limited"`, for sending to someone else. Each companion is
+derived from the archive's: `fileFields` keeps only `ocrPoor` and `ocrFailed`, so read state, flags, colour,
+quality and any unrecognised file-level field are left out and read as not yet assessed, never as a recorded
+clear. `checkedRevision` is removed from every remaining field envelope. The record gets a new `revision` and
+no `parents`, since it is not part of the archive record's history. Descriptive fields, their evidence and
+field revisions, and unrecognised keys outside `fileFields` keep their wire form. The manifest's `omitted`
+lists what was left out and its note calls the folder a disclosure-limited snapshot. Verification derives
+each record again from the scanned archive record under the manifest's revision and requires the same bytes.
+PDFs, preserved originals and folder records are copied byte for byte as in the whole export; OCR text and
+PDF headers can still disclose what they contain.

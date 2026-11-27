@@ -72,6 +72,46 @@ final class CatalogueExportReaderTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: out.appendingPathComponent("B").path))
     }
 
+    /// W49.storage-export-share: Selection ▸ Export Sharing Copy… sends the description without personal state.
+    func testASharingCopyLeavesOutReadStateAndChecks() throws {
+        let item = (file: UUID(), content: UUID())
+        let document = UUID()
+        let revision = UUID()
+        try Data("\(item.file) \(item.content)".utf8).write(to: root.appendingPathComponent("Letter.pdf"))
+        try Data("""
+        {"schema":1,"fileID":"\(item.file)","contentRevision":"\(item.content)","revision":"\(UUID())","parents":[],
+         "pages":[{"id":"\(UUID())","physicalIndex":0,"documentID":"\(document)","role":"searchable"}],
+         "documents":[{"id":"\(document)","ownerFileID":"\(item.file)","fields":{"title":{"state":"value","value":"Dear Sir",
+           "fieldRevision":"\(revision)","origin":"user","checkedRevision":"\(revision)"}}}],
+         "fileFields":{"readState":{"state":"value","value":"read","fieldRevision":"\(UUID())","origin":"user"}}}
+        """.utf8).write(to: root.appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: "Letter.pdf")))
+        let identify: CatalogueReader.IdentifyPDF = { fd, _ in
+            let text = String(decoding: try FileHandle(fileDescriptor: fd, closeOnDealloc: false).readToEnd() ?? Data(), as: UTF8.self)
+            let parts = text.split(separator: " ").compactMap { UUID(uuidString: String($0)) }
+            return parts.count == 2 ? .init(fileID: parts[0], contentRevision: parts[1], pageCount: 1) : nil
+        }
+        let rootPath = CorpusWalker.discoveredPathPrefix(for: root) ?? root.path
+        let selected = URL(fileURLWithPath: rootPath).appendingPathComponent("Letter.pdf")
+        let destination = out.appendingPathComponent(NavigationModel.catalogueExportName([selected], sharing: true))
+        XCTAssertEqual(destination.lastPathComponent, "Letter (sharing copy)")
+
+        let result = NavigationModel.exportCatalogue([selected], root: root, to: destination, contents: .disclosureLimited,
+                                                     identifyPDF: identify)
+        XCTAssertEqual(try result.get().contents, .disclosureLimited)
+        let shared = try CatalogueRecord(json: Data(contentsOf: destination.appendingPathComponent(
+            CatalogueRecord.companionFilename(forPDFFilename: "Letter.pdf"))))
+        XCTAssertNil(shared.fileFields.readState)
+        let title = try XCTUnwrap(shared.documents.first?.fields?.title)
+        XCTAssertFalse(title.isChecked)
+        guard case .value("Dear Sir") = title.current else { return XCTFail("the title did not travel") }
+        XCTAssertEqual(NavigationModel.catalogueExportMessage(result, name: destination.lastPathComponent),
+                       "Exported a sharing copy of 1 document to “Letter (sharing copy)”, without read state, flags, colour, "
+                           + "quality or checks. Send the whole folder to keep the catalogue facts.")
+        XCTAssertEqual(ReaderCommand.exportSharingCopy.title, "Export Sharing Copy…")
+        XCTAssertNil(ReaderCommand.exportSharingCopy.key)
+        XCTAssertEqual(NavigationModel.catalogueExportName([selected, selected], sharing: true), "Catalogue sharing copy")
+    }
+
     func testTheFolderNameAndTheRefusals() {
         XCTAssertEqual(NavigationModel.catalogueExportName([URL(fileURLWithPath: "/a/1.pdf"), URL(fileURLWithPath: "/a/2.pdf")]),
                        "Catalogue export")

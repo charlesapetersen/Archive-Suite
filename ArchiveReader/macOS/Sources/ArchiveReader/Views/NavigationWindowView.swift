@@ -284,6 +284,8 @@ struct NavigationWindowView: View {
         menu.addItem(withTitle: ReaderCommand.addToZotero.title, action: #selector(ContextMenuActions.addToZotero), keyEquivalent: "")
         menu.addItem(withTitle: ReaderCommand.exportWithCatalogue.title, action: #selector(ContextMenuActions.exportWithCatalogue),
                      keyEquivalent: "")
+        menu.addItem(withTitle: ReaderCommand.exportSharingCopy.title, action: #selector(ContextMenuActions.exportSharingCopy),
+                     keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Mark Read", action: #selector(ContextMenuActions.markRead), keyEquivalent: "")
         menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
@@ -1154,6 +1156,7 @@ final class ContextMenuActions: NSObject {
     @objc func exportToZotero() { model.exportToZotero() }
     @objc func addToZotero() { model.addToZotero() }
     @objc func exportWithCatalogue() { model.exportWithCatalogue() }
+    @objc func exportSharingCopy() { model.exportWithCatalogue(sharing: true) }
     @objc func markRead()         { model.mark(.read) }
     @objc func markUnread()       { model.mark(.unread) }
     @objc func toggleFlag()       { model.toggleFlagSelection() }

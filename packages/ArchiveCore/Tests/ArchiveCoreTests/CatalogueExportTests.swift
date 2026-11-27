@@ -219,7 +219,87 @@ struct CatalogueExportTests {
         }
     }
 
+    @Test func aSharingCopyLeavesOutPersonalStateAndKeepsTheDescription() throws {
+        try withRoots { root, out in
+            let ownerPath = "Original.pdf"
+            let memberPath = "Part.pdf"
+            try writePDF(owner, named: ownerPath, in: root)
+            try writePDF(member, named: memberPath, in: root)
+            func envelope(_ value: String, checked: Bool = true, evidence: String = "") -> String {
+                let revision = UUID()
+                return #"{"state":"value","value":\#(value),"fieldRevision":"\#(revision)","origin":"user""#
+                    + (checked ? #","checkedRevision":"\#(revision)""# : "") + evidence + "}"
+            }
+            let personal = #""readState":\#(envelope("\"read\"")),"flagged":\#(envelope("true")),"#
+                + #""colour":\#(envelope("\"red\"")),"quality":\#(envelope("2")),"x-mood":\#(envelope("\"tired\"")),"#
+                + #""ocrPoor":\#(envelope("true")),"ocrFailed":{"state":"cleared","fieldRevision":"\#(UUID())","origin":"model"}"#
+            let evidence = #","evidence":[{"source":"ocr","quote":"Dear Sir","observedValue":"Letter"}]"#
+            let ownerJSON = Data(String(decoding: record(for: owner, owner: owner, title: "Original"), as: UTF8.self)
+                .replacingOccurrences(of: "\"fileFields\":{}", with: "\"fileFields\":{\(personal)},  \"x-later\":[1]")
+                .replacingOccurrences(of: "\"fields\":{", with: "\"fields\":{\"documentKind\":\(envelope("\"Letter\"", evidence: evidence)),")
+                .utf8)
+            try ownerJSON.write(to: companion(ownerPath, in: root))
+            try record(for: member, owner: owner).write(to: companion(memberPath, in: root))
+            let archived = try CatalogueRecord(json: ownerJSON)
+            let before = try snapshotOfFiles(root)
+
+            let destination = out.appendingPathComponent("Sharing")
+            let manifest = try CatalogueExport.export([memberPath], from: reader(root), to: destination,
+                                                      contents: .disclosureLimited, now: Date(timeIntervalSince1970: 1_800_000_000))
+            #expect(try snapshotOfFiles(root) == before)
+            #expect(manifest.contents == .disclosureLimited && manifest.omitted == CatalogueExport.omittedFromSharing)
+            #expect(manifest.note.contains("not the archive's own records"))
+            #expect(manifest.files.map(\.path) == [memberPath, ownerPath])
+            #expect(!manifest.files.contains { $0.revision == archived.revision })
+            #expect(try Data(contentsOf: destination.appendingPathComponent(ownerPath)) == Data(contentsOf: root.appendingPathComponent(ownerPath)))
+            let saved = try CatalogueExport.Manifest.decode(Data(contentsOf: destination.appendingPathComponent(CatalogueExport.manifestName)))
+            #expect(saved == manifest)
+
+            let shared = try CatalogueRecord(json: Data(contentsOf: companion(ownerPath, in: destination)))
+            let text = String(decoding: shared.originalJSON, as: UTF8.self)
+            for gone in ["readState", "flagged", "colour", "quality", "x-mood", "tired", "checkedRevision"] {
+                #expect(!text.contains(gone), "\(gone) left the archive")
+            }
+            #expect(shared.fileFields.readState == nil && shared.fileFields.quality == nil)
+            #expect(shared.fileFields.ocrPoor.map { !$0.isChecked } == true)
+            if case .cleared? = shared.fileFields.ocrFailed?.current {} else { Issue.record("ocrFailed lost its clear") }
+            #expect(shared.parents.isEmpty && shared.revision == manifest.files[1].revision)
+            #expect(shared.fileID == archived.fileID && shared.contentRevision == archived.contentRevision)
+            #expect(text.contains("\"x-later\":[1]") && text.contains("Dear Sir"))
+            let kind = try #require(shared.documents.first?.fields?.documentKind)
+            #expect(!kind.isChecked && kind.evidence.count == 1)
+
+            // Opened as its own root, the member reads the owner's description through the sharing record.
+            let exported = try CatalogueReader(grantedRoot: destination, rootInstanceID: UUID(), mode: .adopted,
+                                               identifyPDF: Self.identify).discover()
+            let facts = exported.facts(at: memberPath, physicalPageIndex: 0)
+            #expect(try title(in: facts) == "Original")
+            #expect(try facts.document.get().owner.revision.facts == shared.revision)
+
+            // A whole-record folder cannot pass as a sharing copy, nor the reverse.
+            let whole = try CatalogueExport.export([memberPath], from: reader(root), to: out.appendingPathComponent("Whole"))
+            #expect(whole.contents == .wholeRecords && whole.omitted.isEmpty)
+            let snapshot = try reader(root).discover()
+            #expect(throws: CatalogueExport.Failure.self) {
+                try CatalogueExport.verify(relabelled(whole, as: .disclosureLimited), at: out.appendingPathComponent("Whole"),
+                                           against: snapshot, identify: Self.identify)
+            }
+            #expect(throws: CatalogueExport.Failure.self) {
+                try CatalogueExport.verify(relabelled(manifest, as: .wholeRecords), at: destination,
+                                           against: snapshot, identify: Self.identify)
+            }
+            try CatalogueExport.verify(manifest, at: destination, against: snapshot, identify: Self.identify)
+        }
+    }
+
     // MARK: - Fixtures
+
+    private func relabelled(_ manifest: CatalogueExport.Manifest, as contents: CatalogueExport.Contents) -> CatalogueExport.Manifest {
+        CatalogueExport.Manifest(format: manifest.format, version: manifest.version, snapshot: true, contents: contents,
+                                 omitted: manifest.omitted, createdAt: manifest.createdAt, note: manifest.note,
+                                 originName: manifest.originName, originRootInstanceID: manifest.originRootInstanceID,
+                                 files: manifest.files, context: manifest.context)
+    }
 
     private struct Identity {
         var file = UUID()

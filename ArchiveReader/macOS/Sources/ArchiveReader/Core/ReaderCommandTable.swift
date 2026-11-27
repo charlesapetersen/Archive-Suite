@@ -70,7 +70,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     case chooseFolder, rescan, saveSearch, connectImproveOCR, containerLevels, print
     // Selection
     case open, preview, revealInFinder, openInDefaultApp, copyLinks, copyArchiveLinks, exportToZotero, addToZotero, exportWithCatalogue,
-         selectRun, nextUnread,
+         exportSharingCopy, selectRun, nextUnread,
          previousUnread
     // Tags
     case markRead, markUnread, markReadAndNext, renameTag, findSimilarTags, tagChanges, toggleFlag, undoTagChange, redoTagChange,
@@ -140,6 +140,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .exportToZotero: return "Export to Zotero…"
         case .addToZotero: return "Add to Zotero"
         case .exportWithCatalogue: return "Export with Catalogue Records…"
+        case .exportSharingCopy: return "Export Sharing Copy…"
         case .selectRun: return "Select Document Run"
         case .nextUnread: return "Next Unread"
         case .previousUnread: return "Previous Unread"
@@ -230,7 +231,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .revealInFinder: return CommandKey("r", [.command, .shift])
         case .copyLinks: return CommandKey("c", [.command, .option])
         case .copyArchiveLinks: return CommandKey("l", [.command, .shift])
-        case .openInDefaultApp, .exportToZotero, .addToZotero, .exportWithCatalogue, .selectRun: return nil
+        case .openInDefaultApp, .exportToZotero, .addToZotero, .exportWithCatalogue, .exportSharingCopy, .selectRun: return nil
         // ⌘] / ⌘[ are Back and Forward, as in Finder and Preview (W40.reader-back-forward); the bare ] / [ in
         // the list stay Next / Previous Unread.
         case .nextUnread: return CommandKey("]", [.command, .option])
@@ -302,6 +303,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
             return "Add the selection to the Zotero open on this Mac, with its subjects as tags, into the library or collection selected there"
         case .exportWithCatalogue:
             return "Copy the selected PDFs with their catalogue records, and the files those records depend on, into a new folder"
+        case .exportSharingCopy:
+            return "Export with catalogue records for sending to someone else, leaving out read state, flags, colour, quality and checks"
         case .markRead: return "Mark the selected documents as read"
         case .markUnread: return "Mark the selected documents as unread"
         case .toggleFlag: return "Flag or unflag the selection — app-only, never written to the file"

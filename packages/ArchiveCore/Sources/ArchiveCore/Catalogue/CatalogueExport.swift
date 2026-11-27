@@ -6,15 +6,32 @@ import Foundation
 /// documents depend on: the owner and the other members of a split document, the owner of an
 /// enclosure's covering document, the verified preservation copies and the folder records the
 /// container context inherits from. The folder is a dated snapshot. It is checked by reading it back
-/// as its own root before it is published, and the archive is only read.
+/// as its own root before it is published, and the archive is only read. A sharing copy writes derived
+/// companions without the owner's personal state instead (`Contents.disclosureLimited`).
 public enum CatalogueExport {
     public static let manifestName = "archivesuite-export.json"
     public static let format = "archivesuite-export"
-    public static let version = 1
+    public static let version = 2
     static let metadataDirectory = ".archivesuite"
     /// The folder records a file's container context and collection settings are read from.
     static let contextNames = [ContainerFile.fileName, ContainerLevelMap.fileName, ContainerNames.fileName,
                                CollectionSettingsRecord.fileName]
+
+    /// What each exported companion holds.
+    public enum Contents: String, Codable, Sendable {
+        /// Each companion byte for byte, personal state included: the full transfer.
+        case wholeRecords = "whole-records"
+        /// A derived companion for sharing without read state, flags, colour, quality, field checks or
+        /// unrecognised file-level fields. A left-out field reads as not yet assessed, not as a recorded clear.
+        /// Personal state is file-level (`SPEC/catalogue.md`), so unrecognised keys elsewhere travel as written.
+        case disclosureLimited = "disclosure-limited"
+    }
+
+    /// The file fields a sharing copy keeps. Every other file-level field is personal or unrecognised.
+    static let sharedFileFields: Set<String> = ["ocrPoor", "ocrFailed"]
+    /// What a sharing copy leaves out, as recorded in its manifest.
+    static let omittedFromSharing = ["fileFields.readState", "fileFields.flagged", "fileFields.colour", "fileFields.quality",
+                                     "fileFields.<unrecognised>", "checkedRevision"]
 
     /// Why a file is in the export.
     public enum Role: String, Codable, Sendable {
@@ -31,6 +48,7 @@ public enum CatalogueExport {
         public let role: Role
         public let fileID: UUID
         public let contentRevision: UUID
+        /// The exported companion's revision: the archive's own for whole records, a fresh one for a sharing copy.
         public let revision: UUID
         /// Base64 SHA-256 of the exported bytes.
         public let pdfSHA256: String
@@ -43,6 +61,9 @@ public enum CatalogueExport {
         public let format: String
         public let version: Int
         public let snapshot: Bool
+        public let contents: Contents
+        /// The record keys a sharing copy left out; empty for whole records.
+        public let omitted: [String]
         public let createdAt: Date
         public let note: String
         /// The archive folder's name, not its path on this Mac.
@@ -114,7 +135,7 @@ public enum CatalogueExport {
     /// an existing item is never replaced. Synchronous; run it off the main actor.
     @discardableResult
     public static func export(_ selectedPaths: [String], from reader: CatalogueReader, to destination: URL,
-                              now: Date = Date()) throws -> Manifest {
+                              contents: Contents = .wholeRecords, now: Date = Date()) throws -> Manifest {
         guard !selectedPaths.isEmpty else { throw Failure.nothingSelected }
         try checkDestination(destination, archive: reader.root)
         let snapshot = reader.discover(including: selectedPaths)
@@ -132,7 +153,7 @@ public enum CatalogueExport {
 
         let manifest: Manifest
         do {
-            manifest = try stage(plan, from: reader, into: staging, now: now)
+            manifest = try stage(plan, contents: contents, from: reader, into: staging, now: now)
             try verify(manifest, at: staging, against: snapshot, identify: reader.identifyPDF)
         } catch let failure as Failure {
             throw failure
@@ -154,17 +175,28 @@ public enum CatalogueExport {
         return manifest
     }
 
-    static func stage(_ plan: Plan, from reader: CatalogueReader, into staging: URL, now: Date) throws -> Manifest {
+    static func stage(_ plan: Plan, contents: Contents, from reader: CatalogueReader, into staging: URL,
+                      now: Date) throws -> Manifest {
         var files: [File] = []
         for (path, role) in plan.order {
             try Task.checkCancellation()
-            files.append(try copy(plan.facts[Data(path.utf8)]!, role: role, from: reader, into: staging))
+            files.append(try copy(plan.facts[Data(path.utf8)]!, role: role, contents: contents, from: reader, into: staging))
         }
         let context = try copyContext(for: plan.order.map(\.path), from: reader, into: staging)
+        let note = switch contents {
+        case .wholeRecords:
+            "A snapshot of these catalogue records when they were exported. Later edits in the archive do not change it. "
+                + "Each record is copied whole, including read state, flags, colour, quality and checks."
+        case .disclosureLimited:
+            "A disclosure-limited snapshot for sharing. Each record was derived from the archive's when it was exported, "
+                + "leaving out read state, flags, colour, quality, the checks on every field and any file-level field "
+                + "this version does not recognise. A left-out field is not yet assessed here, not a recorded clear. "
+                + "Descriptive fields, their evidence and unrecognised keys outside the file fields travel as written. "
+                + "These are not the archive's own records, and later edits in the archive do not change them."
+        }
         let manifest = Manifest(
-            format: format, version: version, snapshot: true, createdAt: now,
-            note: "A snapshot of these catalogue records when they were exported. Later edits in the archive do not change it. "
-                + "Each record is copied whole, including read state, flags, colour, quality and checks.",
+            format: format, version: version, snapshot: true, contents: contents,
+            omitted: contents == .disclosureLimited ? omittedFromSharing : [], createdAt: now, note: note,
             originName: reader.root.lastPathComponent, originRootInstanceID: reader.rootInstanceID,
             files: files, context: context)
         try write(try manifest.encoded(), to: staging.appendingPathComponent(manifestName))
@@ -236,7 +268,8 @@ public enum CatalogueExport {
 
     // MARK: - Copying
 
-    static func copy(_ facts: ItemFacts.FileFacts, role: Role, from reader: CatalogueReader, into staging: URL) throws -> File {
+    static func copy(_ facts: ItemFacts.FileFacts, role: Role, contents: Contents, from reader: CatalogueReader,
+                     into staging: URL) throws -> File {
         let occurrence = facts.pair.occurrence
         let path = occurrence.relativePath
         let target = staging.appendingPathComponent(path)
@@ -248,17 +281,22 @@ public enum CatalogueExport {
                     let json = try reader.directory.withFile(companionName, in: parent, artifact: .companion) {
                         try readSmall($0)
                     }
-                    let companionDigest = Data(SHA256.hash(data: json))
-                    guard companionDigest == facts.revision.companionSHA256 else { throw Failure.changed(path: path) }
+                    guard Data(SHA256.hash(data: json)) == facts.revision.companionSHA256 else { throw Failure.changed(path: path) }
+                    let record = facts.pair.record
+                    var exported = (json: json, revision: record.revision)
+                    if contents == .disclosureLimited {
+                        exported.revision = UUID()
+                        exported.json = try sharingRecord(record, revision: exported.revision)
+                    }
                     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                     let pdfDigest = try copyFile(pdf, to: target, expectedSize: nil)
-                    try write(json, to: folder.appendingPathComponent(companionName))
-                    let preservation = try copyPreservation(of: facts.pair.record, beside: path, in: parent,
+                    try write(exported.json, to: folder.appendingPathComponent(companionName))
+                    let preservation = try copyPreservation(of: record, beside: path, in: parent,
                                                             from: reader, into: staging)
-                    let record = facts.pair.record
                     return File(path: path, role: role, fileID: record.fileID, contentRevision: record.contentRevision,
-                                revision: record.revision, pdfSHA256: pdfDigest.base64EncodedString(),
-                                companionSHA256: companionDigest.base64EncodedString(), preservation: preservation)
+                                revision: exported.revision, pdfSHA256: pdfDigest.base64EncodedString(),
+                                companionSHA256: Data(SHA256.hash(data: exported.json)).base64EncodedString(),
+                                preservation: preservation)
                 }
             }
         } catch let failure as Failure {
@@ -375,33 +413,84 @@ public enum CatalogueExport {
         return copied
     }
 
+    /// The companion a sharing copy carries: `record` without its personal state, under `revision` with no
+    /// parents, since it is not part of the archive record's history. Other values keep their wire form.
+    static func sharingRecord(_ record: CatalogueRecord, revision: UUID) throws -> Data {
+        func unchecked(_ envelope: Data) throws -> Data {
+            guard envelope.first == UInt8(ascii: "{") else { return envelope }
+            var field = try CatalogueJSON.Object(envelope)
+            field["checkedRevision"] = nil
+            return try field.encoded()
+        }
+        func unchecked(fields raw: Data, keeping keep: (String) -> Bool) throws -> Data {
+            var fields = try CatalogueJSON.Object(raw)
+            for key in Array(fields.keys) {
+                fields[key] = keep(key) ? try unchecked(fields[key]!) : nil
+            }
+            return try fields.encoded()
+        }
+        var root = try CatalogueJSON.Object(record.originalJSON)
+        guard let fileFields = root["fileFields"], let rawDocuments = root["documents"] else {
+            throw CatalogueRecord.Invalid.inconsistentRecord
+        }
+        root["fileFields"] = try unchecked(fields: fileFields, keeping: sharedFileFields.contains)
+        var documents = try CatalogueJSON.entries(in: rawDocuments)
+        for index in documents.indices {
+            var document = try CatalogueJSON.Object(documents[index])
+            guard let fields = document["fields"], fields.first == UInt8(ascii: "{") else { continue }
+            document["fields"] = try unchecked(fields: fields) { _ in true }
+            documents[index] = try document.encoded()
+        }
+        root["documents"] = CatalogueJSON.array(documents)
+        let encoder = JSONEncoder()
+        root["revision"] = try encoder.encode(revision)
+        root["parents"] = try encoder.encode([UUID]())
+        return try CatalogueRecord(json: root.encoded()).originalJSON
+    }
+
     // MARK: - Verification
 
-    /// Read the staged folder back as its own root: the same files, records and document owners.
+    /// Read the staged folder back as its own root: the same files, records and document owners. A sharing
+    /// copy's records must be exactly what `sharingRecord` derives from the archive's under their new revisions.
     static func verify(_ manifest: Manifest, at staging: URL, against source: CatalogueReader.Snapshot,
                        identify: @escaping CatalogueReader.IdentifyPDF) throws {
+        var expected: [Data: (facts: UUID, companionSHA256: Data)] = [:]
+        for file in manifest.files {
+            let failure = Failure.verification(path: file.path)
+            guard let original = try? source.facts(at: file.path).file.get(),
+                  let digest = Data(base64Encoded: file.companionSHA256) else { throw failure }
+            switch manifest.contents {
+            case .wholeRecords:
+                guard file.revision == original.revision.facts, digest == original.revision.companionSHA256 else { throw failure }
+            case .disclosureLimited:
+                guard file.revision != original.revision.facts,
+                      let derived = try? sharingRecord(original.pair.record, revision: file.revision),
+                      Data(SHA256.hash(data: derived)) == digest else { throw failure }
+            }
+            expected[Data(file.path.utf8)] = (file.revision, digest)
+        }
         let check = try CatalogueReader(grantedRoot: staging, rootInstanceID: UUID(), mode: .adopted, identifyPDF: identify)
         let copy = check.discover()
-        let expected = Set(manifest.files.map { Data($0.path.utf8) })
-        guard copy.inventory.isComplete, Set(copy.inventory.relativePDFPaths.map { Data($0.utf8) }) == expected else {
+        guard copy.inventory.isComplete, Set(copy.inventory.relativePDFPaths.map { Data($0.utf8) }) == Set(expected.keys) else {
             throw Failure.verification(path: manifest.files.first?.path ?? "")
         }
         for file in manifest.files {
             let failure = Failure.verification(path: file.path)
             guard let exported = try? copy.facts(at: file.path).file.get(),
                   let original = try? source.facts(at: file.path).file.get(),
-                  exported.revision.companionSHA256 == original.revision.companionSHA256,
+                  let want = expected[Data(file.path.utf8)],
+                  exported.revision.companionSHA256 == want.companionSHA256,
                   exported.revision.fileID == original.revision.fileID,
                   exported.revision.content == original.revision.content,
-                  exported.revision.facts == original.revision.facts else { throw failure }
+                  exported.revision.facts == want.facts else { throw failure }
             let record = original.pair.record
             for page in record.pages {
                 let there = copy.facts(at: file.path, physicalPageIndex: page.physicalIndex)
                 let here = source.facts(at: file.path, physicalPageIndex: page.physicalIndex)
-                guard sameDocument(there.document, here.document) else { throw failure }
+                guard sameDocument(there.document, here.document, expected) else { throw failure }
                 switch (there.enclosure, here.enclosure) {
                 case (nil, nil): break
-                case (let a?, let b?): guard sameDocument(a, b) else { throw failure }
+                case (let a?, let b?): guard sameDocument(a, b, expected) else { throw failure }
                 default: throw failure
                 }
             }
@@ -415,13 +504,17 @@ public enum CatalogueExport {
         }
     }
 
+    /// `a` read from the copy and `b` from the archive name the same document and owner file, and the copy's
+    /// owner is the exported record `expected` lists for it.
     private static func sameDocument(_ a: Result<ItemFacts.DocumentFacts, ItemFacts.Unavailable>,
-                                     _ b: Result<ItemFacts.DocumentFacts, ItemFacts.Unavailable>) -> Bool {
+                                     _ b: Result<ItemFacts.DocumentFacts, ItemFacts.Unavailable>,
+                                     _ expected: [Data: (facts: UUID, companionSHA256: Data)]) -> Bool {
         guard let a = try? a.get(), let b = try? b.get() else { return false }
+        let path = Data(a.owner.pair.occurrence.relativePath.utf8)
+        guard let want = expected[path] else { return false }
         return a.document.id == b.document.id && a.owner.revision.fileID == b.owner.revision.fileID
-            && a.owner.revision.facts == b.owner.revision.facts
-            && a.owner.revision.companionSHA256 == b.owner.revision.companionSHA256
-            && Data(a.owner.pair.occurrence.relativePath.utf8) == Data(b.owner.pair.occurrence.relativePath.utf8)
+            && a.owner.revision.facts == want.facts && a.owner.revision.companionSHA256 == want.companionSHA256
+            && path == Data(b.owner.pair.occurrence.relativePath.utf8)
     }
 
     // MARK: - Files

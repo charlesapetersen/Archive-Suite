@@ -153,9 +153,9 @@ struct DocumentTagActions {
         navigation.addToZotero(paths: paths) { viewer.tagStatus = $0 }
     }
 
-    func exportWithCatalogue() {
+    func exportWithCatalogue(sharing: Bool = false) {
         guard let navigation, let paths = libraryPaths(navigation) else { return }
-        navigation.exportWithCatalogue(paths: paths) { viewer.tagStatus = $0 }
+        navigation.exportWithCatalogue(paths: paths, sharing: sharing) { viewer.tagStatus = $0 }
     }
 
     /// The open file's path when the library holds it; otherwise the status line says why nothing happens.
