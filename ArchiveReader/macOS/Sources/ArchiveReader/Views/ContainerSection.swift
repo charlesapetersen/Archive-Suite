@@ -35,6 +35,7 @@ struct ContainerSection: View {
                     VStack(alignment: .leading, spacing: 4) {
                         FieldStatusRow(name: row.field.label, value: row.text, status: row.status,
                                        identifier: "ar.container.\(row.field.rawValue)", onToggle: nil)
+                            .hiddenWithInspector()
                         if editor != nil {
                             if editing == row.field { editorField(row.field) } else { rowMenu(row) }
                         }

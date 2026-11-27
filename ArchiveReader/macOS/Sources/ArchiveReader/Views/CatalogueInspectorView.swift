@@ -80,6 +80,7 @@ struct CatalogueInspectorView: View {
                     containers(for: rows)
                     if rows.count == 1, let row = rows.first {
                         CollectionRecordView(fileURL: row.url, root: model.rootStore.root, identifierPrefix: "ar")
+                            .hiddenWithInspector()
                     }
                 }
                 .padding()
@@ -167,6 +168,7 @@ struct CatalogueInspectorView: View {
             DisclosureGroup("Catalogue evidence") {
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                     Text(line).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        .hiddenWithInspector()
                 }
             }
         }

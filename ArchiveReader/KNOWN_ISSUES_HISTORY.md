@@ -4,6 +4,15 @@ Archived from [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) on 2026-11-25 (W49.reader-doc
 and closed entries and the July–October 2026 fix logs, in the order they stood. History only; the open limits
 stay in `KNOWN_ISSUES.md`. A new fixed entry may still be written there and moved here later.
 
+## A hidden Inspector left a parent/child orphan in the accessibility tree (fixed 2026-11-27)
+
+The audit reported a "Parent/Child mismatch" naming no element in the document window, and in the navigation window
+once its Inspector had been shown and hidden again. The hidden Inspector stays mounted at zero width so a draft
+survives ⌥⌘I, but `accessibilityHidden` did not reach its selectable text (`.textSelection(.enabled)`, drawn by an
+AppKit view): the item-field rows' values stayed in the tree under a parent that did not list them. That text is
+now `.hidden()` while its Inspector is (`hiddenWithInspector()`, W49.reader-audit-preview-thumbs-viewer-orphan).
+The preservation "Not recorded" contrast found with it (3.95:1 in light mode) was fixed by W49.ui-fails-under-coverage.
+
 ## Document window panes left the accessibility tree when the image was zoomed (fixed 2026-11-27)
 
 With the image page zoomed past fit, the document window's content reported no accessibility children. Both panes

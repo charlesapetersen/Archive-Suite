@@ -99,6 +99,7 @@ struct TagEditorView: View {
                     if let file = collectionRecordFile {
                         Divider()
                         CollectionRecordView(fileURL: file, root: model.rootStore.root, identifierPrefix: "ar")
+                            .hiddenWithInspector()
                     }
                 }
                 .padding()

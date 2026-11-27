@@ -32,7 +32,11 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
     /// `FixtureUITestCase.setUp` has already launched with the fixture; relaunch with the appearance added.
     private func relaunch(_ appearance: [String]) {
         app.terminate()
-        app.launchArguments += appearance + ["-ar.showSidebar", "YES", "-ar.showTagCloud", "YES"]
+        // Both thumbnail sidebars and both Inspectors are remembered settings; set them so every run audits the
+        // same screens, the sidebars always among them.
+        app.launchArguments += appearance + ["-ar.showSidebar", "YES", "-ar.showTagCloud", "YES",
+                                             "-ar.preview.thumbnailsVisible", "YES", "-ar.doc.thumbnailsVisible", "YES",
+                                             "-ar.infoVisible", "NO", "-ar.doc.infoVisible", "NO"]
         app.launch()
         app.activate()
         XCTAssertTrue(table.waitForExistence(timeout: 10), "Table should appear after the relaunch")
@@ -50,6 +54,14 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         XCTAssertGreaterThan(wide.width, 1700)
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
+        LayoutGuard.waitUntilSettled(main)
+        // Show the Inspector on the file and hide it again: hidden, it stays mounted with the file's item-field rows,
+        // whose selectable text was a parent/child orphan (W49.reader-audit-preview-thumbs-viewer-orphan).
+        let dateField = app.textFields["ar.tagEditor.date"]
+        app.typeKey("i", modifierFlags: [.command, .option])
+        XCTAssertTrue(dateField.waitForExistence(timeout: 5), "the Inspector should show the file's fields")
+        app.typeKey("i", modifierFlags: [.command, .option])
+        XCTAssertTrue(dateField.waitForNonExistence(timeout: 5), "the Inspector should hide")
         LayoutGuard.waitUntilSettled(main)
         for (id, name) in [("ar.filter.tagField", "Filter by tags"), ("ar.filter.name", "Filter file name"),
                            ("ar.filter.ocr", "Search OCR text"), ("ar.table", "Archive files")] {
@@ -90,8 +102,9 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         XCTAssertTrue(preview.waitForExistence(timeout: 5))
         XCTAssertTrue(preview.buttons["ar.preview.open"].exists)
         assertPageTitles(in: preview)
+        XCTAssertTrue(preview.scrollViews["ar.preview.thumbnails"].exists, "the preview's thumbnails are audited")
         assertSmallTextContrast(in: preview, appearance: appearance)
-        sweep.audit(preview, screen: "preview sheet")
+        sweep.audit(preview, screen: "preview sheet", exempt: [Self.lazyThumbnailRow])
         captureScreenshot("reader-aa-preview-\(appearance)")
 
         open.click()
@@ -99,8 +112,9 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         XCTAssertTrue(viewer.waitForExistence(timeout: 10), "Open in Viewer should bring up the document window")
         LayoutGuard.waitUntilSettled(viewer)
         assertPageTitles(in: viewer)
+        XCTAssertTrue(viewer.scrollViews["ar.doc.thumbnails"].exists, "the document window's thumbnails are audited")
         assertSmallTextContrast(in: viewer, appearance: appearance)
-        sweep.audit(viewer, screen: "document viewer")
+        sweep.audit(viewer, screen: "document viewer", exempt: [Self.lazyThumbnailRow])
         captureScreenshot("reader-aa-viewer-\(appearance)")
         viewer.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(viewer.waitForNonExistence(timeout: 5), "the viewer should close")
@@ -176,4 +190,18 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
 
     // No contrast exemptions: counts, status, page counters, Type/Read and warnings are audited in both modes.
     @MainActor static let known: [AccessibilityAudit.KnownIssue] = []
+
+    // Seen 2026-11-27 on macOS 27.2 in both thumbnail sidebars (`PageThumbnailSidebar`): an unnamed element of
+    // type other directly under the scroll view, the size of each thumbnail button, which is labelled itself
+    // ("Page 1 of file 1"). It is the host SwiftUI's `LazyVStack` puts around each row: probed in the guest
+    // (W49.reader-audit-preview-thumbs-viewer-orphan), it went only with a plain `VStack`, and stayed with the
+    // row wrapped in a labelled container, with `.combine`, without the file's `Section` and without the row's
+    // `.task`. A plain `VStack` would fetch every page picture of every open file at once. Narrow on purpose:
+    // passed to the two screens with a thumbnail sidebar only, and the shared container exemption covers
+    // groups only.
+    @MainActor static let lazyThumbnailRow =
+        AccessibilityAudit.Exemption(reason: "SwiftUI LazyVStack row host around a labelled thumbnail (macOS 27)") {
+            $0.audit == .sufficientElementDescription && $0.type == .other && $0.identifier.isEmpty
+                && $0.label.isEmpty && $0.parentType == .scrollView && $0.labelledDescendants > 0
+        }
 }

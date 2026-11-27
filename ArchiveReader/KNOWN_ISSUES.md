@@ -9,12 +9,13 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 
 ## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
 
-The document window's "Not recorded" preservation status measured 3.95:1 in light mode at caption size; it now uses
-the primary text colour. Two audit findings remain:
-- In the preview sheet, an unnamed element wraps each page thumbnail while the preview's thumbnail sidebar is shown,
-  so VoiceOver meets an empty group before each thumbnail button. (queued: W49.reader-audit-preview-thumbs-viewer-orphan)
-- The document window reports a parent/child mismatch that names no element; VoiceOver may meet an element its
-  parent does not list. (queued: W49.reader-audit-preview-thumbs-viewer-orphan)
+- Both thumbnail sidebars put an unnamed element (type other) around each page thumbnail button, which is labelled
+  itself. It is the row host of SwiftUI's `LazyVStack`: in guest probes it went only with a plain `VStack`, which
+  would make and fetch a thumbnail for every page of every open file at once, and stayed with every lazy-stack
+  variant tried. `AccessibilityAuditUITests` exempts it on those two screens. (asked: W49.reader-thumb-row-host-owner-ok)
+- The document window's find field has no description and adds a parent/child orphan while focused, and with the
+  document window's Inspector shown the date row's status badge has no valid role. The audit opens neither screen.
+  (queued: W49.reader-audit-find-bar-inspector-shown)
 
 ## Tag changes across the apps — the limits (W40.tag-rename-suite, 2026-11-26)
 

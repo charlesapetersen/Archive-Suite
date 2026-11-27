@@ -316,6 +316,7 @@ struct FieldStatusList: View {
                                    identifier: "ar.fieldStatus.\(row.field)",
                                    onToggle: row.userSet ? nil
                                        : { apply(.setChecked(row.field, row.status.level != .checked)) })
+                        .hiddenWithInspector()
                     if editable, CheckableField.correctable.contains(row.field) {
                         if editing == row.field { editor(row.field) } else { rowMenu(row) }
                     }
