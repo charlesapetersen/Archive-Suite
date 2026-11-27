@@ -45,8 +45,9 @@ on the 895 no floor makes a tie, so a pick there takes the stratum's leader and 
 owner's "the interval makes no tie", applied to the 895 picks by W46.pairs-redecide); the interval (R-3, the matrix's
 895 `tie` flag) decides only whether a stratum route earns a row, as Ling3 Flash VL's N5 pair did. The rerun floor
 is a route's own property, not the 96's, so the hosted 0.49 applies on the 895 too as each route's own floor; it changes
-no pick today (no cluster runner-up within 0.49 in L4, L9 or pooled L1-L3), and L3 and N6 are the groups where a
-cluster runner-up sits within it (`ocr-pair-matrix.md` §The tie per pair; pass 14, P14-5).
+no pick today (no cluster runner-up within 0.49 in L4, L9 or pooled L1-L3), and L3 is the group where a
+cluster runner-up sits within it (`ocr-pair-matrix.md` §The tie per pair; pass 14, P14-5). N6 was the other until
+CHURRO-3B read it (W46.ocr-family-coverage, 2026-11-26) and led by 13.3 points.
 The bench pairs every reading row that has per-page scores with every other (`ocr-pair-matrix.md`, W46.ocr-pair-matrix
 and W46.pair-matrix-cover): on the 96 over all pages, per kind (typewritten, printed, handwritten, each with its kind
 floor: 0.42, 0.24, 0.60 hosted, a Mac pair 0.00) and on hands16; on the 895 per stratum and pooled L1-L3. The
@@ -487,13 +488,17 @@ routes has the floor 0.00, so any paired gap separates two of them; on the 895 a
 - Forms: `qwen3.5-27b-farmshare` (L4 69.98), the leader of public895/L4/strict; `qwen3.6-27b-farmshare` −0.69
   [−6.71, +5.37], `qwen3.6-35b-a3b-farmshare` −2.87 [−8.33, +2.76], Infinity −3.07 [−7.90, +1.83] (n 80). Their
   intervals hold 0, which on the 895 makes no tie for a pick (§3), so the leader stands.
-- N6: `xiaomi-ocr-0-sherlock` 78.67, Infinity −0.41 [−4.34, +3.22] (n 40, public895/N6/strict); Xiaomi is also the
-  faster (9,322.5 pages an hour against 1,206.0 on two GPUs), so the pick holds under any floor.
+- N6: `churro-3b-farmshare` 92.0 (W46.ocr-family-coverage, 2026-11-26: CHURRO-3B's first reading of N6, on Sherlock),
+  +13.30 [+11.72, +14.98] over `xiaomi-ocr-0-sherlock` (78.67, the pick until then) and +13.71 [+10.17, +17.52] over
+  Infinity (n 40, public895/N6/strict; `bench-corpus/family-coverage-20261126.md`). Labelled with OCR-15 until
+  W46.ocr-churro-overlap checks N6 against CHURRO-DS, and with its research-only licence; Xiaomi is the runner-up.
 - Early modern hands and non-Latin strata of the 440 (L5-L8, N1, N3, N4): `churro-3b-farmshare` (L6 69.45, N3 84.70),
   the leader on each of the seven strata; its smallest leads are L8 +2.95 [−0.03, +4.94] over Infinity and N4 +12.07
   [−0.55, +24.12] over `qwen3.6-27b-farmshare` (n 80, 40, public895/<stratum>/strict). Labelled with OCR-15 (trained on
   CHURRO-DS) and its research-only licence; since 2026-11-17 a research licence no longer excludes a model, which is offered
-  with the licence shown (`00-plan.md`; CHURRO's remaining strata in W46.ocr-family-coverage).
+  with the licence shown (`00-plan.md`). Its other strata, read by W46.ocr-family-coverage (2026-11-26), lead only N6
+  (above); on L1-L4, L9, N2 and N5 it trails the picks (L1 −5.16, L2 −7.88 against `qwen3.6-27b-farmshare`), so it is no
+  cluster hand reader. olmOCR-2, Chandra-2 and dots.ocr, read in the same item, lead no stratum and no kind of the 96.
 
 **5. Any of these plus a coding agent.** The kit's same-hand kraken PP-OCRv6 fine-tune is an after-training row (note
 12): +2.6 (+1.7 to +3.4) at 160 lines on MPS on one public hand, worse on 3 of 4 owner Shils pages; corrected lines in the

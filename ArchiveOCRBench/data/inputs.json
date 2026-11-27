@@ -85,7 +85,10 @@
       "xiaomi-ocr-0-sherlock": {"name": "Xiaomi-OCR-0, native Markdown (Sherlock)", "where": "farmshare", "run": "xiaomi-ocr-0-49202334", "pair": null, "machine": "one 48 or 80 GB GPU, Stanford Sherlock (W46.ocr-new-open)"},
       "infinity-parser2-pro-sherlock": {"name": "Infinity-Parser2-Pro 35B-A3B, doc2md (Sherlock)", "where": "farmshare", "run": "infinity-parser2-pro-50536490", "pair": null, "machine": "two 48 or 80 GB GPUs, Stanford Sherlock (W46.ocr-new-open-sherlock)"},
       "unlimited-ocr-sherlock": {"name": "Unlimited-OCR, card prompt and blocks (Sherlock)", "where": "farmshare", "run": "unlimited-ocr-50550130", "pair": null, "machine": "one 48 or 80 GB GPU, Stanford Sherlock (W46.ocr-new-open-boxes, transformers)"},
-      "nemotron-parse-2-sherlock": {"name": "Nemotron-Parse 2.0, card prompt and blocks (Sherlock)", "where": "farmshare", "run": "nemotron-parse-2-50569394", "pair": null, "machine": "one 48 or 80 GB GPU, Stanford Sherlock (W46.ocr-new-open-boxes, transformers)"}
+      "nemotron-parse-2-sherlock": {"name": "Nemotron-Parse 2.0, card prompt and blocks (Sherlock)", "where": "farmshare", "run": "nemotron-parse-2-50569394", "pair": null, "machine": "one 48 or 80 GB GPU, Stanford Sherlock (W46.ocr-new-open-boxes, transformers)"},
+      "olmocr-2-7b-sherlock": {"name": "olmOCR-2 7B fp8, its pipeline prompt (Sherlock)", "where": "farmshare", "run": "olmocr-2-7b-52765237", "pair": null, "machine": "one 48 or 80 GB GPU, Stanford Sherlock (W46.ocr-family-coverage, vLLM in process)"},
+      "chandra-ocr-2-sherlock": {"name": "Chandra-2, its OCR prompt (Sherlock)", "where": "farmshare", "run": "chandra-ocr-2-52765248", "pair": null, "machine": "one 48 or 80 GB GPU, Stanford Sherlock (W46.ocr-family-coverage, vLLM in process)"},
+      "dots-ocr-sherlock": {"name": "dots.ocr, its layout prompt (Sherlock)", "where": "farmshare", "run": "dots-ocr-52765254", "pair": null, "machine": "one 48 or 80 GB GPU, Stanford Sherlock (W46.ocr-family-coverage, vLLM in process)"}
     },
     "table_only": [
       {"name": "Qwen3.6 27B fp8, bf16 KV cache (FarmShare)", "run": "qwen3.6-27b-1849744", "under": "qwen3.6-27b-farmshare", "machine": "one NVIDIA L40S, Stanford FarmShare"},

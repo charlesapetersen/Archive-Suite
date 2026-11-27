@@ -138,6 +138,18 @@ class Adapter(unittest.TestCase):
         self.assertEqual((out[0][1], out[0][3], out[0][5]), ('Hello', (40, 30), 'stop'))
         self.assertIn('prompts', m.settings()['client_settings'])
         self.assertNotIn('logits_processors', m.engine)
+        self.assertEqual(m.settings()['vllm_use_v2_model_runner'], '0')
+
+    def test_v1_runner_only_with_a_logits_processor(self):
+        """Jobs 52765255 and 52765258: vLLM 0.31's v2 runner refused both v1 processors at load."""
+        os.environ.pop('VLLM_USE_V2_MODEL_RUNNER', None)
+        try:
+            F.Vllm(self.cfg(vllm={}), llm=object())
+            self.assertNotIn('VLLM_USE_V2_MODEL_RUNNER', os.environ)
+            v = F.Vllm(self.cfg(vllm={'logits_processors': ['json:JSONDecoder']}), llm=object())
+            self.assertEqual(v.settings()['vllm_use_v2_model_runner'], '0')
+        finally:
+            os.environ.pop('VLLM_USE_V2_MODEL_RUNNER', None)
 
 
 class Review(unittest.TestCase):

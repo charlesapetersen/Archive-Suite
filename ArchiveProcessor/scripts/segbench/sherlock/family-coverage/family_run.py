@@ -138,6 +138,14 @@ def one_by_one(pages, read, size_at):
     return out
 
 
+def v1_runner():
+    """vLLM 0.31 picks its v2 GPU model runner when VLLM_USE_V2_MODEL_RUNNER is unset, and that runner refuses a v1
+    logits processor class at engine load (DeepSeek-OCR-2's NGramPerReqLogitsProcessor, job 52765255; mineru-vl-utils'
+    VllmV1NoRepeatNGramLogitsProcessor, job 52765258). Set to 0 it is False, the v1 runner the processors were written
+    for (vllm/envs.py at v0.31.0). Only routes with such a processor set it; the others keep vLLM's own choice."""
+    os.environ['VLLM_USE_V2_MODEL_RUNNER'] = '0'
+
+
 class Vllm:
     kind = 'vllm'
 
@@ -147,6 +155,8 @@ class Vllm:
         self.cfg, self.reduce = cfg, P.REDUCE[cfg['reduce']]
         self.engine = engine_kwargs(cfg)
         self.sampling = sampling_kwargs(cfg)
+        if self.engine.get('logits_processors'):
+            v1_runner()
         if llm is None:
             from vllm import LLM, SamplingParams
             llm = LLM(**self.engine)
@@ -163,7 +173,8 @@ class Vllm:
                 'chat_template_kwargs': {'enable_thinking': False} if self.cfg['mode'] == 'chat' else None,
                 'chat_kwargs': self.cfg.get('chat_kwargs'),
                 'reduce': self.cfg['reduce'], 'family_run_sha256': sha(__file__), 'family_parse_sha256': sha(P.__file__),
-                'vllm_worker_multiproc_method': os.environ['VLLM_WORKER_MULTIPROC_METHOD']}
+                'vllm_worker_multiproc_method': os.environ['VLLM_WORKER_MULTIPROC_METHOD'],
+                'vllm_use_v2_model_runner': os.environ.get('VLLM_USE_V2_MODEL_RUNNER')}
 
     def _generate(self, pages):
         if self.cfg['mode'] == 'chat':
@@ -201,6 +212,7 @@ class MinerU:
         self.engine = {**engine_kwargs({**cfg, 'vllm': {}}), **(cfg.get('vllm') or {})}
         self.engine.pop('logits_processors', None)  # MinerU's own processor, below
         self.engine.pop('limit_mm_per_prompt', None)
+        v1_runner()  # MinerULogitsProcessor is a v1 processor
         if client is None:
             from mineru_vl_utils import MinerUClient, MinerULogitsProcessor
             from vllm import LLM
@@ -217,7 +229,8 @@ class MinerU:
                 'two_step_extract; finish reasons not reported (a truncated block raises: an error record)',
                 'client_settings': seen, 'mineru_vl_utils': R.version('mineru-vl-utils'),
                 'family_run_sha256': sha(__file__), 'family_parse_sha256': sha(P.__file__),
-                'vllm_worker_multiproc_method': os.environ['VLLM_WORKER_MULTIPROC_METHOD']}
+                'vllm_worker_multiproc_method': os.environ['VLLM_WORKER_MULTIPROC_METHOD'],
+                'vllm_use_v2_model_runner': os.environ.get('VLLM_USE_V2_MODEL_RUNNER')}
 
     def _one(self, blocks, size):
         dicts = [b if isinstance(b, dict) else {k: getattr(b, k, None) for k in ('type', 'bbox', 'angle', 'content')}

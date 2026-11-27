@@ -398,9 +398,10 @@ def reading_rows():
         ("xiaomi-ocr-0-sherlock", "Xiaomi-OCR-0 (your cluster)", "xiaomi-ocr-0", ("xiaomi-ocr-0", "Sherlock native"), "xiaomi-ocr-0", "xiaomi-ocr-0-49202334", ["Markdown output", "the 96 is run xiaomi-ocr-0-49202334; the public figures are the 895 run (ocr-scorers.json, Sherlock native), named apart; whether one job or two is not recorded here (R-6) [?]"]),
         ("qwen3.5-9b-sherlock", "Qwen3.5 9B (your cluster)", None, None, None, "qwen3.5-9b-49202328", ["96 only in the scorer tables"]),
         # W46.ocr-rows-omitted: dominated on the 96 by qwen3.5-9b-sherlock, but the best cluster route on seven strata of the 440
-        ("churro-3b-farmshare", "CHURRO-3B (your cluster)", "fs-churro", ("fs-churro", "FarmShare churro"), None, "churro-1855420",
-         ["trained on CHURRO-DS, the source of the 440's strata it leads (L5-L8, N1, N3, N4); image-hash overlap with the 895 not checked (OCR-15, W46.ocr-churro-overlap)",
-          "public: the 440 only", "weights Qwen research licence, CHURRO-DS research use only (C-ocr.md); acceptable in a user's own kit, stated",
+        # W46.ocr-family-coverage: its public figures are the 455 read on Sherlock joined to the FarmShare 440; it leads N6 too
+        ("churro-3b-farmshare", "CHURRO-3B (your cluster)", "fs-churro", ("churro-3b", "Sherlock+FarmShare joined"), None, "churro-1855420",
+         ["trained on CHURRO-DS, the source of the 440's strata it leads (L5-L8, N1, N3, N4); image-hash overlap with the 895, N6 included, not checked (OCR-15, W46.ocr-churro-overlap)",
+          "public: the 455 read on Sherlock (job 52765261, W46.ocr-family-coverage) joined to the FarmShare 440 (churro-1855420)", "weights Qwen research licence, CHURRO-DS research use only (C-ocr.md); acceptable in a user's own kit, stated",
           "on the 96 it is dominated: 91.07 answered against qwen3.5-9b-sherlock 95.13, and slower (1,251.0 pages an hour)"]),
     ]:
         add(rid, nm, "cluster", None, "measured", {"cluster": True, "gpus": fsrows[label].get("gpus")}, figs(rid, rid, hk, pk, lk), cost(rid, money=False), cluster_time(label),

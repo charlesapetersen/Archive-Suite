@@ -11528,7 +11528,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L1",
    "n": 80,
    "ok": 77,
@@ -11548,7 +11548,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L2",
    "n": 80,
    "ok": 66,
@@ -11572,7 +11572,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L3",
    "n": 80,
    "ok": 80,
@@ -11595,7 +11595,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L4",
    "n": 80,
    "ok": 63,
@@ -11615,7 +11615,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L5",
    "n": 80,
    "ok": 73,
@@ -11644,7 +11644,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L6",
    "n": 80,
    "ok": 77,
@@ -11673,7 +11673,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L7",
    "n": 80,
    "ok": 69,
@@ -11702,7 +11702,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L8",
    "n": 80,
    "ok": 79,
@@ -11734,7 +11734,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "L9",
    "n": 15,
    "ok": 7,
@@ -11754,7 +11754,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "N1",
    "n": 40,
    "ok": 33,
@@ -11777,7 +11777,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "N2",
    "n": 40,
    "ok": 8,
@@ -11797,7 +11797,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "N3",
    "n": 40,
    "ok": 40,
@@ -11817,7 +11817,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "N4",
    "n": 40,
    "ok": 32,
@@ -11837,7 +11837,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "N5",
    "n": 40,
    "ok": 23,
@@ -11857,7 +11857,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "N6",
    "n": 40,
    "ok": 40,
@@ -11877,7 +11877,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "stratum": "all",
    "n": 895,
    "ok": 767,

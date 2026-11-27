@@ -648,7 +648,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "against": "qwen3.6-27b",
    "pages": 895,
    "failed": 128,
@@ -671,7 +671,7 @@
   {
    "set": "public895",
    "route": "churro-3b",
-   "family": "Sherlock native",
+   "family": "Sherlock+FarmShare joined",
    "against": "lightonocr3-4b",
    "pages": 895,
    "failed": 128,

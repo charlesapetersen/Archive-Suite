@@ -38,7 +38,7 @@ HYDROGEN_ROUTE, HYDROGEN = 'gemini4-hydrogen', CACHES / 'gemini4-hydrogen-96' / 
 MAC = ('qwen3-vl-8b-mlx4', 'lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16',
        'granite-docling-258m-mlx')
 # W46.licence-freed-sweep's Mac readers: read like MAC, but not among the CHEAP pairs, which predate them.
-MAC_LATE = ('hunyuanocr-1.5-bf16', 'fastvlm-0.5b-bf16')
+MAC_LATE = ('hunyuanocr-1.5-bf16', 'fastvlm-0.5b-bf16', 'gemma3-12b-mlx4')  # the last: W46.ocr-gemma3-12b
 # The cheap readers whose texts are compared pairwise: free, or $1 or less per 1,000 pages on the bench.
 CHEAP = ('apple-vision', *MAC, 'qwen3.5-9b', 'mistral-small-24b', 'gemma4-31b', 'gemma4-26b-a4b', 'qwen3.6-35b-a3b',
          'qwen3.8-flash', 'qwen3.5-35b-a3b', 'qwen3-vl-30b-a3b')
@@ -77,7 +77,7 @@ def failure(ok, finish, completion_tokens, meta=None) -> str:
     which must be on disk."""
     if ok:
         return ''
-    if finish in ('length', 'cap'):
+    if finish in ('length', 'cap', 'loop'):   # loop: the Mac runner's repetition stop (W46.ocr-gemma3-12b)
         return 'cap'
     if finish == 'content_filter':
         return 'refusal'

@@ -237,7 +237,8 @@ def public_sources(truth):
         d = SH / 'family-895' / folder
         if d.is_dir():
             recs = F.read_records(d)
-            out[(label, f'Sherlock {mode}')] = {j: X.reading(recs.get(j), mode) for j in want}
+            family = 'Sherlock+FarmShare joined' if label == 'churro-3b' else f'Sherlock {mode}'
+            out[(label, family)] = {j: X.reading(recs.get(j), mode) for j in want}
     g3 = CACHE / 'ocr-gemma3-12b/public'   # W46.ocr-gemma3-12b (ocr_gemma3_public.py collect), the 96's Mac-local key
     if g3.is_dir():
         out[('gemma3-12b-mlx4', 'Mac local')] = {j: _parsed(g3 / f'{j}.json') for j in want if (g3 / f'{j}.json').exists()}

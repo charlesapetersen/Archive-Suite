@@ -113,7 +113,8 @@ OCR_SCORERS_PAGES = RESULTS / "ocr-scorers-pages.csv"
 TIME_LFL = RESULTS / "ocr-time-like-for-like.json"    # W46.ocr-time-like-for-like: Mac seconds a page, like for like  # ocr_rescore.py's per-page rows, both sets
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 # Later native routes: reports in PUBLIC, receipts in data/, with the same names.
-OPEN_SWEEP_LATER = ("new-open-sherlock-20261024", "new-open-sherlock-20261031", "new-open-boxes-20261031")
+OPEN_SWEEP_LATER = ("new-open-sherlock-20261024", "new-open-sherlock-20261031", "new-open-boxes-20261031",
+                    "family-coverage-20261126")
 TEMPLATE = HERE / "site" / "template.html"
 OUT_DATA = HERE / "data" / "panel-data.json"
 OUT_PAGE = HERE / "site" / "index.html"
@@ -694,7 +695,7 @@ MODEL_FAILURES = ("cap", "refusal", "empty")
 # here has read only the 96; the same model run elsewhere (a hosted route's FarmShare twin) does not count.
 PUBLIC_TWIN = {
     "apple-vision": ("apple-vision", "Mac"), "gemini3.8-flash": ("gemini3.8-flash", "reference"),
-    "qwen3-vl-235b": ("qwen3-vl-235b", "reference"), "churro-3b-farmshare": ("fs-churro", "FarmShare churro"),
+    "qwen3-vl-235b": ("qwen3-vl-235b", "reference"), "churro-3b-farmshare": ("churro-3b", "Sherlock+FarmShare joined"),  # W46.ocr-family-coverage: the 455 joined to the 440
     "glm-ocr-farmshare": ("glm-ocr", "FarmShare native"), "lightonocr3-4b-farmshare": ("lightonocr3-4b", "FarmShare native"),
     "lightonocr3-0.8b-farmshare": ("lightonocr3-0.8b", "FarmShare native"),
     "paddleocr-vl1.5-farmshare": ("paddleocr-vl1.5", "FarmShare native"),
@@ -708,6 +709,9 @@ PUBLIC_TWIN = {
     "unlimited-ocr-sherlock": ("unlimited-ocr", "Sherlock native"),
     "nemotron-parse-2-sherlock": ("nemotron-parse-2", "Sherlock native"),
     "infinity-parser2-pro-sherlock": ("infinity-parser2-pro", "Sherlock native"),  # W46.ocr-new-open-sherlock
+    "olmocr-2-7b-sherlock": ("olmocr-2-7b", "Sherlock native"),  # W46.ocr-family-coverage, vLLM in process
+    "chandra-ocr-2-sherlock": ("chandra-ocr-2", "Sherlock native"),
+    "dots-ocr-sherlock": ("dots-ocr", "Sherlock native"),
     "qwen3.5-9b-sherlock": ("qwen3.5-9b", "Sherlock logprob"),  # W46.ocr-logprob's run read both sets
     "gemini3.7-flash-gw": ("gemini3.7-flash-gw", "gateway"),  # W46.ocr-gemini37-895-paid
     "gemma3-12b-mlx4": ("gemma3-12b-mlx4", "Mac local"),  # W46.ocr-gemma3-12b, the same Mac build on both sets
@@ -792,7 +796,11 @@ PRESET_NAMES = {"qwen3.5-27b": "Qwen3.5 27B", "qwen3.6-27b": "Qwen3.6 27B", "qwe
                 "qwen3.8-27b-sherlock": "Qwen3.8 27B (Sherlock, open sweep settings)",
                 "infinity-parser2-pro-native": "Infinity-Parser2-Pro (doc2md prompt, two cards)",
                 "unlimited-ocr-native": "Unlimited-OCR (card prompt, boxes)",
-                "nemotron-parse-2-native": "Nemotron-Parse 2.0 (card prompt, boxes)"}
+                "nemotron-parse-2-native": "Nemotron-Parse 2.0 (card prompt, boxes)",
+                # W46.ocr-family-coverage: one reader per unmeasured family, vLLM in process (family_run.py)
+                "olmocr-2-7b-native": "olmOCR-2 7B (its pipeline prompt, fp8)",
+                "chandra-ocr-2-native": "Chandra-2 (its OCR prompt)",
+                "dots-ocr-native": "dots.ocr (layout prompt, texts in order)"}
 
 
 def newsbench_table():

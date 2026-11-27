@@ -79,7 +79,7 @@ Every route over the pages its run covered (the reference routes and Vision were
 | german-handwriting | kraken specialist | 80/80 | 72.6 (72.6) | 5.1 | 31.9 | 24.1 | 70.7 | 46.5 | -24.3 | 94.5 | 52 | 98 | 0.04 | 0.082 (63) |
 | gemini3.8-flash | reference | 419/440 | 70.3 (73.8) | 17.7 | 24.2 | 19.7 | 65.5 | 60.6 | -4.9 | 70.5 | 45 | 90 | -0.02 | 0.079 (278) |
 | fs-churro | FarmShare churro | 403/440 | 69.9 (76.3) | 12.6 | 18.8 | 20.5 | 66.3 | 63.2 | -3.1 | 71.3 | 40 | 94 | 0.18 | 0.097 (269) |
-| churro-3b | Sherlock native | 767/895 | 67.8 (79.1) | 10.2 | 13.1 | 17.9 | 68.4 | 68.7 | 0.4 | 71.3 | 40 | 94 | 0.18 | 0.089 (530) |
+| churro-3b | Sherlock+FarmShare joined | 767/895 | 67.8 (79.1) | 10.2 | 13.1 | 17.9 | 68.4 | 68.7 | 0.4 | 71.3 | 40 | 94 | 0.18 | 0.089 (530) |
 | trocr-kurrent | kraken specialist | 80/80 | 67.3 (67.3) | 5.7 | 31.9 | 27.5 | 66.9 | 50.3 | -16.6 | 94.9 | 39 | 98 | 0.06 | 0.084 (63) |
 | kurrent-v3 | kraken specialist | 80/80 | 64.2 (64.2) | 5.1 | 43.3 | 31.9 | 61.6 | 30.2 | -31.4 | 94.4 | 68 | 97 | -0.01 | 0.075 (61) |
 | infinity-parser2-pro | Sherlock native | 874/895 | 64.2 (65.8) | 7.4 | 12.0 | 30.8 | 68.9 | 66.1 | -2.8 | 62.1 | 53 | 82 | 0.24 | 0.089 (547) |
@@ -328,7 +328,7 @@ Pages whose reading carries Markdown or HTML (headings, bold, tables, tags, imag
 | public895 | olmocr-2-7b | Sherlock native | 3 | 84.9 | 85.7 | +0.00 |
 | public895 | chandra-ocr-2 | Sherlock native | 6 | 89.5 | 89.6 | +0.00 |
 | public895 | dots-ocr | Sherlock native | 74 | 80.9 | 81.6 | +0.06 |
-| public895 | churro-3b | Sherlock native | 6 | 90.1 | 90.1 | -0.00 |
+| public895 | churro-3b | Sherlock+FarmShare joined | 6 | 90.1 | 90.1 | -0.00 |
 
 ### Restoration-only words (scale variants of the local panel)
 

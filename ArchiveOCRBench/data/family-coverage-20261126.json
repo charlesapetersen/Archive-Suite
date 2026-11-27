@@ -1,0 +1,117 @@
+{
+  "_source": "W46.ocr-family-coverage, Sherlock batch 20261117-214529 (submitted 2026-11-17), collected 2026-11-26 into the engine artifact ocr-family-coverage-20261117 and copied to family-{895,96} in the shared Sherlock results cache. Model, revision, prompt check and versions from each session's prepared.json and status.json; server_min is the 895 job's Slurm elapsed (sacct.tsv), including model load. CHURRO-3B's row joins its 455 Sherlock readings to the FarmShare 440 (churro-1855420); the pilot page FarmShare already read keeps its FarmShare reading.",
+  "status": "One reader per family, its own card prompt and reduction to text, vLLM in process, greedy, 8192 new tokens, the same frozen images; caps and blanks score zero. CHURRO-3B leads N6 (Devanagari print); nothing else changes a pick.",
+  "hardware": "One Sherlock GPU per job (48 or 80 GB, type not recorded), vLLM 0.31.0 in process (family_run.py), batches of 16, torch 2.13.0+cu129.",
+  "routes": {
+    "olmocr-2-7b": {
+      "model": "allenai/olmOCR-2-7B-1025-FP8",
+      "revision": "40bd7202494b8264ee17ada08b401b5aab7a9ce1",
+      "route": "native",
+      "prompt": "Attached is one page of a document that you must process. Just return the plain text representation of this document as if you were reading it naturally. Convert equations to LateX and tables to HTML.\nIf there are any figures or charts, label them with the following markdown syntax ![Alt text descri …",
+      "prompt_sha256": "c12f21aca8c6c5599cea6176edd974b7ea6a05cf451497abd6370dd449db3979",
+      "prompt_check": {
+        "source": "olmocr-0.4.27-py3-none-any.whl",
+        "file_sha256": "9615450d797501c67c69c5b52b5c91f59e734e111fc68c51be9d02a55ae7d634",
+        "same_as_transcription": true
+      },
+      "dtype": "fp8 (publisher checkpoint)",
+      "job": 52765236,
+      "server_min": 67.733,
+      "license": "Apache-2.0",
+      "weight_gb": 10.062,
+      "gpus": 1,
+      "cluster": "Sherlock",
+      "runtime": "vLLM 0.31.0",
+      "reduce": "olmocr",
+      "generation": {
+        "temperature": 0.0,
+        "max_tokens": 8192
+      }
+    },
+    "chandra-ocr-2": {
+      "model": "datalab-to/chandra-ocr-2",
+      "revision": "af93b47dba1b47b6640c86ccf487ed2260ab9a09",
+      "route": "native",
+      "prompt": "OCR this image to HTML.\n\nOnly use these tags ['math', 'br', 'i', 'b', 'u', 'del', 'sup', 'sub', 'table', 'tr', 'td', 'p', 'th', 'div', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'ul', 'ol', 'li', 'input', 'a', 'span', 'img', 'hr', 'tbody', 'small', 'caption', 'strong', 'thead', 'big', 'code', 'chem'], and …",
+      "prompt_sha256": "5bddc652e7f39d5c5501e5455ea2487ebb5cdbf71832b5dfb749ec2413b5a69b",
+      "prompt_check": {
+        "source": "chandra_ocr-0.3.0-py3-none-any.whl",
+        "file_sha256": "53101d315a9923dac2fd65bf64047a73d396c69c409b3680c753315837b151eb",
+        "same_as_transcription": false,
+        "transcription": null
+      },
+      "dtype": "bf16",
+      "job": 52765243,
+      "server_min": 66.717,
+      "license": "modified OpenRAIL-M",
+      "weight_gb": 10.591,
+      "gpus": 1,
+      "cluster": "Sherlock",
+      "runtime": "vLLM 0.31.0",
+      "reduce": "chandra",
+      "generation": {
+        "temperature": 0.0,
+        "max_tokens": 8192
+      }
+    },
+    "dots-ocr": {
+      "model": "rednote-hilab/dots.ocr",
+      "revision": "c0111ce6bc07803dbc267932ffef0ae3a51dc951",
+      "route": "native",
+      "prompt": "Please output the layout information from the PDF image, including each layout element's bbox, its category, and the corresponding text content within the bbox.\n\n1. Bbox format: [x1, y1, x2, y2]\n\n2. Layout Categories: The possible categories are ['Caption', 'Footnote', 'Formula', 'List-item', 'Page- …",
+      "prompt_sha256": "16ff71ac5d218f35e5b3db41240b6e70741498bc099db3fa922ce1ff972e3b2f",
+      "prompt_check": {
+        "source": "https://raw.githubusercontent.com/rednote-hilab/dots.ocr/master/dots_ocr/utils/prompts.py",
+        "file_sha256": "33c5437260e393b7dc04c9f19a6fc19b7cfa00d7c05ff8c6e66b5be28de29ec6",
+        "same_as_transcription": true
+      },
+      "dtype": "bf16",
+      "job": 52765252,
+      "server_min": 50.4,
+      "license": "MIT",
+      "weight_gb": 6.078,
+      "gpus": 1,
+      "cluster": "Sherlock",
+      "runtime": "vLLM 0.31.0",
+      "reduce": "dots",
+      "generation": {
+        "temperature": 0.0,
+        "max_tokens": 8192
+      }
+    },
+    "churro-3b": {
+      "model": "stanford-oval/churro-3B",
+      "revision": "ca2150ea465d5a3d67818c50e234b9422619c75d",
+      "route": "native",
+      "prompt": "Transcribe the entirety of this historical document to XML format.",
+      "prompt_sha256": "13592f5580805cf12d2aa14c963b872e3a4e6a5834e5d2afd7b86effd42a8b4d",
+      "prompt_check": null,
+      "dtype": "bf16",
+      "job": 52765261,
+      "server_min": 37.25,
+      "license": "Qwen research",
+      "weight_gb": 7.509,
+      "gpus": 1,
+      "cluster": "Sherlock",
+      "runtime": "vLLM 0.31.0",
+      "reduce": "churro",
+      "generation": {
+        "temperature": 0.0,
+        "max_tokens": 8192
+      },
+      "note": "895 row: 455 read on Sherlock (job above) joined to the FarmShare 440 (churro-1855420, its XML reduced by churro_text)"
+    }
+  },
+  "not_scored": [
+    {
+      "route": "DeepSeek-OCR-2 (Sherlock)",
+      "job": 52765255,
+      "state": "Failed at engine load in 59 s: vLLM 0.31's v2 model runner rejects the recipe's NGramPerReqLogitsProcessor (a v1 logits processor). The 96 job (52765256) was cancelled afterok. No reading; rerun in W46.ocr-family-coverage-rerun."
+    },
+    {
+      "route": "MinerU2.5-Pro-2605 1.2B (Sherlock)",
+      "job": 52765258,
+      "state": "Failed at engine load in 56 s: vLLM 0.31's v2 model runner rejects mineru-vl-utils 2.0.9's VllmV1NoRepeatNGramLogitsProcessor. The 96 job (52765260) was cancelled afterok. No reading; rerun in W46.ocr-family-coverage-rerun."
+    }
+  ]
+}

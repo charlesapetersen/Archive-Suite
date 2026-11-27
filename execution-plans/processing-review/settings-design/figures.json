@@ -1,6 +1,6 @@
 {
- "built": "2026-11-25",
- "table_built": "2026-11-25",
+ "built": "2026-11-26",
+ "table_built": "2026-11-26",
  "noise": {
   "ocr_tie": "a paired gap under the practical floor of 0.5 NES points, the same for cloud, plan, cluster and Mac routes, every kind and both sets (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4: practical floor only; the paired 95% interval is shown and makes no tie, so an underpowered interval never hands a pick to the weaker route; it replaced the 2026-11-11 rerun-range floors, hosted 0.49, local greedy 0.00); each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
   "seg_rerun_pages_exact_points": "a paired gap of test-box pages exact under the practical floor of 2.0 points (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4: practical floor only); the paired 95% interval, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled, is shown in each pair's entry (seg-pair-ties.json) and makes no tie. It replaced the interval holding 0 (2026-11-17, W46.seg-truth-audit)",
@@ -1838,7 +1838,7 @@
    "s_page": 2.88,
    "s_est": false,
    "peak_gb": 0,
-   "note": "trained on CHURRO-DS, the source of the 440's strata it leads (L5-L8, N1, N3, N4); image-hash overlap with the 895 not checked (OCR-15, W46.ocr-churro-overlap); public: the 440 only",
+   "note": "trained on CHURRO-DS, the source of the 440's strata it leads (L5-L8, N1, N3, N4); image-hash overlap with the 895, N6 included, not checked (OCR-15, W46.ocr-churro-overlap); public: the 455 read on Sherlock (job 52765261, W46.ocr-family-coverage) joined to the FarmShare 440 (churro-1855420)",
    "source": "settings-routes.json, stage reading, row churro-3b-farmshare",
    "nes": {
     "typewritten": 90.99,
@@ -1865,10 +1865,10 @@
     ]
    },
    "hands16": 87.6,
-   "public895": 69.92,
+   "public895": 67.8,
    "public_n": [
-    403,
-    440
+    767,
+    895
    ]
   },
   {

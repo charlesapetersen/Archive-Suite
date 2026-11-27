@@ -141,6 +141,13 @@ owner-supported document-exact accuracy. Refresh without inference or pack acces
 The writer validates route rows, support and estimator arithmetic and records the source SHA-256;
 the builder rejects stale provenance. Sasha's held-out comparison is unchanged.
 
+W46.ocr-family-coverage adds one reader from each of three families never measured, olmOCR-2 7B, Chandra-2 and
+dots.ocr, on both sets (one Sherlock card each, vLLM in process), and CHURRO-3B's reading of the 455 public pages its
+FarmShare run skipped: CHURRO's public row is now the full 895 (the 455 joined to the FarmShare 440). They join the OCR
+charts, headline, speed and scorer tables and part 7's tables, outside part 5's frozen fit. DeepSeek-OCR-2 and
+MinerU2.5-Pro failed at load and are listed as not scored. Report:
+`ArchiveProcessor/segbench-results/bench-corpus/family-coverage-20261126.md`.
+
 ## What is here
 
 | Path | What it is |

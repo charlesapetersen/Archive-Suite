@@ -19163,3 +19163,23 @@ the same three lines and landing them separately would silently revert part of t
   target's rule is lazy migration, so no item was filed. Next pass starts at `6ddcfa68`; `W49.proc-arch-review-due` rearmed. $0;
   no bench cache used.
   <!-- /W49.proc-arch-review-gate-b -->
+- [x] **W46.ocr-family-coverage — readers from families never measured, on both sets [M]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) (cluster: sherlock) — Owner review of the pipeline doc, 2026-11-17: stop same-family comparisons and measure what is significantly different: DeepSeek-OCR-2, olmOCR-2, MinerU2.5, dots.ocr and Chandra-2 (licence now allowed), plus CHURRO on the strata it skipped. Pilot first and size the Sherlock job per the review rule; also run table-cell reading on forms L4 beyond its 3-page pilot (split into W46.ocr-cells-l4-more: it needs new truth first).
+
+  SHIPPED 2026-11-26 (this commit), after checkpoints 94b7cfac, 985371ef (kit, adversarial review with ten fixes, pack and
+  hand-over, 2026-11-17) and the scoring checkpoint of 2026-11-26. Sherlock batch 20261117-214529 (owner session), 3.94
+  GPU-hours of the 9 expected and 40 reserved. Report: `ArchiveProcessor/segbench-results/bench-corpus/family-coverage-20261126.md`.
+  Results: **CHURRO-3B leads N6 (Devanagari print)**, 92.0 strict, +13.30 (+11.72 to +14.98) over Xiaomi-OCR-0, the pick
+  there (04-reading.md's N6 bullet updated; OCR-15 carried until W46.ocr-churro-overlap). CHURRO does not lead the English
+  hands (L1 -5.16, L2 -7.88 against Qwen3.6 27B), so it is no cluster hand reader. Its 895 row joins the 455 read here to the
+  FarmShare 440: 67.80 strict, +4.54 over Qwen3.6 27B. On the 96: olmOCR-2 7B fp8 92.45 and Chandra-2 92.32 (both 96/96,
+  +3.0 and +2.9 over LightOnOCR-3 4B with intervals clear of 0, -1.9 and -2.0 behind Qwen3.6 27B), dots.ocr 90.52; none
+  leads a kind. On the 895: Chandra-2 60.73, olmOCR-2 53.45, dots.ocr 52.72 (many caps). DeepSeek-OCR-2 and MinerU2.5-Pro
+  failed at engine load (vLLM 0.31's v2 runner refuses their v1 logits processors); the kit now sets
+  VLLM_USE_V2_MODEL_RUNNER=0 for such routes and their rerun is W46.ocr-family-coverage-rerun. Scorers: farmshare_truth96.py
+  reads family_run's in-process vLLM settings; ocr_rescore.py, ocr_new_open_paired.py and ArchiveOCRBench carry the four
+  routes (churro-3b-farmshare's public twin is now the joined 895 row). Fixed on the way: ocr_pages_export.py never listed
+  gemma3-12b-mlx4 (a Mac route since W46.ocr-gemma3-12b) and now classifies its 'loop' stops as caps, so ocr-pages.csv
+  carries it. The L4 cells were split to W46.ocr-cells-l4-more at filing. Readings kept in the shared cache
+  (`sherlock-results/family-{895,96}`, 84 MB) as later items' inputs, as new-open's were; the artifact copy stays where the
+  engine keeps it. $0 real money.
+  <!-- /W46.ocr-family-coverage -->
