@@ -683,21 +683,36 @@ struct PDFPaneView: NSViewRepresentable {
 /// PDFKit supplies an AXPage node below the PDFView, with its selectable text underneath. Naming the
 /// outer view does not name that page, and PDFKit ignores the node's label setter. Its public title
 /// setter works: name only AXPage nodes and leave PDFKit's content, actions and parentage intact.
+///
+/// The walk runs just after the query, not inside it (W40.fix-reader-docpanekeys-vm-harness): on
+/// macOS 27.2, asking PDFKit's descendants for their children while it answered ours, with the page
+/// zoomed past fit, left the document window's content with no accessibility children at all (both
+/// panes gone for VoiceOver and XCUITest until Fit Page), even with the title setter taken out. A
+/// query that meets a page PDFKit has just rebuilt sees it untitled once; the next one sees the title.
 final class ReaderPDFView: PDFView {
     var pageAccessibilityTitle = "PDF page"
     weak var paneController: PDFPaneController?
     private let pageTurns = PageTurnMonitor()
+    private var pageNamingQueued = false
 
     override func accessibilityChildren() -> [Any]? {
-        let children = super.accessibilityChildren()
-        namePages(in: children ?? [])
-        return children
+        if !pageNamingQueued {
+            pageNamingQueued = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                pageNamingQueued = false
+                namePages(in: pdfKitAccessibilityChildren() ?? [])
+            }
+        }
+        return super.accessibilityChildren()
     }
+
+    private func pdfKitAccessibilityChildren() -> [Any]? { super.accessibilityChildren() }
 
     private func namePages(in children: [Any]) {
         for case let element as any NSAccessibilityProtocol in children {
             if element.accessibilityRole() == .pageRole {
-                element.setAccessibilityTitle(pageAccessibilityTitle)
+                if element.accessibilityTitle() != pageAccessibilityTitle { element.setAccessibilityTitle(pageAccessibilityTitle) }
             } else if let descendants = element.accessibilityChildren() {
                 namePages(in: descendants)
             }

@@ -4,6 +4,14 @@ Archived from [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) on 2026-11-25 (W49.reader-doc
 and closed entries and the July–October 2026 fix logs, in the order they stood. History only; the open limits
 stay in `KNOWN_ISSUES.md`. A new fixed entry may still be written there and moved here later.
 
+## Document window panes left the accessibility tree when the image was zoomed (fixed 2026-11-27)
+
+With the image page zoomed past fit, the document window's content reported no accessibility children. Both panes
+were gone for VoiceOver and XCUITest until Fit Page, and `DocumentPaneKeysUITests` failed at "the Original image
+page is in the window". The page-naming walk inside `ReaderPDFView.accessibilityChildren()` caused it on macOS
+27.2. The walk now runs just after the query.
+[Measurements](../verification/evidence/reader/W40.fix-reader-docpanekeys-vm-harness.md). (W40.fix-reader-docpanekeys-vm-harness)
+
 ## Cloud-only PDFs in Reader (S-002, fixed 2026-11-21)
 
 Selection, page thumbnails and neighbor prefetch leave cloud-only PDFs in the cloud. The document window

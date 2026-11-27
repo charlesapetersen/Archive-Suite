@@ -19286,3 +19286,20 @@ the same three lines and landing them separately would silently revert part of t
   <!-- /W49.proc-gemma-request-adopt -->
 - [x] **W40.fix-processor-batch-stop-contract — the run-quit-resume contract's two batch-Stop checks fail on main [S · S3]** · §W40 — verification phase (lane: processor) (uses: build) — Found by `W40.fix-processor-pending-run-caption` 2026-11-24, failing identically on pristine main (ea20505f): `scripts/test-run-quit-resume.sh` FAILs "Stop during a batch submission waits, then cancels the recorded job" and "a quit after Stop still cancels the job, then quits". After the cancel request the processor now also GETs `batches/quit-test` and keeps the batch journal, where the checks expect exactly create + cancel and the journal gone. Find which commit added the post-cancel status read (candidates: `W49.storage-processor`, `W49.proc-batch-resume-approach`, `W49.proc-fix-s051`) and decide from its record whether the app regressed (fix it) or the contract is stale (update the expectation and say why). The gate's coverage of this script should be checked too, since it went red unnoticed. — SHIPPED 2026-11-27. **The contract was stale, not the app.** `W49.proc-ledger-track-paid` (201f3b21, 2026-11-23) added `BatchChunkCanceller.confirmChunk`: after a provider acknowledges a cancel, Stop reads the job back (`GeminiBatchClient.confirmCancellation`, a GET of `batches/<name>`) and deletes the journal only once the job reports a terminal state, so the ledger can reconcile what the job charged and a cancel that did not take keeps Resume available. That is intended keep-on-doubt behaviour. The contract's fake server answered the status GET with `{}` (no state), so the app rightly kept the journal. `RunQuitResumeContract.batchSubmissionWaits` now answers it with `BATCH_STATE_CANCELLED`, and both checks expect create, cancel, then the status read, with the journal gone. Gate coverage: the health gate never ran this script (only the one-off W40.e4 coverage audit did), which is why it went red unnoticed; it is now the free `processor-run-quit-resume` step on the gate-DD artifact (~8 s), and the script honours `ARCHIVEPROC_TEST_BINARY` like its siblings. Verified: Debug build clean (no new warnings), the script ALL PASS (30 checks) twice, once through the gate's binary override. No bench scratch.
   <!-- /W40.fix-processor-batch-stop-contract -->
+- [x] **W40.fix-reader-docpanekeys-vm-harness — DocumentPaneKeysUITests cannot find the image page in the macOS 27.2 guest [S · S3]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) (lane: reader) — SHIPPED 2026-11-27.
+  The cause was the app, not the guest. With the image page zoomed past fit, the document window's whole content
+  had no accessibility children, so both panes were gone for XCUITest and VoiceOver until Fit Page.
+  `ReaderPDFView.namePages` walked PDFKit's descendants inside our own `accessibilityChildren()` query. On macOS
+  27.2 that walk empties the tree when zoomed, even with the title setter skipped. Variants were measured in the
+  guest: naming off, walk without setter, guarded setter, and a deferred walk. Only the deferred walk keeps the page
+  and the three scroll views at every zoom step. The fix queues the walk for after the query, coalesced, and sets the
+  title only when it differs. The test is unchanged.
+  `DocumentPaneKeysUITests` passed 3 of 3 runs in the guest. `CopyTextPane`, `ImageContextMenu`, `InvertImages`
+  and `testDocumentViewerOpens` pass. `PDFPaneAccessibilityTests` waits for the queued naming and gains a 3× zoomed
+  pass, and the Reader unit bundle passes.
+  `AccessibilityAuditUITests` ×4 fail identically on the unchanged app. They are already in
+  `W49.ui-fails-under-coverage`.
+  Ledger R-35 `fixed-pending-recheck` → `works`: the arrow-key and focus fix of rows 6 and 7 is shown in the VM.
+  Evidence: `verification/evidence/reader/W40.fix-reader-docpanekeys-vm-harness.md`. No migration: nothing to migrate.
+  $0. Bench cache: nothing created.
+  <!-- /W40.fix-reader-docpanekeys-vm-harness -->

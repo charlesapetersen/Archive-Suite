@@ -10,13 +10,18 @@ final class PDFPaneAccessibilityTests: XCTestCase {
         let window = NSWindow(contentRect: view.bounds, styleMask: [], backing: .buffered, defer: true)
         window.contentView = view
 
-        for (title, text) in [("Original image page", "Original fixture content"),
-                              ("OCR text page", "Selectable OCR words after cycling")] {
+        // The second pass is zoomed past fit, where naming inside the query emptied the window's tree in the
+        // macOS 27.2 guest (W40.fix-reader-docpanekeys-vm-harness); the naming now runs just after a query.
+        for (title, text, scale) in [("Original image page", "Original fixture content", CGFloat(0)),
+                                     ("OCR text page", "Selectable OCR words after cycling", 3)] {
             view.pageAccessibilityTitle = title
             view.document = TestPDFBuilder.textPDF(pages: [text])
             view.displayMode = .singlePage
-            view.autoScales = true
+            view.autoScales = scale == 0
+            if scale > 0 { view.scaleFactor = scale }
             view.layoutDocumentView()
+            _ = view.accessibilityChildren()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))   // the naming queued by that query
             let elements = descendants(of: view)
             let pages = elements.filter { $0.accessibilityRole() == .pageRole }
             XCTAssertEqual(pages.count, 1, "the page node must stay in PDFKit's tree")

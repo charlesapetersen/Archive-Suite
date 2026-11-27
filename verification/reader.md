@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 25 · works 18 · broken 3 · fixed-pending-recheck 1 · dropped 1` (2026-11-26, after `W40.h2` re-checked the `fixed-pending-recheck` rows at HEAD: works: R-04, R-11, R-17, R-20, R-21, R-23, R-25, R-28, R-29, R-30, R-36, R-37, R-43, R-44, R-45, R-46, R-47, R-48; broken: R-12, R-13, R-16; fixed-pending-recheck: R-35; dropped: R-26).
+- **Count:** `unproven 25 · works 19 · broken 3 · fixed-pending-recheck 0 · dropped 1` (2026-11-27: R-35 → works by `W40.fix-reader-docpanekeys-vm-harness`; before that 2026-11-26, after `W40.h2` re-checked the `fixed-pending-recheck` rows at HEAD: works: R-04, R-11, R-17, R-20, R-21, R-23, R-25, R-28, R-29, R-30, R-36, R-37, R-43, R-44, R-45, R-46, R-47, R-48; broken: R-12, R-13, R-16; fixed-pending-recheck: R-35; dropped: R-26).
   Earlier: Updated by `W40.g1-reader-2-ledger`, 2026-11-06, from the owner's Reader session 2 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)) and what it left on disk ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
@@ -795,6 +795,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `W40.fix-reader-doc-keys-focus`); the VM interaction check is
   `ArchiveReaderUITests/DocumentPaneKeysUITests.testDocumentPaneKeyboardFocusAndPan` (`W40.fix-reader-doc-keys-focus-ui`).
   Nothing tests the splitter, persistence or ⌥⌘0.
+- **Runtime evidence:** 2026-11-27 · macOS 27.2 guest · [`evidence/reader/W40.fix-reader-docpanekeys-vm-harness.md`](evidence/reader/W40.fix-reader-docpanekeys-vm-harness.md): `DocumentPaneKeysUITests` both tests, 3 of 3 runs, after the fix that keeps the panes in the accessibility tree when the image is zoomed.
 - **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md) (W40.h2, see History). Earlier: 2026-11-12 · macOS 27.2 guest, `DocumentPaneKeysUITests` on three generated PDFs (two single
   pages with a text layer, one image + OCR text pair), 3 of 3 runs: a click in the extracted-text pane moves the focus
   border to it and Zoom In grows its text, not the image; a click on the image moves the border back; with the image
@@ -803,7 +804,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   two-page document (Zoom In zooms its OCR page) and back into extracted text; with the caret in Find, ⌘⇧↓ cycles
   and typing still goes into the field.
 - **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): the 12-pair *00114 Young papers.pdf* opened and paged, and the text size changes worked; the arrow keys did nothing in the document view (row 6), and a click in the text pane did not seem to move the focus (row 7).
-- **Status:** `fixed-pending-recheck` (builder is not verifier; the VM check cannot run, `W40.fix-reader-docpanekeys-vm-harness`)
+- **Status:** `works` (the arrow keys and pane focus of rows 6 and 7; the splitter, persistence and ⌥⌘0 are still untested, see Real-path test)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `broken`: with the owner watching, ↑/↓ did not scroll (the owner expects the arrow keys to move the image) and a click did not give the text pane the focus border (rows 6, 7, both A; an A row that contradicts the promise counts, as in notes-1). Fix item `W40.fix-reader-doc-keys-focus` (S3). The View menu's "Show All Tabs" was unclear, and the owner asks for a tiled view of all pages (row 9: `W40.reader-tiled-pages`).
@@ -815,6 +816,10 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     `ViewerUITests.testDocumentViewerOpens`, `DocumentPaneInputTests` and `DocumentViewerPagePairTests` pass.
     Filed `W40.fix-reader-docpanekeys-vm-harness`
     ([`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md)).
+  - 2026-11-27 W40.fix-reader-docpanekeys-vm-harness — `fixed-pending-recheck` → `works`: the failure was the app (zooming the image
+    emptied the window's accessibility tree; fixed in `ReaderPDFView`), not the guest. With that fixed, both
+    `DocumentPaneKeysUITests` pass 3 of 3 with the test unchanged. The item text named this item as the one to
+    move the row.
 - **Notes:** **Drift.**
   - No ⏎ handler was found. Only a double-click and ⌘O open the viewer.
   - ⌥⌘0 resets the split to the saved default, not to ⅔.
