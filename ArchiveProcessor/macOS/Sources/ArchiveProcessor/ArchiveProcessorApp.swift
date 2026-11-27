@@ -23,6 +23,7 @@ struct ArchiveProcessorApp: App {
                 preconditionFailure("Could not seed the scratch paid batch: \(error)")
             }
             MoneyJourneyFixture.configureIfRequested()
+            ProcessorUITestConfiguration.clearKeyChips()   // no chip left over from an earlier suite
             MessageJourneyFixture.resetKeyWizardIfRequested()
             ProcessorUITestConfiguration.installScratchCollectionSettings()   // the range view's click check
             ProcessorUITestConfiguration.installScratchTagLists()   // the Tags window's check (W40.tag-window-processor)

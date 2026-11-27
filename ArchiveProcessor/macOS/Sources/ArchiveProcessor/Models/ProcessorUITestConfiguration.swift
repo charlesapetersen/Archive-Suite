@@ -15,6 +15,27 @@ enum ProcessorUITestConfiguration {
     /// W49.proc-s044-check: a dummy credential for the guest loopback gateway, headless Keychain stays untouched.
     static var usesStandInGateway: Bool { isActive && arguments.contains("-APUITestStandInGateway") }
 
+    /// W49.proc-fix-audit-badge-fixture: `-APUITestStandInKey <account>` makes a headless UI-test launch read a dummy
+    /// key for that one account, so its Accounts row draws a key chip (the audit's Validated badge). The Keychain is
+    /// never read or written; nothing is sent with the dummy, since the audit contacts no provider.
+    static func standInKey(for account: String) -> String? {
+        guard isActive, let i = arguments.firstIndex(of: "-APUITestStandInKey"), i + 1 < arguments.count,
+              arguments[i + 1] == account else { return nil }
+        return "ap-uitest-stand-in-key"
+    }
+
+    /// W49.proc-fix-audit-badge-fixture: a UI-test launch starts with no key chip left in the app's defaults by an
+    /// earlier suite (`testWizardReportsRefusedKeySave` leaves `keySaveFailed_OpenAI` set). Launch arguments such as
+    /// `-keyValidated_Gemini YES` still apply: they sit in the argument domain, which this does not touch.
+    static func clearKeyChips() {
+        guard isActive else { return }
+        let defaults = UserDefaults.standard
+        guard let id = Bundle.main.bundleIdentifier, let stored = defaults.persistentDomain(forName: id) else { return }
+        for key in stored.keys where key.hasPrefix("keyValidated_") || key.hasPrefix("keySaveFailed_") {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     /// W49.proc-managed-local-ocr: the guest has too little memory for the managed page readers; this run says 18 GB.
     static var managedOCRMemoryGB: Double? { isActive && arguments.contains("-APUITestManagedOCR") ? 18 : nil }
     /// W49.proc-local-ocr-onboarding: in that run a started download fetches nothing and waits until cancelled.

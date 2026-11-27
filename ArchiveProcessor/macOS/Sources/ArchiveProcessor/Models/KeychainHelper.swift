@@ -59,7 +59,13 @@ struct KeychainHelper {
     }
 
     static func load(account: String, allowInteraction: Bool = true) -> String? {
-        if isHeadlessTestMode { return nil }
+        if isHeadlessTestMode {
+            #if DEBUG
+            return ProcessorUITestConfiguration.standInKey(for: account)   // nil unless a UI test names the account
+            #else
+            return nil
+            #endif
+        }
         return lock.withLock { read(account: account, allowInteraction: allowInteraction) }
     }
 
