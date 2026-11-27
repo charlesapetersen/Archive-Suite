@@ -574,6 +574,8 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    (see [Item type](#item-type)). Ordinary document PDFs receive no generated tags in either mode.
    In Live Capture, "No tagging" still writes the tag card's subjects, date and Quality and the
    phone's date and Quality (W40.fix-live-vision-drops-card-tags). With nothing set, no write at all.
+   A staged session processed later in Process Files keeps the phone's Quality the same way, verbatim,
+   in its Finder tags and catalogue record (W49.proc-quality-no-tagging, owner 2026-11-27).
    Live Capture box and folder photos stay untagged in this mode.
 7. **App-authoritative type and color.** In real-tagging modes Processor writes the `Box`/`Folder` token
    for a label photo, and `.labelNumberKey` from the colour the user chose for that type (or `0` to clear

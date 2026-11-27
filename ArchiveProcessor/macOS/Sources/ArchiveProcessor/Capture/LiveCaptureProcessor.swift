@@ -2134,6 +2134,8 @@ final class LiveCaptureProcessor: ObservableObject {
     /// W40.fix-live-vision-drops-card-tags — whether a staged artifact gets a Finder-tag write. Every
     /// tagging mode writes; No tagging writes only when a person set something (its `baseTags` hold just
     /// the card's and phone's values), so an untouched page still gets no Finder metadata write at all.
+    /// Process Files keeps the phone's rating in No tagging too (`applyCaptureQualityTags`,
+    /// `catalogueQuality`; owner, 2026-11-27, W49.proc-quality-no-tagging).
     nonisolated private static func writesFinderTags(_ mode: TaggingMode, _ tags: [String]) -> Bool {
         mode != .none || !tags.isEmpty
     }

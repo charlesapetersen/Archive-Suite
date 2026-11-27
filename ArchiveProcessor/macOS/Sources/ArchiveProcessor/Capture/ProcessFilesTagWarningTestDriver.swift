@@ -431,21 +431,41 @@ enum ProcessFilesTagWarningTestDriver {
               && tagsOf(copyClearPDF).contains("History")
               && !tagsOf(copyClearPDF).contains("Q0"))
 
-        // "No tagging" is not a copy-source spelling. It must leave phone quality and already-written
-        // metadata completely alone rather than silently turning the run into Q tagging.
+        // W49.proc-quality-no-tagging (owner, 2026-11-27): "No tagging" keeps the phone's rating, as Live
+        // Capture does. It replaces only the Q token, verbatim: no Unread, other tags and the label untouched.
         let noTagSource = colourDir.appendingPathComponent("IMG_7007.jpg")
         let noTagPDF = colourDir.appendingPathComponent("none-quality.pdf")
         writeOnePagePDF(noTagPDF)
         _ = OCRProcessor.writeOutputTags(["History", "Q1"], to: noTagPDF, stampUnread: false)
-        let noTagBefore = tagsOf(noTagPDF)
         let noTagLabelBefore = labelOf(noTagPDF)
         let noTagCapture = wiredProcessor(source: noTagSource, output: noTagPDF,
                                           classification: .documentStart, taggingMode: .none)
         noTagCapture.preGroupedQualities = ["Q3"]
         noTagCapture.applyCaptureQualityTags()
-        check("no-tagging leaves phone quality and existing Finder metadata entirely untouched",
-              tagsOf(noTagPDF) == noTagBefore && labelOf(noTagPDF) == noTagLabelBefore
-              && !tagsOf(noTagPDF).contains("Q3"))
+        check("no-tagging writes the phone's Q3 in place of the old rating, verbatim",
+              tagsOf(noTagPDF) == ["History", "Q3"] && labelOf(noTagPDF) == noTagLabelBefore
+              && noTagCapture.jobs[0].appliedTags.contains("Q3"))
+
+        // An untagged no-tagging output with no phone rating to add gets no Finder write at all.
+        let noTagClearSource = colourDir.appendingPathComponent("IMG_7007-clear.jpg")
+        let noTagClearPDF = colourDir.appendingPathComponent("none-unrated.pdf")
+        writeOnePagePDF(noTagClearPDF)
+        let noTagClearCapture = wiredProcessor(source: noTagClearSource, output: noTagClearPDF,
+                                               classification: .documentStart, taggingMode: .none)
+        noTagClearCapture.preGroupedQualities = ["Q0"]
+        noTagClearCapture.applyCaptureQualityTags()
+        check("no-tagging with a phone Q0 leaves an untagged output untagged",
+              tagsOf(noTagClearPDF).isEmpty && noTagClearCapture.untaggedOutputs.isEmpty)
+
+        // A pre-OCRed input's output IS the user's own PDF; no-tagging never writes to it.
+        let noTagOwnPDF = colourDir.appendingPathComponent("none-own.pdf")
+        writeOnePagePDF(noTagOwnPDF)
+        _ = OCRProcessor.writeOutputTags(["Mine"], to: noTagOwnPDF, stampUnread: false)
+        let noTagOwnCapture = wiredProcessor(source: noTagOwnPDF, output: noTagOwnPDF,
+                                             classification: .documentStart, taggingMode: .none)
+        noTagOwnCapture.preGroupedQualities = ["Q2"]
+        noTagOwnCapture.applyCaptureQualityTags()
+        check("no-tagging leaves a pre-OCRed source PDF untouched", tagsOf(noTagOwnPDF) == ["Mine"])
 
         // W19.q6: both Process Files manual flows hand their human decision to the late Capture
         // boundary. Without this, its imported Q3 would overwrite a Q1 selection or re-add Q3
@@ -503,8 +523,10 @@ enum ProcessFilesTagWarningTestDriver {
         check("with no phone rating the catalogue takes the generated tags' Q2",
               generatedOnly.catalogueQuality(of: generatedSources) == "Q2")
         let (noTagRating, noTagSources) = ratingProcessor(["IMG_7104.jpg"], phone: ["Q3"], mode: .none)
-        check("a no-tagging run carries no phone rating into the catalogue",
-              noTagRating.catalogueQuality(of: noTagSources) == nil)
+        check("a no-tagging run carries the phone's rating into the catalogue, as Live Capture does",
+              noTagRating.catalogueQuality(of: noTagSources) == "Q3")
+        check("...but a pre-OCRed run carries none",
+              noTagRating.catalogueQuality(of: noTagSources, preOCRed: true) == nil)
         let (multi, multiSources) = ratingProcessor(["IMG_7105.jpg", "IMG_7106.jpg"], phone: ["Q0", "Q1"])
         check("a merged document takes the first page, in order, that has a rating",
               multi.catalogueQuality(of: multiSources) == "Q1")

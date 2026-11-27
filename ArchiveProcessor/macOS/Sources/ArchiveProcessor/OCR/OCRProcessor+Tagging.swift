@@ -361,19 +361,24 @@ extension OCRProcessor {
     /// macOS tag application replaces, so read → replace the rating intent → re-apply; also record the
     /// canonical token in the job's appliedTags so document merging carries it. No-op outside a
     /// pre-grouped run.
+    ///
+    /// Contract (owner, 2026-11-27, W49.proc-quality-no-tagging): "No tagging" still writes the phone's
+    /// rating, because a person set it, exactly as Live Capture's `writesFinderTags` does. A session staged
+    /// for later keeps the ratings a live one keeps. That write is verbatim (no `Unread`, label untouched),
+    /// adds only the Q token, is skipped when it would change nothing, and never touches a pre-OCRed input
+    /// whose output is the user's own file. `catalogueQuality` follows the same rule for the record.
     func applyCaptureQualityTags(runConfig: SessionProcessingConfig? = nil) {
         guard !preGroupedQualities.isEmpty else { return }
         let settings = lateRunOutputSettings(for: runConfig)
-        // "No tagging" means exactly that, including the post-tagging phone boundary. In particular,
-        // do not read/rewrite an output merely to apply a phone quality: that would turn a no-tag run
-        // into a Quality-tagging run and could also canonicalize or strip metadata it promised to leave alone.
-        guard settings.taggingMode != .none else { return }
+        let noTagging = settings.taggingMode == .none
         let stampUnread = settings.stampUnread
         for i in jobs.indices where i < preGroupedQualities.count {
             guard let raw = preGroupedQualities[i]?.trimmingCharacters(in: .whitespaces),
                   ["Q0", "Q1", "Q2", "Q3"].contains(raw),
                   let outputPDF = outputURLMap[jobs[i].sourceURL] else { continue }
+            if noTagging, OutputFileSafety.isSameFile(outputPDF, jobs[i].sourceURL) { continue }
             guard var tags = try? MacOSTagger.readTags(from: outputPDF) else { continue }
+            let tagsOnDisk = tags
             // Copy-source and no-tagging are verbatim by contract. Apply only canonical Q tokens.
             tags.removeAll { DocumentTags.isRatingToken($0) }
             if stampUnread {
@@ -386,9 +391,11 @@ extension OCRProcessor {
             // tags are an array read back off DISK, so the colour must come from the page's
             // classification (as the fresh write's did) — never from detection over those names,
             // which promoted a subject tag "Red" to the box label.
-            tagOutput(tags, at: outputPDF, source: jobs[i].sourceURL,
-                      appColor: Self.authoritativeColor(forJob: jobs[i]),
-                      colorIsAuthoritative: true, stampUnread: stampUnread)
+            if !(noTagging && tags == tagsOnDisk) {
+                tagOutput(tags, at: outputPDF, source: jobs[i].sourceURL,
+                          appColor: Self.authoritativeColor(forJob: jobs[i]),
+                          colorIsAuthoritative: true, stampUnread: stampUnread)
+            }
             jobs[i].appliedTags.removeAll { DocumentTags.isRatingToken($0) }
             if raw != "Q0" {
                 jobs[i].appliedTags.append(raw)
