@@ -45,9 +45,10 @@ final class TagsWindowUITests: FixtureUITestCase {
 
         // (2) Merge the near-spelling into the first, then undo.
         replaceSearch(search, with: "Tagswin")
-        let rowA = tags.descendants(matching: .any)["tags.row.\(alpha)"]
-        let rowB = tags.descendants(matching: .any)["tags.row.\(beta)"]
-        XCTAssertTrue(rowA.waitForExistence(timeout: 10) && rowB.waitForExistence(timeout: 10), "both tags listed")
+        let rowA = row(alpha, in: tags), rowB = row(beta, in: tags)
+        let listed = rowA.waitForExistence(timeout: 10) && rowB.waitForExistence(timeout: 10)
+        captureScreenshot("w40-tag-window-reader-search")
+        XCTAssertTrue(listed, "both tags listed (search: \(search.value as? String ?? "?"))")
         rowA.click()
         XCUIElement.perform(withKeyModifiers: .command) { rowB.click() }
         tags.buttons["tags.merge"].click()
@@ -134,6 +135,12 @@ final class TagsWindowUITests: FixtureUITestCase {
         search.click()
         search.typeKey("a", modifierFlags: .command)
         search.typeText(text)
+        _ = waitFor(timeout: 5) { (search.value as? String) == text }
+    }
+
+    /// A list row by its tag: the row's identifier reaches each of its texts, so the first.
+    private func row(_ name: String, in window: XCUIElement) -> XCUIElement {
+        window.descendants(matching: .any).matching(identifier: "tags.row.\(name)").firstMatch
     }
 
     private func waitFor(timeout: TimeInterval = 10, _ condition: () -> Bool) -> Bool {

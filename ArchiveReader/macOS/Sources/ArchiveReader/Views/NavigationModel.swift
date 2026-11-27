@@ -3083,6 +3083,8 @@ final class NavigationModel: ObservableObject {
     var tagsWindowStale = false
     /// The tag Tags ▸ Rename Tag… asked for before the list was built.
     var tagsWindowPendingTag: String?
+    var tagsWindowFollow: AnyCancellable?
+    var tagsWindowVisible = false
     /// How many catalogue records the last save changed (not merely verified), read by its `completed`.
     var catalogueLastSaveChanged = 0
 

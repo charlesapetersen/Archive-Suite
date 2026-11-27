@@ -58,9 +58,10 @@ final class TagsWindowReaderTests: XCTestCase {
         return model
     }
 
-    /// The window's list, once built off the main actor.
+    /// The window's list, once built off the main actor, following the library as when the window shows.
     private func window(_ model: NavigationModel) async throws -> TagsWindowModel {
         let window = model.tagsWindow
+        model.tagsWindowShown(true)
         try await waitUntil("the list was built") { !window.inventory.subjects.isEmpty }
         return window
     }
@@ -100,7 +101,6 @@ final class TagsWindowReaderTests: XCTestCase {
         // A change to the library reaches the list.
         let d = try XCTUnwrap(model.library.files.first { $0.url.path == fixture.files[3].path })
         model.applyEdit(.addSubject("Emancipation"), to: d)
-        model.refreshTagsWindow()
         try await waitUntil("the new tag is listed") { window.inventory.entry(for: "Emancipation") != nil }
     }
 
@@ -121,9 +121,15 @@ final class TagsWindowReaderTests: XCTestCase {
         try await waitUntil("recorded") { log(fixture.root).count == 1 }
         XCTAssertEqual(log(fixture.root).first?.id, AuditLedger.shared.entries().first?.group)
 
+        try await waitUntil("the list follows the rename") { window.inventory.entry(for: "Abraham Lincoln") != nil }
+
         await undo(model)
         XCTAssertEqual(tags(fixture.files[1]), ["Unread", "lincoln"])
         try await waitUntil("withdrawn by Undo") { log(fixture.root).first?.withdrawn == true }
+        // The list follows the Undo too (the library bumps its revision before it replaces the rows).
+        try await waitUntil("the list follows the Undo") {
+            window.inventory.entry(for: "Abraham Lincoln") == nil && window.inventory.entry(for: "Lincoln")?.itemCount == 3
+        }
         await undo(model, redo: true)
         XCTAssertEqual(tags(fixture.files[1]), ["Unread", "Abraham Lincoln"])
         try await waitUntil("restored by Redo") { log(fixture.root).first?.withdrawn == false }

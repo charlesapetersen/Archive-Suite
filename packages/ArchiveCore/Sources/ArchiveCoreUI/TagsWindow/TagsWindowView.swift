@@ -157,15 +157,24 @@ public struct TagsWindowView<Accessory: View>: View {
                     .accessibilityIdentifier("tags.status")
             }
             if !model.suiteTokens.isEmpty {
-                DisclosureGroup("The suite’s own tags (\(model.suiteTokens.count))", isExpanded: $showsSuiteTokens) {
+                // A button rather than a DisclosureGroup: macOS draws a DisclosureGroup's triangle left of its
+                // leading edge, 12 pt outside the window here (the Reader's layout guard, W40.tag-window-reader).
+                Button {
+                    showsSuiteTokens.toggle()
+                } label: {
+                    Label("The suite’s own tags (\(model.suiteTokens.count))",
+                          systemImage: showsSuiteTokens ? "chevron.down" : "chevron.right")
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .accessibilityIdentifier("tags.suiteTokens")
+                if showsSuiteTokens {
                     Text("Ratings, dates, read state, item types, colours and checks are set by the apps’ own "
                          + "controls and are not changed here.")
                         .font(.caption).foregroundStyle(.secondary)
                     Text(model.suiteTokens.map { "\($0.name) (\($0.itemCount))" }.joined(separator: " · "))
                         .font(.caption).textSelection(.enabled)
                 }
-                .font(.caption)
-                .accessibilityIdentifier("tags.suiteTokens")
             }
         }
         .padding(10)

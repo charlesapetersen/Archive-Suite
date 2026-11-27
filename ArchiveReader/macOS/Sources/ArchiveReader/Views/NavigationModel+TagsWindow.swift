@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import ArchiveCore
 import ArchiveCoreUI
 
@@ -20,8 +21,24 @@ extension NavigationModel {
             return await applyTagPlan(plan)
         }
         tagsWindowModel = model
+        // Every change to the library, the window's own included, rebuilds the list while the window shows. Delivered
+        // on the next turn of the main queue: `ArchiveLibrary` bumps `filesRevision` before it replaces the rows, and
+        // `@Published` sends before the change, so a list rebuilt at once read the rows from before (an Undo left the
+        // window showing the undone name; seen in the VM).
+        tagsWindowFollow = library.$filesRevision.dropFirst().receive(on: DispatchQueue.main).sink { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.tagsWindowVisible else { return }
+                self.refreshTagsWindow()
+            }
+        }
         refreshTagsWindow()
         return model
+    }
+
+    /// The window shows (its view's appear and disappear): the list follows the library only while it does.
+    func tagsWindowShown(_ shown: Bool) {
+        tagsWindowVisible = shown
+        if shown { refreshTagsWindow() }
     }
 
     /// The main archive's path, the only tree whose subjects the Reader changes; nil without one.

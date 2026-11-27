@@ -19183,3 +19183,33 @@ the same three lines and landing them separately would silently revert part of t
   (`sherlock-results/family-{895,96}`, 84 MB) as later items' inputs, as new-open's were; the artifact copy stays where the
   engine keeps it. $0 real money.
   <!-- /W46.ocr-family-coverage -->
+- [x] **W40.tag-window-reader — the Reader's Window ▸ Tags, over its library [M · Tier-2]** (lane: reader) (uses: build,vm) · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) — SHIPPED 2026-11-26.
+  Built: Window ▸ Tags in the Reader (`ReaderTagsWindow`, `NavigationModel+TagsWindow`), the shared ArchiveCoreUI window
+  over the main archive's files (their tags verbatim; in catalogue mode their catalogue subjects), built off the main
+  actor with its Find Similar groups and following the library while it shows. Rename, merge and remove write through
+  `TagWriter.applyPlan` (the plan made on each file's fresh read in coordination; only source tokens move) as one ledger
+  group and one Undo, or in catalogue mode one journal operation; Edit ▸ Undo works with the window in front. Tags ▸
+  Rename Tag…, Find Similar Tags… and the tag cloud's right-click bring the window up on the tag (selected once the list
+  is built); Show Files filters the navigation list. `RenameTagSheet` and `SimilarTagsSheet` are deleted. Every change is
+  recorded for the other apps, one entry per source tag kept against its ledger group or journal operation, so its Undo
+  withdraws and Redo restores them: the catalogue journal's Undo now does too (the limit W40.tag-rename-suite left). A
+  remove is a `tag-changes.json` schema 2 entry with an empty `to` (SPEC/tag-format.md invariant 8; a schema 1 log is
+  read as it is and written back as schema 2, so a schema 1 build leaves it alone; no migration: nothing to migrate);
+  Notes applies one (`renameSubjects(_, to: "")`, one Undo), the Processor follows it (`TagChangeLog.follow`, never
+  emptying the controlled list), the Reader applies another app's. A remove of a suite token is never recorded.
+  Measured at corpus size (116k synthetic files, 7,000 subjects, Debug, in memory): list build 1.6 s and Find Similar
+  groups 2.5 s off the main actor; on it the window's update 1.8 ms, the rows 4 ms (31 ms under Find Similar), a
+  rename's plan 0.5 s and its file selection 0.27 s. `TagSimilarity.clusters` compared every pair and took 659 s there on
+  the main thread; it now compares only forms sharing a deletion form (long forms directly by length), exact against
+  all pairs in a randomized test. Found and fixed in the VM: the window kept an undone name (the library bumps
+  `filesRevision` before replacing its rows, and `@Published` sends first, so the list is now rebuilt on the next main
+  queue turn); the shared view's "suite's own tags" disclosure drew 12 pt outside the window (now a button).
+  Tier-2: independent review (Opus) found nothing HIGH; fixed its schema stamp, refused-change, controlled-list,
+  catalogue-count, suite-token and long-tag findings. Filed: W40.tag-window-reader-multidoc (a catalogue PDF with several
+  documents; Reader KNOWN_ISSUES). Tests: TagsWindowReaderTests 9 (scratch roots, a catalogue fixture, corpus size) and
+  the Reader's tag suites; ArchiveCore (TagChangeLog, TagSimilarity, TagInventory); Notes NotesTagRenameTests 14; VM
+  UITests TagsWindowUITests (rename, merge, remove, each undone with ⌘Z in the window; Find Similar), and
+  NavigationUITests' matched-identity writes, TriageJourneyUITests and LayoutGuardUITests updated for the window.
+  Design: execution-plans/tag-rename-suite.md (kept for W40.tag-window-notes). $0; bench cache: nothing created.
+  Commits: checkpoints 1-2 and this one.
+  <!-- /W40.tag-window-reader -->

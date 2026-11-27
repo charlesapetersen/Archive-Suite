@@ -444,8 +444,10 @@ final class TriageJourneyUITests: FixtureUITestCase {
         app.menuItems["Find Similar Tags…"].click()
         let tagsWindow = app.windows["Tags"]
         XCTAssertTrue(tagsWindow.waitForExistence(timeout: 10), "Find Similar Tags… should bring up the Tags window")
-        let keepRow = tagsWindow.descendants(matching: .any)["tags.row.\(mergeKeep)"]
-        let variantRow = tagsWindow.descendants(matching: .any)["tags.row.\(mergeVariant)"]
+        // The row's identifier reaches each of its texts, so the first.
+        let keepRow = tagsWindow.descendants(matching: .any).matching(identifier: "tags.row.\(mergeKeep)").firstMatch
+        let variantRow = tagsWindow.descendants(matching: .any)
+            .matching(identifier: "tags.row.\(mergeVariant)").firstMatch
         XCTAssertTrue(keepRow.waitForExistence(timeout: 10) && variantRow.waitForExistence(timeout: 10),
                       "Find Similar should list the two variants")
         keepRow.click()

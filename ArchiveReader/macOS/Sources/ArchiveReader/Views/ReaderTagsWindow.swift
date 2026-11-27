@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 import ArchiveCore
 import ArchiveCoreUI
 
@@ -41,12 +40,10 @@ private struct ReaderTagsWindowContent: View {
                 nav?.showFiles(withTag: entry.name)
                 openWindow(id: WindowID.navigation)
             }
-            nav.refreshTagsWindow()
+            nav.tagsWindowShown(true)   // and its list follows the library while it shows
             Task { await nav.refreshTagChangeInbox() }
         }
-        // Every change to the library, the window's own included, rebuilds the list off the main actor.
-        .onReceive(nav.library.$filesRevision.dropFirst()) { _ in nav.refreshTagsWindow() }
-        .accessibilityIdentifier("ar.tagsWindow")
+        .onDisappear { nav.tagsWindowShown(false) }
     }
 }
 
