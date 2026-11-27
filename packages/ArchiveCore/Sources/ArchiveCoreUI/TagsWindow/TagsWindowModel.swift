@@ -39,6 +39,9 @@ public final class TagsWindowModel: ObservableObject {
     public let noun: TagNoun
     /// Shows the items carrying a tag (the Reader filters its list, Notes its sidebar). Nil hides the command.
     public var showItems: (@MainActor (TagInventory.Entry) -> Void)?
+    /// What the count column says for a tag, in place of its count: the Processor names the lists that hold it
+    /// (W40.tag-window-processor). Nil shows the count.
+    public var itemsLabel: (@MainActor (TagInventory.Entry) -> String)?
     private let writer: Writer
     private var clusterIndex: [String: Int] = [:]
 

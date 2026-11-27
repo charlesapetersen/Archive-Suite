@@ -149,4 +149,16 @@ final class TagsWindowModelTests: XCTestCase {
         host.layoutSubtreeIfNeeded()
         XCTAssertGreaterThan(host.fittingSize.height, 0)
     }
+
+    /// The Processor's lists name where a tag is held in place of a count (W40.tag-window-processor).
+    func testTheCountColumnCanNameTheLists() {
+        let (_, model) = make(["Suggestions": ["Labor", "Strikes"], "Subject list": ["Labor"]])
+        model.itemsLabel = { $0.itemIDs.sorted().joined(separator: ", ") }
+        let labor = model.rows.first { $0.name == "Labor" }!
+        XCTAssertEqual(model.itemsLabel?(labor), "Subject list, Suggestions")
+        let host = NSHostingView(rootView: TagsWindowView(model: model))
+        host.frame = NSRect(x: 0, y: 0, width: 520, height: 420)
+        host.layoutSubtreeIfNeeded()
+        XCTAssertGreaterThan(host.fittingSize.height, 0)
+    }
 }

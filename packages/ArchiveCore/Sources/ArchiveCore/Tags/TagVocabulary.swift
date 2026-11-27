@@ -183,6 +183,28 @@ public final class TagVocabulary: @unchecked Sendable {
         return changed
     }
 
+    /// Makes a rename, merge or remove from the Processor's Tags window, or its Undo (W40.tag-window-processor): each
+    /// changed tag takes its new spelling or is dropped. A tag added since stays; a new name past `maxNames` is not
+    /// added. As with `rename`, a later harvest of files that still carry a dropped tag brings it back.
+    /// - Returns: true when anything changed.
+    @discardableResult
+    public func apply(_ change: TagSpellingChange) -> Bool {
+        lock.lock()
+        let before = names
+        for (key, spelling) in change.spellings {
+            if let spelling {
+                guard names[key] != nil || names.count < Self.maxNames else { continue }
+                names[key] = spelling
+            } else {
+                names.removeValue(forKey: key)
+            }
+        }
+        let changed = names != before
+        lock.unlock()
+        if changed { scheduleSave() }
+        return changed
+    }
+
     // MARK: - Roots
 
     /// Would harvesting this root be a legitimate archive walk, or the invasive `$HOME` sweep the owner's

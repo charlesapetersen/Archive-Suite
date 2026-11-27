@@ -93,9 +93,9 @@ public struct TagsWindowView<Accessory: View>: View {
                 .accessibilityIdentifier("tags.row.\(entry.name)")
             }
             TableColumn(model.noun.plural.capitalized) { entry in
-                Text("\(entry.itemCount)").monospacedDigit()
+                Text(model.itemsLabel?(entry) ?? "\(entry.itemCount)").monospacedDigit()
             }
-            .width(min: 50, ideal: 70, max: 110)
+            .width(min: 50, ideal: model.itemsLabel == nil ? 70 : 150, max: model.itemsLabel == nil ? 110 : 220)
         }
         .contextMenu(forSelectionType: String.self) { ids in
             menu(for: entries(ids))
