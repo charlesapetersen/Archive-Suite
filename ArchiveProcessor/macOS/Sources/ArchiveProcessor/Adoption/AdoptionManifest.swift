@@ -46,6 +46,8 @@ struct AdoptionManifest: Codable, Equatable, Sendable {
         case originalMultipage = "original-multipage"
         /// The matched original is a cloud placeholder; copying it would download it.
         case originalOffline = "original-offline"
+        /// The optional label classifier proposed the item type (`AdoptionClassify`); a reviewer confirms it.
+        case typeClassified = "type-classified"
 
         /// Whether conversion can still go ahead once a reviewer accepts the entry.
         var convertible: Bool {
@@ -112,6 +114,9 @@ struct AdoptionManifest: Codable, Equatable, Sendable {
         var decision: Decision
         /// Preserve the matched original in the derived archive's Preservation folder.
         var keepOriginal: Bool
+        /// The optional label classifier's verdict (`box`, `folder`, `document` or `unread`), so a later pass does
+        /// not read the file again. Absent when the pass has not read it.
+        var classified: Fact<String>? = nil
     }
 
     var format = Self.currentFormat

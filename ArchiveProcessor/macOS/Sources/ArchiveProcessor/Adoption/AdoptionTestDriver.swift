@@ -18,6 +18,10 @@ import PDFKit
 ///   6. A source whose tags changed after the inventory is refused, and nothing is filed for it.
 ///   7. Labels are proposed without writing, then written only into the derived archive.
 ///   8. A non-empty destination without this run's ledger is refused.
+///   9. The optional label classifier, on a second tree with no marks: its estimate changes nothing and a run over the
+///      cap is refused; a run (fake page reader and judge, no model call) proposes a found label for review with the
+///      classifier as its rule, records every verdict so a second run reads nothing, and a converted label carries
+///      origin `model`.
 @MainActor
 enum AdoptionTestDriver {
     private static var didRun = false
@@ -321,6 +325,108 @@ enum AdoptionTestDriver {
             check("8 a non-empty destination is refused",
                   (error as? AdoptionError).map { if case .destinationNotEmpty = $0 { true } else { false } } ?? false, "\(error)")
         }
+        await classifier(base)
+    }
+
+    private static func classifier(_ base: URL) async {
+        let fm = FileManager.default
+        let tree = base.appendingPathComponent("unmarked/Papers", isDirectory: true)
+        let originals = base.appendingPathComponent("unmarked/Photos", isDirectory: true)
+        do {
+            try pdf(tree.appendingPathComponent("Box A/Label.pdf"))
+            try jpeg(originals.appendingPathComponent("Box A/Label.jpg"))
+            try pdf(tree.appendingPathComponent("Box A/Letter.pdf"))
+            try pdf(tree.appendingPathComponent("Box A/Blank.pdf"))
+            try pdf(tree.appendingPathComponent("Box A/Tagged.pdf"), tags: ["Box"])
+            try pdf(tree.appendingPathComponent("Box A/Two pages.pdf"), pages: 2)
+        } catch { check("9 fixture tree", false, "\(error)"); return }
+        let before = snapshot(base.appendingPathComponent("unmarked"))
+        let state = base.appendingPathComponent("state-classify", isDirectory: true)
+        let manifestURL = state.appendingPathComponent(AdoptionManifest.fileName)
+        var env = ["ARCHIVE_ADOPT_STATE": state.path, "ARCHIVE_ADOPT_SOURCE": tree.path,
+                   "ARCHIVE_ADOPT_ORIGINALS": originals.path, "ARCHIVE_ADOPT_COLOURS": "none"]
+        let (inventoryText, inventoryOK) = await AdoptionCommand.run(step: "inventory", env: env)
+        guard inventoryOK, var manifest = try? AdoptionManifest.decode(Data(contentsOf: manifestURL)) else {
+            check("9 inventory of the unmarked tree", false, inventoryText); return
+        }
+        guard let model = LLMModel.geminiModels.first(where: { $0.inputCostPer1M > 0 }),
+              let route = AdoptionClassify.Route("gemini:" + model.id) else { check("9 a model route parses", false); return }
+        check("9 routes parse, and an unknown or transcription-only one is refused",
+              AdoptionClassify.Route("vision-heuristic") == .heuristic && AdoptionClassify.Route("gemini:no-such-model") == nil
+                && AdoptionClassify.Route("apple vision:macos-vision") == nil
+                && AdoptionClassify.Route.heuristic.dollarsPerPage == 0)
+
+        let texts = ["Label": "RECORD GROUP 59 BOX 12", "Letter": "Dear Sir, I write about the treaty."]
+        let reader: AdoptionClassify.TextReader = { path, _ in
+            texts[((path as NSString).lastPathComponent as NSString).deletingPathExtension]
+        }
+        let judge: AdoptionClassify.Judge = { text in text.contains("BOX") ? .boxLabel : .documentStart }
+
+        let estimate = await AdoptionClassify.estimate(manifest, ledger: nil, route: route, reader: reader)
+        check("9 the estimate covers the one-page files with no type and prices each",
+              estimate.candidates == 3 && estimate.sampled == 3 && (estimate.dollars ?? 0) > 0
+                && estimate.dollars == (route.dollarsPerPage ?? -1) * 3, "\(estimate)")
+
+        let manifestBefore = try? Data(contentsOf: manifestURL)
+        env["ARCHIVE_ADOPT_CLASSIFY_ROUTE"] = route.name
+        let (noKey, noKeyOK) = await AdoptionCommand.run(step: "classify", env: env)
+        check("9 a model route without a key is refused", !noKeyOK && noKey.contains("ARCHIVE_ADOPT_CLASSIFY_KEY"), noKey)
+        env["ARCHIVE_ADOPT_CLASSIFY_KEY"] = "not-a-key"
+        let (shown, shownOK) = await AdoptionCommand.run(step: "classify", env: env)
+        check("9 without run it shows time and cost and changes nothing",
+              shownOK && shown.contains("Estimated time") && shown.contains("Estimated cost: $") && shown.contains("Files to read: 3")
+                && (try? Data(contentsOf: manifestURL)) == manifestBefore
+                && fm.fileExists(atPath: state.appendingPathComponent("classify-estimate.md").path), shown)
+        env["ARCHIVE_ADOPT_CLASSIFY_RUN"] = "1"
+        let (uncapped, uncappedOK) = await AdoptionCommand.run(step: "classify", env: env)
+        env["ARCHIVE_ADOPT_CLASSIFY_MAX_COST"] = "0"
+        let (capped, cappedOK) = await AdoptionCommand.run(step: "classify", env: env)
+        check("9 a run with no cap, or a cap below the estimate, is refused and changes nothing",
+              !uncappedOK && !cappedOK && capped.contains("MAX_COST must be at least")
+                && (try? Data(contentsOf: manifestURL)) == manifestBefore, uncapped + capped)
+
+        do {
+            let result = try await AdoptionClassify.run(&manifest, ledger: nil, route: route, judge: judge, reader: reader)
+            check("9 the pass reads each candidate once and asks the model only for read text",
+                  result.boxes == ["Box A/Label.pdf"] && result.documents == 1 && result.unread == ["Box A/Blank.pdf"]
+                    && result.calls == 2 && result.failed.isEmpty, "\(result)")
+            let label = entry(manifest, "Box A/Label.pdf")
+            check("9 a found label is a proposed type that waits for review, with the classifier as its rule",
+                  label?.proposal.itemType?.value == "box" && label?.proposal.itemType?.rule == "classifier:" + route.name
+                    && label?.proposal.itemType?.evidence.contains("RECORD GROUP") == true
+                    && label?.review == [.typeClassified] && label?.decision == .review, "\(String(describing: label))")
+            let letter = entry(manifest, "Box A/Letter.pdf")
+            check("9 a document keeps no type, and its verdict is recorded",
+                  letter?.proposal.itemType == nil && letter?.classified?.value == "document"
+                    && entry(manifest, "Box A/Blank.pdf")?.classified?.value == "unread")
+            check("9 a tagged file and a two-page file are not read",
+                  entry(manifest, "Box A/Tagged.pdf")?.classified == nil && entry(manifest, "Box A/Two pages.pdf")?.classified == nil)
+            let again = try await AdoptionClassify.run(&manifest, ledger: nil, route: route, judge: judge, reader: reader)
+            check("9 a second pass reads nothing", again == AdoptionClassify.Result(), "\(again)")
+            try manifest.encoded().write(to: manifestURL, options: .atomic)
+        } catch { check("9 the classifier runs", false, "\(error)"); return }
+        check("9 the pass changes nothing in the source", snapshot(base.appendingPathComponent("unmarked")) == before)
+
+        var decide = env
+        decide["ARCHIVE_ADOPT_DECISION"] = "accept"
+        decide["ARCHIVE_ADOPT_REASONS"] = "type-classified"
+        let (decided, decidedOK) = await AdoptionCommand.run(step: "decide", env: decide)
+        check("9 a reviewer accepts the classified labels as a group", decidedOK && decided.hasPrefix("1 entries"), decided)
+        var convert = env
+        let dest = base.appendingPathComponent("derived-classify", isDirectory: true)
+        convert["ARCHIVE_ADOPT_DEST"] = dest.path
+        let (converted, _) = await AdoptionCommand.run(step: "convert", env: convert)
+        do {
+            let reader = try CatalogueReader(grantedRoot: dest, rootInstanceID: UUID(), mode: .adopted,
+                                             identifyPDF: CataloguePDFIdentity.identify)
+            let fields = try reader.snapshot(.init(relativePDFPaths: ["Box A/Label.pdf"], isComplete: false))
+                .facts(at: "Box A/Label.pdf").document.get().document.fields
+            if case .value(let type)? = fields?.itemType?.current {
+                check("9 the converted label is a Box read by a model, with the classifier's evidence",
+                      type == "box" && fields?.itemType?.origin == "model"
+                        && fields?.itemType?.evidence.first?.route == "classifier:" + route.name, converted)
+            } else { check("9 the converted label has its type", false, converted) }
+        } catch { check("9 a reader opens the classified archive", false, "\(error) \(converted)") }
     }
 }
 #endif

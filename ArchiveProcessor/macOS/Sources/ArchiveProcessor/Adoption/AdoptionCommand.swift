@@ -8,6 +8,10 @@ import Foundation
 ///   inventory  ARCHIVE_ADOPT_SOURCE, optional ARCHIVE_ADOPT_ORIGINALS (`none` for no originals tree; unset uses the
 ///              pre-app `Archival Photos JPEGS` beside an `Archival Photos` source), ARCHIVE_ADOPT_COLOURS
 ///              (`red-box-purple-folder`, the default, or `none`).
+///   classify   optional, before convert: finds box and folder photos with no tag or colour mark.
+///              ARCHIVE_ADOPT_CLASSIFY_ROUTE (`vision-heuristic`, $0, or `<provider>:<model id>` with its key in
+///              ARCHIVE_ADOPT_CLASSIFY_KEY). Alone it prints the estimated time and cost and changes nothing;
+///              ARCHIVE_ADOPT_CLASSIFY_RUN=1 with ARCHIVE_ADOPT_CLASSIFY_MAX_COST (dollars) runs it within that cap.
 ///   decide     ARCHIVE_ADOPT_DECISION (accept|skip|review) for waiting entries whose reasons are all in
 ///              ARCHIVE_ADOPT_REASONS (comma-separated codes); ARCHIVE_ADOPT_KEEP_ORIGINAL=0 drops their originals.
 ///   convert    ARCHIVE_ADOPT_DEST, a new or empty folder (or the one this state folder's ledger names).
@@ -107,6 +111,37 @@ enum AdoptionCommand {
                 let report = AdoptionReport.inventory(manifest)
                 try write(report, "inventory-report.md", in: state)
                 return (report, true)
+            case "classify":
+                var manifest = try AdoptionManifest.decode(Data(contentsOf: manifestURL))
+                let ledger = AdoptionInventory.canonicalDirectory(state).flatMap { try? AdoptionLedger.load(from: $0) }
+                guard let route = AdoptionClassify.Route(env["ARCHIVE_ADOPT_CLASSIFY_ROUTE"] ?? "") else {
+                    return ("ARCHIVE_ADOPT_CLASSIFY_ROUTE must be \(AdoptionClassify.Route.heuristicName) or "
+                            + "<provider>:<model id> from the Processor's model list\n", false)
+                }
+                let key = env["ARCHIVE_ADOPT_CLASSIFY_KEY"] ?? ""
+                if case .model = route, key.isEmpty { return ("ARCHIVE_ADOPT_CLASSIFY_KEY is required for \(route.name)\n", false) }
+                let estimate = await AdoptionClassify.estimate(manifest, ledger: ledger, route: route)
+                var report = AdoptionReport.classifyEstimate(estimate, route: route)
+                guard env["ARCHIVE_ADOPT_CLASSIFY_RUN"] == "1" else {
+                    report += "\nNothing was classified. To run it, repeat with run and a cost cap of at least the estimate.\n"
+                    try write(report, "classify-estimate.md", in: state)
+                    return (report, true)
+                }
+                guard let dollars = estimate.dollars else {
+                    return (report + "\nNot run: the model's price is not known, so its cost cannot be shown first.\n", false)
+                }
+                if dollars > 0 {
+                    guard let cap = env["ARCHIVE_ADOPT_CLASSIFY_MAX_COST"].flatMap(Double.init), cap >= dollars else {
+                        return (report + "\nNot run: ARCHIVE_ADOPT_CLASSIFY_MAX_COST must be at least "
+                                + "\(CostEstimate.money(dollars)).\n", false)
+                    }
+                }
+                let result = try await AdoptionClassify.run(&manifest, ledger: ledger, route: route,
+                                                            judge: route.judge(apiKey: key))
+                try manifest.encoded().write(to: manifestURL, options: .atomic)
+                report += "\n" + AdoptionReport.classified(result, route: route)
+                try write(report, "classify-report.md", in: state)
+                return (report, result.failed.isEmpty)
             case "decide":
                 var manifest = try AdoptionManifest.decode(Data(contentsOf: manifestURL))
                 guard let decision = AdoptionManifest.Decision(rawValue: env["ARCHIVE_ADOPT_DECISION"] ?? "") else {
@@ -197,6 +232,41 @@ enum AdoptionReport {
                 lines.append("- \(entry.path) — \(detail)")
             }
         }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    static func classifyEstimate(_ estimate: AdoptionClassify.Estimate, route: AdoptionClassify.Route) -> String {
+        var lines = ["# Adoption label classifier: estimate", "", "Route: \(route.name)",
+                     "Files to read: \(estimate.candidates) (one page, no Box or Folder tag or colour, not yet read)"]
+        let vision = String(format: "%.1f", estimate.visionSecondsPerPage)
+        lines.append(estimate.sampled > 0
+            ? "Vision on this Mac: \(vision) s a file, timed on \(estimate.sampled) of them ($0)"
+            : "Vision on this Mac: not timed, no files to read")
+        switch route {
+        case .heuristic:
+            lines.append("Classifier: the Processor's keyword rules on this Mac; nothing is sent anywhere")
+        case .model(let model):
+            lines.append("Classifier: \(model.displayName), sent the Vision text only (never the image), "
+                         + "about \(String(format: "%.1f", estimate.secondsPerCall)) s a call")
+        }
+        lines.append("Estimated time: \(TimeEstimate.fmt(estimate.seconds))")
+        if let dollars = estimate.dollars, let each = estimate.dollarsPerPage {
+            lines.append("Estimated cost: \(CostEstimate.money(dollars)) (\(CostEstimate.money(each)) a file, the Processor's "
+                         + "estimate for a text-only classification; a reasoning model may cost more)")
+        } else {
+            lines.append("Estimated cost: unknown, the model's price is not listed")
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    static func classified(_ result: AdoptionClassify.Result, route: AdoptionClassify.Route) -> String {
+        var lines = ["# Adoption label classifier: result", "",
+                     "- box labels: \(result.boxes.count)", "- folder labels: \(result.folders.count)",
+                     "- documents: \(result.documents)", "- no text read: \(result.unread.count)"]
+        if case .model = route { lines.append("- model calls: \(result.calls)") }
+        lines.append("Labels found wait for review as `type-classified`.")
+        for path in (result.boxes + result.folders).prefix(listLimit) { lines.append("- \(path)") }
+        for path in result.failed { lines.append("- FAILED \(path): not read; a later run tries it again") }
         return lines.joined(separator: "\n") + "\n"
     }
 

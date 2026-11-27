@@ -4,6 +4,7 @@
 # meaning of each reason code: SPEC/adoption.md. The real corpus is refused until the owner approves a real run.
 #
 #   adopt-archive.sh inventory STATE SOURCE [ORIGINALS|none] [red-box-purple-folder|none]
+#   adopt-archive.sh classify  STATE vision-heuristic|PROVIDER:MODEL [run MAX_DOLLARS]
 #   adopt-archive.sh decide    STATE accept|skip|review REASON[,REASON...] [drop-original]
 #   adopt-archive.sh convert   STATE DEST
 #   adopt-archive.sh verify    STATE
@@ -11,11 +12,14 @@
 #
 # STATE is a folder outside both archives; it keeps the manifest, the ledger and each step's report.
 # The labels step reads label photos with Vision on this Mac ($0), under the heavy lock.
+# classify is optional, before convert: it finds box and folder photos that have no tag or colour mark. Without run it
+# prints the estimated time and cost and changes nothing; with run it goes ahead only within MAX_DOLLARS. A model
+# route takes its key from ARCHIVE_ADOPT_CLASSIFY_KEY in the environment, never from the command line.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 bin="$here/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
-usage() { sed -n '6,10p' "$0" | sed 's/^# *//' >&2; exit 2; }
+usage() { sed -n '6,11p' "$0" | sed 's/^# *//' >&2; exit 2; }
 [ -x "$bin" ] || { echo "ArchiveProcessor is not built; run the documented Debug build first." >&2; exit 1; }
 [ $# -ge 2 ] || usage
 step="$1" state="$2"
@@ -27,6 +31,14 @@ case "$step" in
         export ARCHIVE_ADOPT_SOURCE="$1"
         [ $# -lt 2 ] || export ARCHIVE_ADOPT_ORIGINALS="$2"
         [ $# -lt 3 ] || export ARCHIVE_ADOPT_COLOURS="$3" ;;
+    classify)
+        [ $# -eq 1 ] || [ $# -eq 3 ] || usage
+        export ARCHIVE_ADOPT_CLASSIFY_ROUTE="$1"
+        if [ $# -eq 3 ]; then
+            [ "$2" = run ] || usage
+            export ARCHIVE_ADOPT_CLASSIFY_RUN=1 ARCHIVE_ADOPT_CLASSIFY_MAX_COST="$3"
+        fi
+        exec python3 "$here/../ops/autonomous/heavy-run.py" run -- "$bin" ;;
     decide)
         [ $# -ge 2 ] || usage
         export ARCHIVE_ADOPT_DECISION="$1" ARCHIVE_ADOPT_REASONS="$2"

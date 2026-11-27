@@ -220,8 +220,10 @@ enum AdoptionConversion {
 
     typealias Record = ProcessorCatalogueRecord
 
+    /// A fact the old archive carried is `imported`; one the optional label classifier proposed is a `model` reading.
     private static func field<Value>(_ value: Value, rule: String, evidence: String) -> Record.Field<Value> {
-        Record.Field(value, origin: "imported", evidence: [.init(source: "adoption", route: rule, quote: evidence)])
+        Record.Field(value, origin: rule.hasPrefix(AdoptionClassify.rulePrefix) ? "model" : "imported",
+                     evidence: [.init(source: "adoption", route: rule, quote: evidence)])
     }
 
     private static func date(_ fact: AdoptionManifest.DateFact?) -> Record.Field<CatalogueRecord.DateValue>? {
