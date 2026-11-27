@@ -366,6 +366,7 @@ ensure_vm() {
     [ "$LANE" = "xcuitest" ] || die "VM '$VM' is already running and this script did not start it, so there is no VNC endpoint (and the mounts may be wrong). Stop it first:  tart stop $VM"
     log "VM already running — reusing it (xcuitest only needs the guest agent)."
     tart_wait_agent "$VM" "$AGENT_WAIT" || die "guest agent never answered within ${AGENT_WAIT}s on the already-running VM."
+    clear_panic
     ensure_display
     return 0
   fi
@@ -434,7 +435,21 @@ ensure_vm() {
   # see tart-lib.sh. Never exec after a boot without it.
   tart_wait_agent "$VM" "$AGENT_WAIT" || die "Tart Guest Agent never answered within ${AGENT_WAIT}s — check $runlog"
   log "VM up — guest agent ready after ${TART_AGENT_WAITED}s${VNC_PORT:+, VNC $VNC_HOST:$VNC_PORT}"
+  clear_panic
   ensure_display
+}
+
+# --- a pending guest kernel panic (W49.vm-guest-crash-dialog) ----------------------------------------
+# Its "restarted because of a problem" alert sits over the app under test at every boot until it is answered,
+# and fails whatever it covers. Not fatal: a guest that could not clear it still runs, with the reason said.
+clear_panic() {
+  local rc=0
+  tart_clear_panic "$VM" || rc=$?
+  case "$rc" in
+    1) log "$TART_PANIC_NOTE" ;;
+    2) warn "$TART_PANIC_NOTE" ;;
+  esac
+  return 0
 }
 
 # --- the guest's SCREEN SIZE (W21.vmgui-c) -----------------------------------------------------------

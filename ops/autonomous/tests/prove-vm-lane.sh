@@ -195,6 +195,14 @@ if grep -q '&& tart_stop_clean "\$VM"' "$RUNNER" && grep -q '&& tart_stop_clean 
 else
   no "a bare tart stop is back — on macOS 27 it powers the guest off and loses unflushed writes"
 fi
+# W49.vm-guest-crash-dialog: that in-guest shutdown sometimes panics the guest, and the panic's alert then
+# covers the app at every boot until answered. Both entry points must clear it after the agent answers.
+if [ "$(grep -c '^[^#]*clear_panic$' "$RUNNER")" -ge 2 ] && grep -q '^[^#]*tart_clear_panic "\$VM"' "$GATEF" \
+   && [ -f "$(dirname "$RUNNER")/vm-clear-panic-guest.sh" ]; then
+  ok "runner (both boot paths) and gate clear a pending guest kernel panic after boot"
+else
+  no "a boot path no longer clears a pending guest panic — its alert will sit over the app under test"
+fi
 
 echo "== 9. FORWARD tripwire: any app-hosted test bundle must suppress its window =="
 # The window-suppression fix is per-app opt-in (each App calls ArchiveTestHost in init()), so it does NOT

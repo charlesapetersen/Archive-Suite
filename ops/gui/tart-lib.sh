@@ -293,6 +293,38 @@ tart_kill_app() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# tart_clear_panic VM — acknowledge a pending guest kernel panic, so macOS's "Your computer was restarted
+# because of a problem" alert is not in front of the app under test. Call it after every boot, once the agent
+# answers. Returns 0 nothing pending · 1 a panic was pending and is now cleared · 2 one was pending and could
+# not be cleared. TART_PANIC_NOTE says which panic it was (its first line) and where the report went.
+#
+# THE BUG THIS EXISTS FOR (W49.vm-guest-crash-dialog, measured 2026-11-27). The guest panics now and then
+# while it shuts down: "Halt/Restart Timed Out @IOPlatformExpert.cpp:900" on 23, 26 and 27 Nov, each time
+# under tart_stop_clean's in-guest `shutdown -h`, the stop W40.vm-macos27 chose because `tart stop` loses
+# unflushed writes. Almost every shutdown of this guest stalls (a shutdown_stall report per stop, 56 by
+# 27 Nov); a few stall past the kernel's halt timeout. The panic leaves /private/var/db/PanicReporter/
+# current.panic, and until someone answers the alert, Diagnostics Reporter raises it again at every boot,
+# centred over the app. It failed all four AccessibilityAuditUITests on the contrast of the two texts it
+# covered, and Reader's Inspector clicks as "Not hittable" (26 Nov, cleared by hand; ops/gui/README.md).
+# The panic is the guest's, not a defect of the app under test, so the report is copied to
+# $TART_GUEST_OUT/guest-panics/ for the record, retired where the 26 Nov hand fix put it, and the alert closed.
+tart_clear_panic() {
+  local vm="$1" raw
+  TART_PANIC_NOTE=""
+  # The guest half is a file on the repo mount (vm-clear-panic-guest.sh says why).
+  raw="$(tart exec "$vm" bash "$GUEST_REPO/ops/gui/vm-clear-panic-guest.sh" "$TART_GUEST_OUT/guest-panics" 2>&1)" || true
+  case "$(printf '%s\n' "$raw" | tail -n 1)" in
+    NONE) return 0 ;;
+    CLEARED*)
+      TART_PANIC_NOTE="cleared a pending guest kernel panic ($(printf '%s\n' "$raw" | sed -n 's/^PANIC //p' | tr '\n' ' ' | sed 's/ *$//')); report kept in guest-panics/ and ${raw##*CLEARED }"
+      return 1 ;;
+    *)
+      TART_PANIC_NOTE="a guest kernel panic may still be pending and its alert may cover the app: $(printf '%s' "$raw" | tr '\n' ' ' | cut -c1-300)"
+      return 2 ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------------------------------
 # tart_crash_mark VM / tart_crash_harvest VM ART_SUBDIR — the crash and hang harvest (W40.e2).
 #
 # A crash the test runner does not attribute to a test is invisible to both VM entry points: an app that

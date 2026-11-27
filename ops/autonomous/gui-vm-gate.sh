@@ -175,6 +175,13 @@ boot_vm() {
   tart ip "$VM" --wait 120 >/dev/null 2>&1 || return 1
   tart_wait_agent "$VM" "$AGENTWAIT" || return 2
   echo "guest agent ready after ${TART_AGENT_WAITED}s" >>"$GLOG"
+  # A pending guest kernel panic puts its alert over the app at every boot (W49.vm-guest-crash-dialog).
+  local prc=0
+  tart_clear_panic "$VM" || prc=$?
+  case "$prc" in
+    1) echo "$TART_PANIC_NOTE" >>"$GLOG" ;;
+    2) echo "WARN: $TART_PANIC_NOTE" >>"$GLOG" ;;
+  esac
   # The guest's SCREEN SIZE, not the VM's configured one: --no-graphics boots the WindowServer at
   # 1024×768, below the Notes browser's ~1084 pt minimum, which clips its right pane off-window and made
   # 4 UITests fail as "not hittable" (W21.vmgui-c). Never silent, never fatal — Reader is green either way.
