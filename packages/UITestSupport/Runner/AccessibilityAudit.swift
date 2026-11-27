@@ -163,6 +163,17 @@ final class AccessibilityAudit {
         $0.audit == .parentChild && $0.type == nil
     }
 
+    /// Seen 2026-11-27 on macOS 27.2 in the Reader: one "Parent/Child mismatch" naming no element whenever a text
+    /// field has the keyboard focus, and gone when it loses it (probed in the guest,
+    /// W49.reader-audit-find-bar-inspector-shown): the document window's find field, the navigation window's SwiftUI
+    /// OCR search, and its file-name filter, a plain AppKit `NSTextField` the app builds itself, all alike. It is the
+    /// window's field editor, which AppKit puts in the field while it is edited. The same matcher as the grouped-Form
+    /// orphan, for the same reason kept out of `shared`: pass it only for a screen audited with a field focused.
+    static let focusedTextFieldOrphan = Exemption(
+        reason: "AppKit's field editor in a focused text field (macOS 27): a parent/child orphan XCTest cannot name") {
+        $0.audit == .parentChild && $0.type == nil
+    }
+
     nonisolated static func name(_ t: XCUIAccessibilityAuditType) -> String {
         switch t {
         case .contrast: "contrast"

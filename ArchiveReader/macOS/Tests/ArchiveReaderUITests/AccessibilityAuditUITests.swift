@@ -1,8 +1,9 @@
 import XCTest
 
 /// W40.e3 — Xcode's accessibility audit (`packages/UITestSupport/Runner/AccessibilityAudit.swift`) over the
-/// Reader's main screens: the navigation window with a document selected, the preview sheet, the document viewer
-/// window, and Settings. One test per appearance, because contrast differs and the appearance is a launch argument.
+/// Reader's main screens: the navigation window with a document selected, Settings, the preview sheet, and the
+/// document viewer window, with its Inspector hidden, then shown, then with the find bar focused.
+/// One test per appearance, because contrast differs and the appearance is a launch argument.
 /// Read-only: nothing here edits the fixture. Findings and their triage:
 /// `verification/evidence/core/W40.e3-accessibility-audit.md`.
 final class AccessibilityAuditUITests: FixtureUITestCase {
@@ -92,6 +93,15 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         sweep.audit(main, screen: "navigation window")
         captureScreenshot("reader-aa-navigation-\(appearance)")
 
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
+        LayoutGuard.waitUntilSettled(settings)
+        sweep.audit(settings, screen: "settings")
+        captureScreenshot("reader-aa-settings-\(appearance)")
+        settings.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 5), "Settings should close")
+
         toolbarButton("ar.toolbar.preview").click()
         let open = app.buttons["ar.preview.open"]
         XCTAssertTrue(open.waitForExistence(timeout: 5), "the preview sheet should open")
@@ -116,15 +126,35 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
         assertSmallTextContrast(in: viewer, appearance: appearance)
         sweep.audit(viewer, screen: "document viewer", exempt: [Self.lazyThumbnailRow])
         captureScreenshot("reader-aa-viewer-\(appearance)")
-        viewer.typeKey("w", modifierFlags: .command)
-        XCTAssertTrue(viewer.waitForNonExistence(timeout: 5), "the viewer should close")
 
-        app.typeKey(",", modifierFlags: .command)
-        let settings = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
-        LayoutGuard.waitUntilSettled(settings)
-        sweep.audit(settings, screen: "settings")
-        captureScreenshot("reader-aa-settings-\(appearance)")
+        // The document window with its Inspector shown (W49.reader-audit-find-bar-inspector-shown).
+        viewer.typeKey("i", modifierFlags: [.command, .option])
+        let docDate = viewer.textFields["ar.tagEditor.date"]
+        XCTAssertTrue(docDate.waitForExistence(timeout: 5), "the document window's Inspector should show")
+        XCTAssertTrue(viewer.descendants(matching: .any)["ar.fieldStatus.date.status"].waitForExistence(timeout: 5),
+                      "the Inspector's date badge is audited")
+        LayoutGuard.waitUntilSettled(viewer)
+        assertSmallTextContrast(in: viewer, appearance: appearance)
+        sweep.audit(viewer, screen: "document viewer, Inspector shown", exempt: [Self.lazyThumbnailRow])
+        captureScreenshot("reader-aa-viewer-inspector-\(appearance)")
+        viewer.typeKey("i", modifierFlags: [.command, .option])
+        XCTAssertTrue(docDate.waitForNonExistence(timeout: 5), "the document window's Inspector should hide")
+
+        // The find bar, its field focused, last: the sweep reports an issue naming no element once per sweep, and
+        // the focused field's editor is one (exempted here alone), so it must not hide one on an earlier screen.
+        viewer.typeKey("f", modifierFlags: .command)
+        let find = viewer.textFields["ar.doc.findField"]
+        XCTAssertTrue(find.waitForExistence(timeout: 5), "⌘F should show the find bar")
+        XCTAssertEqual(find.label, "Find in open documents")
+        let focusDeadline = Date().addingTimeInterval(5)
+        while (find.value(forKey: "hasKeyboardFocus") as? Bool) != true, Date() < focusDeadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertEqual(find.value(forKey: "hasKeyboardFocus") as? Bool, true, "the find field should have the focus")
+        LayoutGuard.waitUntilSettled(viewer)
+        sweep.audit(viewer, screen: "document viewer, find bar",
+                    exempt: [Self.lazyThumbnailRow, AccessibilityAudit.focusedTextFieldOrphan])
+        captureScreenshot("reader-aa-viewer-find-\(appearance)")
         sweep.finish()
     }
 

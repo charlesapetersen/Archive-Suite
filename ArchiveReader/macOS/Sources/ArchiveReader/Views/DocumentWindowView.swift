@@ -260,6 +260,7 @@ struct DocumentWindowView: View {
                 .frame(maxWidth: 260)
                 .focused($findFocused)
                 .onSubmit { model.findNext() }
+                .accessibilityLabel("Find in open documents")   // the prompt alone is not a description
                 .accessibilityIdentifier("ar.doc.findField")
             Button { model.findPrevious() } label: { Image(systemName: "chevron.up") }
                 .help(ReaderCommand.findPrevious.help)

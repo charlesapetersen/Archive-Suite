@@ -20,13 +20,14 @@ public struct FieldStatusBadge: View {
 
     public var body: some View {
         Label {
-            Text(status.level.label).foregroundStyle(.secondary)
+            Text(status.level.label)   // not `.secondary`: 3.95:1 at caption size in light mode
         } icon: {
             Image(systemName: status.level.symbol).foregroundStyle(Self.color(status.level))
         }
         .font(.caption)
         .help(status.detail)
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isStaticText)   // an ignored-children Label has no role of its own
         .accessibilityLabel(status.level.label)
         .accessibilityValue(status.detail)
     }
@@ -53,7 +54,7 @@ public struct FieldStatusRow: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
-                Text(name).font(.callout).foregroundStyle(.secondary)
+                Text(name).font(.callout)   // not `.secondary`: 3.95:1 at callout size in light mode
                 Spacer(minLength: 8)
                 FieldStatusBadge(status).accessibilityIdentifier(identifier + ".status")
             }

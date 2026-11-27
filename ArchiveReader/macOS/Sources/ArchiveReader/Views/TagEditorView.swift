@@ -38,7 +38,7 @@ struct TagEditorView: View {
             }
             .padding()
             Text(files.count == 1 ? (files.first?.name ?? "") : "Changes apply to all selected files.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption)   // not `.secondary`: 3.95:1 at caption size in light mode
                 .lineLimit(2).padding(.horizontal).padding(.bottom, 8)
             Divider()
             ScrollView {
@@ -426,7 +426,7 @@ struct TagEditorView: View {
     @ViewBuilder private var flagSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             title("Flag")
-            Text("Stored in the app — never written to the file.").font(.caption).foregroundStyle(.secondary)
+            Text("Stored in the app — never written to the file.").font(.caption)   // not `.secondary`: 3.95:1
             Button { toggleFlag() } label: { Label("Toggle flag", systemImage: "flag") }
         }
     }

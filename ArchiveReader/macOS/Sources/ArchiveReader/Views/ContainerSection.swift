@@ -53,10 +53,10 @@ struct ContainerSection: View {
                 }
             } else {
                 Text("No box, folder or collection is recorded for this file.")
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(.callout)   // not `.secondary`: 3.95:1 at callout size in light mode
             }
             if let field = editing, !(detail?.rows.contains { $0.field == field } ?? false) {
-                Text(field.label).font(.callout).foregroundStyle(.secondary)
+                Text(field.label).font(.callout)   // not `.secondary`: 3.95:1 at callout size in light mode
                 editorField(field)
             }
             if let error {
