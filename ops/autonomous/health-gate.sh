@@ -418,6 +418,9 @@ step e2e-cleanup-proof python3 "$ROOT/ArchiveProcessor/scripts/test-e2e-cleanup.
 step smoke-teardown-proof python3 "$ROOT/ArchiveProcessor/scripts/test-smoke-teardown.py"
 step reader bash -c 'cd ArchiveReader/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveReader -destination "platform=macOS" -only-testing:ArchiveReaderTests -derivedDataPath ./build/gate-DD'
 step notes  bash -c 'cd ArchiveNotes/macOS  && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveNotesUnit -destination "platform=macOS" -only-testing:ArchiveNotesTests -derivedDataPath ./build/gate-DD'
+# W49.proc-unit-test-target: ProcessorCore's XCTest bundle. Not app-hosted, so it builds neither the app nor a
+# window; the ArchiveProcessorUnit scheme leaves the UI-test runner out. Seconds, free.
+step processor-unit bash -c 'cd ArchiveProcessor/macOS && xcodegen generate >/dev/null 2>&1 && xcodebuild test -scheme ArchiveProcessorUnit -destination "platform=macOS" -only-testing:ArchiveProcessorTests -derivedDataPath ./build/gate-DD'
 # Processor: build then launch the SAME gate artifact, free. The recovery driver is synthetic/headless
 # ($0, no network, no OCR, no GUI) and confirms the app reached main; a build alone cannot catch a pre-main
 # abort. `ARCHIVEPROC_TEST_BINARY` is explicit so this cannot accidentally pass against stale build/DD.

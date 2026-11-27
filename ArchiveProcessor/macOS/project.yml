@@ -29,6 +29,9 @@ packages:
   # Vision OCR's engine (W42.int-s1); the Processor reads every page through its PageReader protocol (W42.int-s2).
   VisionOCRKit:
     path: ../../packages/VisionOCRKit
+  # The Processor's pure logic, tested by ArchiveProcessorTests without launching the app (W49.proc-unit-test-target).
+  ProcessorCore:
+    path: ../ProcessorCore
 
 targets:
   ArchiveProcessor:
@@ -63,6 +66,7 @@ targets:
       - package: ArchiveCore
       - package: VisionOCRKit
         product: VisionOCRKit
+      - package: ProcessorCore
     # The pinned static PDFium the Improve OCR writer links (W44.reocr-processor; owner, 2026-11-12). The script checks
     # the installed copy's SHA-256 and installs it from the machine's cached zip when missing; it never downloads.
     # Static because a separate dylib cannot pass library validation under the suite's self-signed certificate.
@@ -91,8 +95,8 @@ targets:
           # Xcode 16 otherwise puts the app body in ArchiveProcessor.debug.dylib. The suite's local
           # self-signed certificate has no Team ID, so hardened-runtime library validation rejects that
           # dylib at launch even though both files use the same identity (W28.cert-fu2). Processor has no
-          # app-hosted XCTest target and no SwiftUI previews, so keep the ordinary executable layout in
-          # Debug instead of weakening library validation.
+          # app-hosted XCTest target (ArchiveProcessorTests is not hosted) and no SwiftUI previews, so keep
+          # the ordinary executable layout in Debug instead of weakening library validation.
           ENABLE_DEBUG_DYLIB: NO
         Release:
           # Measured on the signed product: Xcode injected get-task-allow even though the shared entitlement
@@ -104,6 +108,22 @@ targets:
       properties:
         com.apple.security.network.client: true
         com.apple.security.files.user-selected.read-write: true
+
+  # Unit tests of ProcessorCore (W49.proc-unit-test-target). Deliberately NOT app-hosted: it depends on the package,
+  # not the app, so no TEST_HOST, and the app keeps ENABLE_DEBUG_DYLIB: NO with no debug entitlement. New non-UI
+  # tests go here rather than into a new `#if DEBUG` driver; run them with the ArchiveProcessorUnit scheme.
+  ArchiveProcessorTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/ArchiveProcessorTests
+    dependencies:
+      - package: ProcessorCore
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.archiveprocessor.tests
 
   ArchiveProcessorUITests:
     type: bundle.ui-testing
@@ -129,14 +149,26 @@ targets:
         ENABLE_HARDENED_RUNTIME: NO
 
 schemes:
+  # The unit tests alone: builds ProcessorCore and the test bundle, never the app or the UI-test runner.
+  ArchiveProcessorUnit:
+    build:
+      targets:
+        ArchiveProcessorTests: [test]
+    test:
+      config: Debug
+      targets:
+        - ArchiveProcessorTests
+
   ArchiveProcessor:
     build:
       targets:
         ArchiveProcessor: all
+        ArchiveProcessorTests: [test]
         ArchiveProcessorUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
+        - ArchiveProcessorTests
         - ArchiveProcessorUITests

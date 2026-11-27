@@ -175,7 +175,7 @@ xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./buil
 (cd ../ArchiveCaptureiOS && xcodegen generate && \
  xcodebuild -scheme ArchiveCaptureiOS -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath ./build/DD build)
 ```
-`-derivedDataPath` does **not** isolate the shared user-level Clang cache (`CACHE_ROOT`) — not fully sandboxed.
+`-derivedDataPath` does **not** isolate the shared user-level Clang cache (`CACHE_ROOT`).
 
 **Ownership lanes** (one instance per lane): Android `ArchiveCapture/`; iPhone `ArchiveCaptureiOS/` (Swift 5;
 gate step `ios-build`); macOS OCR core `Sources/ArchiveProcessor/{OCR, Models, Capture, Net}`; macOS Views +
@@ -222,43 +222,45 @@ the diff (`/code-review`, or read it critically).
 **Tier 2 — anything with no undo, any diff size:** a multi-agent *adversarial* review plus a targeted functional
 test where feasible, for edits to `Capture/`, `Net/` (durability, protocol, crash-recovery/manifest); file-writing
 tag/output code (`Tagging/MacOSTagger.swift`, PDF/image output, collection numbering that could **overwrite**
-files); batch/manifest persistence; `@MainActor`/`Sendable`/actor isolation. **For `Capture/`/`Net/` the
-functional test is `scripts/e2e-phone-mac.sh`.**
+files); batch/manifest persistence; `@MainActor`/`Sendable`/actor isolation (`Capture/`/`Net/`: the
+phone↔Mac E2E below).
 
 **Tier 3 — before every release:** a multi-agent *find → refute* review of the whole diff since the last release,
 plus a **live smoke test** if the OCR/tagging/PDF path changed. Release only when clean.
 
-**Always adversarially *verify* findings before acting:** a second agent tries to refute each (default "not a bug").
+**Verify findings before acting:** a second agent tries to refute each (default "not a bug").
 
 **Env-gated drivers are Debug-only (W40.a5):** every `*TestDriver.swift`, `SegmentationProofDriver.swift`,
 `*Contract.swift`, their `ContentView` dispatch and `NetworkSession.activeTestTransport`'s stub branch sit whole in
 `#if DEBUG`, and a new driver too (`scripts/lint-release-drivers.sh` fails one without); scripts run Debug.
 `nm <Release binary> | swift demangle | grep -E 'TestDriver|Contract'` must print nothing.
 
-**Smoke tests** before pushing an OCR/pipeline change: `ArchiveProcessor/test-smoke.sh` (headless real pipeline,
-2 tiny images, a few cents; Keychain key, never printed or persisted; scratch I/O only, never `Test Files/` or a real corpus); `./test-smoke.sh
-archivecore|processor|reader|notes|all` (Suite root); `scripts/test-smoke.sh`, `scripts/test-tier2.sh`.
+**New non-UI tests go in `ArchiveProcessorTests`, not a new driver:** pure logic moves to package `ProcessorCore`,
+run by `xcodebuild test -scheme ArchiveProcessorUnit -only-testing:ArchiveProcessorTests`; a driver moves when next
+touched. REFERENCE.md §"Unit tests (ProcessorCore)".
 
-**Visual:** XCUITest sees no pixels. UI runs off-screen in the VM: `ops/gui/vm-gui-runner.sh processor xcuitest` ($0; headless, guest `mktemp` paths: no key, CLI
-login or real corpus) or
-`… processor sighted` (pixels). See `AGENTS.md` → *GUI verification*.
+**Smoke tests** before pushing an OCR/pipeline change: `ArchiveProcessor/test-smoke.sh` (real pipeline, 2 tiny
+images, a few cents; Keychain key never printed or persisted; scratch I/O only, never `Test Files/` or a real corpus);
+`./test-smoke.sh archivecore|processor|reader|notes|all` (Suite root); `scripts/test-tier2.sh`.
+
+**Visual:** XCUITest sees no pixels. UI runs off-screen in the VM: `ops/gui/vm-gui-runner.sh processor xcuitest|sighted`
+($0; guest `mktemp` paths, no key, CLI login or real corpus). See `AGENTS.md` → *GUI verification*.
 
 **Phone↔Mac E2E** (`scripts/E2E-PHONE-MAC.md`): `OCR_KEY=<key> caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh`
-(a few cents): the Tier-2 gate for `Capture/`/`Net/`, **not** per-commit. Needs the Mac free + awake (don't drive
-its GUI meanwhile). Auto-finalize is gated on `LIVECAPTURE_TESTOUT` so it can never file into the real corpus; its
-inject seam is debug-only. Prerequisites and pairing (never USB): REFERENCE.md §Verification & review policy.
+(a few cents): the Tier-2 gate for `Capture/`/`Net/`, **not** per-commit. Auto-finalize is gated on
+`LIVECAPTURE_TESTOUT`, never the real corpus. Mac free + awake, prerequisites, pairing (never USB): REFERENCE.md
+§Verification & review policy.
 
-**Cadence:** push often (clean build + Tier-1, plus Tier-2 where it applies); a DMG + GitHub release is the sparse
-milestone, gated by the Tier-3 review. Push often, release rarely.
+**Cadence:** push often (Tier-1, plus Tier-2 where it applies); release rarely, behind the Tier-3 review.
 
 ## Releasing (macOS DMG + GitHub release)
 
 - Releases ship in the combined Suite DMG, tagged `suite-vMAJOR.MINOR.PATCH` (root [`../CLAUDE.md`](../CLAUDE.md)
   §*Releasing*); the bare `vX.Y.Z` tags (to `v3.8.2`) are this app's pre-merge history. `CFBundleShortVersionString` stays "1.0".
-  Patch for internal-only changes, minor for user-facing features. Distribution is owner-only.
+  Owner-only distribution; bumps: REFERENCE.md §Releasing.
 - Signed with the self-signed **`CODE_SIGN_IDENTITY: "Archive Suite Dev"`** (not ad-hoc), not notarized. The
   target **declares no** `get-task-allow` / `disable-library-validation`; Debug sets `ENABLE_DEBUG_DYLIB: NO`
-  (W28.cert-fu2; valid while there is no app-hosted XCTest target or SwiftUI previews); Release keeps hardened runtime + strict library validation and
+  (W28.cert-fu2; valid with no app-hosted tests or previews); Release keeps hardened runtime, strict library validation and
   `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO`. **⛔ The Release signature must contain neither debug entitlement.**
   Why: REFERENCE.md §Releasing.
 - **Call `gh` by full path, `/opt/homebrew/bin/gh`** — a shadowing Python `gh` is first on `PATH`.

@@ -49,27 +49,8 @@ enum RotationRuleTestDriver {
             results.append("\(condition ? "PASS" : "FAIL"): \(name)")
         }
 
-        // 1. The rule's verdicts.
+        // 1. The rule's verdicts: ArchiveProcessorTests/RotationAgreementTests (W49.proc-unit-test-target).
         typealias V = OCRProcessor.RotationVerdict
-        let answers: @Sendable (Int?) -> (@Sendable () async -> Int?) = { value in { value } }
-        check("1 agreement settles the page", await OCRProcessor.agreementVerdict(vision: 90, lcnet: 90, cloud: nil) == V(correction: 90))
-        check("1 agreement does not call the cloud",
-              await OCRProcessor.agreementVerdict(vision: 0, lcnet: 0, cloud: { 270 }) == V(correction: 0))
-        check("1 a disagreement with no cloud route is left as it is, unsure",
-              await OCRProcessor.agreementVerdict(vision: 90, lcnet: 270, cloud: nil) == V(correction: 0, unsure: true))
-        check("1 Vision abstaining with no cloud route is left as it is, unsure",
-              await OCRProcessor.agreementVerdict(vision: nil, lcnet: 180, cloud: nil) == V(correction: 0, unsure: true))
-        check("1 PP-LCNet answering nothing never settles a page",
-              await OCRProcessor.agreementVerdict(vision: 90, lcnet: nil, cloud: nil) == V(correction: 0, unsure: true))
-        check("1 a build without PP-LCNet runs Vision alone, every page unsure",
-              await OCRProcessor.agreementVerdict(vision: 90, lcnet: nil, cloud: nil, lcnetLoaded: false)
-                == V(correction: 90, unsure: true))
-        check("1 a disagreement takes the cloud's answer",
-              await OCRProcessor.agreementVerdict(vision: 90, lcnet: 270, cloud: answers(180)) == V(correction: 180))
-        check("1 a failed cloud call falls back to Vision, unsure",
-              await OCRProcessor.agreementVerdict(vision: 90, lcnet: 270, cloud: answers(nil)) == V(correction: 90, unsure: true))
-        check("1 a failed cloud call with Vision abstaining is unsure",
-              await OCRProcessor.agreementVerdict(vision: nil, lcnet: 270, cloud: answers(nil)) == V(correction: 0, unsure: true))
 
         // 2. Which backends have a comparative call, and which escalate under the rule.
         let remote = GatewayConfig(baseURL: "https://gateway.invalid/v1", modelID: "gpt-x", displayName: "G")

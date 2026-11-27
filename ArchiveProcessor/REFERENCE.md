@@ -851,6 +851,27 @@ example script lives at `.maintenance/` during active maintenance sessions.
 
 ---
 
+### Unit tests (ProcessorCore) — W49.proc-unit-test-target
+
+Owner, 2026-11-24 (Phase 3 pre-release hygiene): new non-UI tests stop adding to the inline `#if DEBUG` drivers
+(about 40,700 lines, 35.6% of the app target when the item was filed). The pieces:
+- **`ArchiveProcessor/ProcessorCore`** — a local Swift package of pure logic: values in, values out, with no AppKit,
+  Keychain, network, file writes or app state. The app links it statically, as it does ArchiveCore and VisionOCRKit.
+  Its types are `public`; the app may keep a `typealias` where existing code names the old nested type
+  (`OCRProcessor.RotationVerdict`).
+- **`ArchiveProcessorTests`** (`macOS/Tests/ArchiveProcessorTests`) — an XCTest bundle that depends on the package,
+  **not on the app**, so it has no `TEST_HOST`: nothing launches, nothing draws, and the app's signing stays as
+  *Releasing* describes (no debug dylib, no debug entitlement). An app-hosted bundle would need the Reader/Notes
+  Debug entitlements; do not add one without revisiting W28.cert-fu2.
+- **`ArchiveProcessorUnit` scheme** builds only the package and the bundle (seconds):
+  `cd macOS && xcodegen generate && xcodebuild test -scheme ArchiveProcessorUnit -destination platform=macOS
+  -only-testing:ArchiveProcessorTests -derivedDataPath ./build/DD`. The `ArchiveProcessor` scheme lists the bundle
+  too. Health-gate step `processor-unit`.
+- **Migration is lazy:** when a change touches a driver's pure section, move the logic into ProcessorCore and the
+  checks into XCTest, leaving the driver only what needs the app (the gateway seam, the bundled model, the run's
+  summary). First move: the rotation agreement rule (`RotationAgreement.verdict`, from `RotationRuleTestDriver`
+  section 1). Logic that needs app types is not moved by dragging those types along; move it when it can stand alone.
+
 ## Releasing (macOS DMG + GitHub release)
 
 Release builds run `scripts/bundle-compression-tools.py` before Xcode signs the app (W42.int-s5-compress-ship).
