@@ -8,9 +8,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b3`, 2026-10-21.
   checklist §2.0-2.14, Tier 2D driver list), `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` (Runs A-C, Mac side
   only), and `SPEC/tag-format.md` (§Invariants 3, 5, 6, 7 and §2-page PDF structure).
 - **Sources read at:** `8a03097c`; code traced at the same commit.
-- **Count:** `unproven 39 · works 10 · broken 2 · fixed-pending-recheck 1 · unverifiable-here 1` (2026-11-19, after
-  `W40.fix-processor-non-reading-reply`; works: P-19, P-27, P-33, P-34, P-38, P-40, P-45, P-47, P-50, P-53; broken: P-23,
-  P-32; fixed-pending-recheck: P-29).
+- **Count:** `unproven 32 · works 13 · broken 5 · unverifiable-here 1 · verified 2` (2026-11-26, after `W40.h2` re-checked the `fixed-pending-recheck` rows at HEAD: works: P-03, P-14, P-19, P-27, P-32, P-33, P-34, P-37, P-38, P-40, P-45, P-47, P-53; broken: P-17, P-23, P-39, P-48, P-50; unverifiable-here: P-10; verified: P-25, P-26). P-25 and P-26 read `verified`, which is not a README status (left for their owner item).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first, before any
 implementation file was opened (`d3db14f3`). The rest was traced afterwards by four read-only passes, and every
@@ -118,15 +116,20 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `ProcessorUITests.testAnthropicGuidedKeySetupShowsConsoleCostPrivacyAndKeyShape` opens the
   wizard from Settings and checks the Anthropic page text. The tests leave two paths open: the first-run
   presentation and a successful save to a real Keychain.
-- **Runtime evidence:** The [independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md)
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md) (W40.h2, see History). Earlier: The [independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md)
   showed Validated beside an empty OpenAI field. `MessageJourneyUITests.testWizardReportsRefusedKeySave` now
   drives the same Validate button with a successful synthetic provider reply and a refused save. It checks the
   wizard's provider result and Keychain warning, then checks **Save failed** in Accounts after revisiting the panel.
-- **Status:** `fixed-pending-recheck` — W49.proc-fix-s024 for S-024.
+- **Status:** `unproven` — the S-024 fix holds (W40.h2); the first-run presentation and a real Keychain save are unshown.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-21 W49.proc-suspects-messages-check — S-024, see runtime evidence.
   - 2026-11-22 W49.proc-fix-s024 — the wizard reports the Keychain refusal and Accounts shows it.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `unproven`: at `8e327cfb` in the macOS 27.2 guest,
+    `testWizardReportsRefusedKeySave` and `testAnthropicGuidedKeySetup…` pass and the screenshots show the Keychain
+    refusal in the wizard and Save failed in Accounts, so S-024's defect is gone; the row stays short of `works` on
+    the first-run presentation and a successful save to a real Keychain
+    ([`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md)).
 - **Notes:** **Drift.** The key is confirmed by a cheap model-list call (`OCR/KeyValidator.swift:48`), not a sample
   OCR, and saved straight after (`Views/ProviderKeyWizard.swift:206`); the sample OCR is a separate optional
   button. The format check only shows a caption (`:144-147`), it does not block Validate. The wizard covers
@@ -676,15 +679,18 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`OCR/MistralClient.swift:60`).
 - **Real-path test:** `scripts/test-tier2.sh` cases 03-04 (paid; ground truth only warns below 60%). Nothing
   exercises the Mistral heuristic.
-- **Runtime evidence:** W40.d1, 2026-11-18: 110 of 113 photos classified, 97 as the truth has them; 3 replies that were not a
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md) (W40.h2, see History). Earlier: W40.d1, 2026-11-18: 110 of 113 photos classified, 97 as the truth has them; 3 replies that were not a
   reading kept as the page text with no classification and the job `succeeded` ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
-- **Status:** `fixed-pending-recheck` — `W40.fix-processor-non-reading-reply`: an OpenRouter or OpenAI reply with no
-  classification line is now `unparsable` (`OCR/OpenAICompatibleClient.swift` `completedReply`), so the page fails and a
-  cascade reads it again; stubbed in `scripts/test-ocr-cascade.sh`. Not yet rechecked on a real run.
+- **Status:** `unproven` — the non-reading-reply fix holds on the stub transport (W40.h2); no real reply and no Mistral heuristic run.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — `unproven` → `broken`: a non-reading reply leaves the image unclassified and counted as succeeded.
   - 2026-11-19 W40.fix-processor-non-reading-reply — `broken` → `fixed-pending-recheck`.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `unproven`: `scripts/test-ocr-cascade.sh` at `8e327cfb`, 75 PASS: a
+    reply with no classification line fails as unparsable and reaches the second reader, on OpenRouter's and OpenAI's
+    routes. Not seen on a real reply (the W40.d1 paid route was the owner's choice for that run; the three replies
+    were not repeatable on demand), and the Mistral heuristic is still unexercised
+    ([`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md)).
 - **Notes:** **Drift.** For pre-OCRed PDFs Mistral classifies with a `mistral-small-latest` chat call
   (`OCR/OCRProcessor+OCR.swift:614-615`), not heuristics. Apple Vision returns no classification
   (`OCR/VisionClient.swift:112-114`) unless its LLM judgement is on.
@@ -701,20 +707,25 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   Process Files (`Views/OCRView.swift:539`) and Settings (`Views/SettingsView.swift:874`) → stored in
   `DefaultsKeys.segmentationApproach`, read at Start (`OCR/OCRProcessor+Pipeline.swift:297`); row text and cost
   `SegmentationRow.make` (`Segmentation/SegmentationChooser.swift`).
-- **Real-path test:** `ArchiveProcessorUITests/ProcessorUITests.testSegmentationChooserShowsEachApproachWithFiguresAndCost`
+- **Real-path test:** `ArchiveProcessorUITests/ProcessorUITests.testSegmentationChooserOffersEachApproachAndTheSheetShowsTheFigures`
   drives the real picker; `scripts/test-segmentation-chooser.sh` checks the figures. Not covered: the `glm` and
   `local` rows, plan-versus-key cost lines, the Gemini preselect.
-- **Runtime evidence:** The [independent VM reproduction](evidence/processor/W49.proc-suspects-money-check.md)
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md) (W40.h2, see History). Earlier: The [independent VM reproduction](evidence/processor/W49.proc-suspects-money-check.md)
   recorded three OpenAI OCR requests before the missing Gemini key appeared. The replacement Tart regression
   `MoneyJourneyUITests.testMissingGeminiSegmentationKeyBlocksStartBeforeAnyRead` sees the reason at Start,
   checks the disabled button and presses ⌘R with zero requests recorded. The accompanying eligibility test
   covers manual segmentation, No tagging and a pre-grouped photo handoff. The `W36.seg-opt-proof` record in
   `SUITE_TODO_DONE.md` ran the approaches end to end before this ledger.
-- **Status:** `fixed-pending-recheck` — W49.proc-fix-s032 for S-032.
+- **Status:** `unproven` — the S-032 fix holds (W40.h2); the `glm` and `local` rows, plan-versus-key cost and the Gemini preselect (S-054) are unshown.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
   - 2026-11-22 W49.proc-fix-s032 — Start applies the selected window route's credential rules before reading.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `unproven`: both `MoneyJourneyUITests` and the chooser UITest pass in
+    the guest; the screenshot shows Start greyed with "Segmentation: Gemini needs an API key".
+    `test-segmentation-chooser.sh` 127 of 128: the one failure is the preselect suspect S-054
+    (`W49.proc-s054-verify`). The Real-path test's name was stale and is corrected
+    ([`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md)).
 - **Notes:** **Drift.** ChatGPT gets tokens and an approximate dollar figure, not a plan share
   (`Segmentation/SegmentationChooser.swift:253-257`); only Claude has a meter.
 
@@ -845,20 +856,26 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `scripts/test-tag-vocabulary.sh` (copy-source verbatim). The independent VM journey selects both modes and reads
   the tags of the filed PDFs. Auto date and Human have no headless run
   (`Capture/ProcessFilesTestDriver.swift:124` refuses them); `ReviewDialogsJourneyUITests` runs Human (W40.d2, VM).
-- **Runtime evidence:** W40.d2, 2026-11-19: Human with the Manual approach writes only the typed tags and `Unread` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md) (W40.h2, see History). Earlier: W40.d2, 2026-11-19: Human with the Manual approach writes only the typed tags and `Unread` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
   Automatic: W40.d1. Auto date remains unproven.
   With Collection ID on, No tagging wrote Box and Folder markers. Copy source file tags wrote those markers but removed both source Finder tags from the label PDFs. All four other PDFs kept both tags. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
   W40.fix-processor-copy-label-tags, 2026-11-23: in the same VM journey, No tagging produced the two
   label markers and four untagged document PDFs. Copy source file tags preserved both source tags
   on all six PDFs and added the respective marker to each label. The input copies kept their tags
   in both runs.
-- **Status:** `fixed-pending-recheck` — W40.fix-processor-copy-label-tags (S-034).
+- **Status:** `unproven` — No tagging and Copy source shown at HEAD (W40.h2); Auto date has no run.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — stays `unproven`: Human and Automatic shown, the other three not.
   - 2026-11-21 W49.proc-suspects-filing-check — `unproven` → `broken` on this path.
   - 2026-11-23 W40.fix-processor-copy-label-tags — `fixed-pending-recheck`. SPEC invariant 6 records
     owner call 30's label-marker exception.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `unproven`: `testCollectionMarkersWithSourceTags` in the guest. No
+    tagging: the two labels carry only Box and Folder, four PDFs no tags. Copy source: all six keep `1978` and
+    `Scratch Subject`, the labels add their marker; the inputs keep their tags. The test first failed at HEAD because
+    it alone omitted `-segmentationApproach manual` and S-032's guard refused the Gemini default; fixed in the test,
+    assertions unchanged. Auto date remains without a run
+    ([`evidence/processor/W40.h2-recheck.md`](evidence/processor/W40.h2-recheck.md)).
 - **Notes:** **Drift.** `TESTING.md` §2.5 still names "Auto date + manual seg", folded into Auto date by
   `W36.seg-opt-review`.
 

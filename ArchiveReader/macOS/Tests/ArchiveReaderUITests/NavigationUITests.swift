@@ -669,6 +669,33 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertGreaterThanOrEqual(rowCount, 1, "OCR search should keep at least one matching row")
     }
 
+    /// W40.h2 — R-11 (W40.fix-reader-ocr-search-names): the OCR box matches the OCR text only. "NOTEXT" is
+    /// in one file name (`IMG_NOTEXT — Fixture.pdf`, an image-only page with no text layer) and in no
+    /// body, so once the index answers a body term, the name-only term must list nothing.
+    func testOCRSearchDoesNotMatchFileNames() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        let ocrField = app.textFields["ar.filter.ocr"]
+        if !ocrField.exists {
+            pressKey("f", modifiers: [.command, .option])
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        }
+        XCTAssertTrue(ocrField.waitForExistence(timeout: 5), "OCR search field should exist")
+        ocrField.click()
+        ocrField.typeText("California")
+        // The index builds after launch; a body term's snippet is the sign it answers.
+        let snippet = table.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@",
+                                                             "california", "california")).firstMatch
+        XCTAssertTrue(snippet.waitForExistence(timeout: 45), "the index should answer a body term first")
+
+        ocrField.typeKey("a", modifierFlags: .command)
+        ocrField.typeText("NOTEXT")
+        let deadline = Date().addingTimeInterval(5)
+        while rowCount > 0, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+        RunLoop.current.run(until: Date().addingTimeInterval(1))   // a late result would land here
+        XCTAssertEqual(rowCount, 0, "a term found only in a file name should list nothing in the OCR search")
+        captureScreenshot("w40-h2-r11-name-only")
+    }
+
     // MARK: - Matched-identity tag writes (W21.vmgui-e)
 
     /// Exercise all three normal UI write paths that must carry a fresh, matching identity into the

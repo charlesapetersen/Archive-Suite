@@ -276,6 +276,57 @@ final class TriageJourneyUITests: FixtureUITestCase {
         _ = check("net change from the start", from: baseline, expect: net, current: before, canonicalUntouched: true)
     }
 
+    /// W40.h2 — R-20's keys on the list itself, which the journey above leaves unpressed: ⌥⌘] and ⌥⌘[ step
+    /// to the next and previous Unread file and write nothing (⌘] and ⌘[ are Go ▸ Back and Forward since
+    /// W40.reader-back-forward); with the list focused the bare `]` and `[` do the same, and `\` marks the
+    /// selection Read and moves on, like ⌘⇧M.
+    func testTriageKeysStepBetweenUnreadFilesOnTheList() throws {
+        baseline = try snapshot()
+        for (i, path) in baseline.keys.sorted().enumerated() { alias[path] = String(format: "f%02d", i) }
+        waitForRows(minimum: 3, timeout: 20)
+        zoomMainWindow()
+        var before = baseline
+
+        // Two Unread rows with every row between them mapped to a file, so the expected neighbour is known.
+        var pair: (Int, FileState, Int, FileState)?
+        for start in 0..<rowCount where pair == nil {
+            guard let f = fileForRow(start), f.names.contains("Unread"), !f.names.contains("Read") else { continue }
+            var i = start + 1
+            while i < rowCount, let g = fileForRow(i) {
+                if g.names.contains("Unread") {
+                    if !g.names.contains("Read") { pair = (start, f, i, g) }
+                    break
+                }
+                i += 1
+            }
+        }
+        guard let (uRow, u, vRow, v) = pair else {
+            return XCTFail("the list should show two Unread files with no unmapped row between them")
+        }
+        log("[h2] R-20 keys on the list: \(alias[u.path] ?? "?") row \(uRow), next Unread \(alias[v.path] ?? "?") row \(vRow)")
+
+        clickRow(uRow)
+        pressKey("]", modifiers: [.command, .option])
+        XCTAssertTrue(waitFor { self.selectedNames() == [v.name] }, "⌥⌘] should select the next Unread file")
+        pressKey("[", modifiers: [.command, .option])
+        XCTAssertTrue(waitFor { self.selectedNames() == [u.name] }, "⌥⌘[ should select the previous Unread file")
+        before = check("R-20 ⌥⌘] then ⌥⌘[ write nothing", from: before, expect: [:])
+
+        clickRow(uRow)
+        pressKey("]", modifiers: [])
+        XCTAssertTrue(waitFor { self.selectedNames() == [v.name] }, "a bare ] on the list should select the next Unread file")
+        pressKey("[", modifiers: [])
+        XCTAssertTrue(waitFor { self.selectedNames() == [u.name] }, "a bare [ on the list should select the previous Unread file")
+        before = check("R-20 bare ] then [ write nothing", from: before, expect: [:])
+
+        pressKey("\\", modifiers: [])
+        before = check("R-20 bare \\ marks Read and advances", from: before,
+                       expect: [u.path: Delta(remove: ["Unread"], add: ["Read"])])
+        XCTAssertTrue(waitFor { self.selectedNames() == [v.name] }, "a bare \\ should move to the next Unread file")
+        log("[h2] R-20 after \\: selection \(selectedNames() == [v.name] ? "moved to the next Unread file" : "NOT moved, \(selectedNames())")")
+        captureScreenshot("w40-h2-r20-keys")
+    }
+
     // MARK: - UI steps
 
     /// Start editing a row's tag token field. A click in a SELECTED row's field starts editing; it must

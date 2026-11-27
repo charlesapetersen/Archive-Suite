@@ -339,7 +339,10 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         }
 
         for (mode, title) in [("none", "No tagging"), ("copySource", "Copy source file tags")] {
+            // Manual segmentation, as in every other journey here: the default window route needs a Gemini
+            // key the guest lacks, and since W49.proc-fix-s032 Start refuses it before any read (W40.h2).
             let out = try launch("s034-\(mode)", [
+                "-segmentationApproach", "manual",
                 "-rotationModeRaw", "off", "-reviewRotation", "NO",
                 "-reviewDocumentSegmentation", "NO", "-outputImageFile", "NO"
             ], collectionID: true, classificationCycle: true, input: input)

@@ -9,7 +9,8 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 27 · works 13 · broken 1 · fixed-pending-recheck 6 · dropped 1` (works: R-17, R-21, R-23, R-25, R-28, R-29, R-30, R-37, R-44, R-45, R-46, R-47, R-48; broken: R-16; fixed-pending-recheck: R-11, R-13, R-20, R-35, R-36, R-43; dropped: R-26). Updated by `W40.g1-reader-2-ledger`, 2026-11-06, from the owner's Reader session 2 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)) and what it left on disk ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
+- **Count:** `unproven 25 · works 18 · broken 3 · fixed-pending-recheck 1 · dropped 1` (2026-11-26, after `W40.h2` re-checked the `fixed-pending-recheck` rows at HEAD: works: R-04, R-11, R-17, R-20, R-21, R-23, R-25, R-28, R-29, R-30, R-36, R-37, R-43, R-44, R-45, R-46, R-47, R-48; broken: R-12, R-13, R-16; fixed-pending-recheck: R-35; dropped: R-26).
+  Earlier: Updated by `W40.g1-reader-2-ledger`, 2026-11-06, from the owner's Reader session 2 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)) and what it left on disk ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -97,13 +98,19 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   including neighbors and Find, and `CloudDocumentPlaceholder` provides the download action in both views.
 - **Real-path test:** `ArchiveReaderTests/ContentIndexerDatalessTests.testDatalessFileIsNeverOpenedAndItsDisposableContentRowIsRemoved`;
   `.testRacePathPDFOpenRunsInsideNoMaterialisationPolicy`.
-- **Runtime evidence:** [S-002 reproduction and regression](evidence/reader/W49.reader-s002-reproduce-check.md).
-- **Status:** `fixed-pending-recheck` · `W49.fix-reader-dataless-prefetch`
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md) (W40.h2, see History). Earlier: [S-002 reproduction and regression](evidence/reader/W49.reader-s002-reproduce-check.md).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-21 W49.reader-s002-reproduce-check — independently reproduced and queued the fix.
   - 2026-11-21 W49.fix-reader-dataless-prefetch — the app-hosted OneDrive probe and both viewer UI regression
     tests cover the download boundary. The original prefetch probe is now an opt-in app-hosted test.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`: at `8e327cfb`, `CloudDocumentUITests` (document window and
+    Space preview) pass in the macOS 27.2 guest; the screenshots show "This PDF is in the cloud" with Download and
+    Show before any page, then the pages after it. `ContentIndexerDatalessTests` and
+    `ArchiveLinkWriterTests.testBatchLinksSkipKnownDatalessFiles` pass on the host. The real File Provider probe
+    is the fix's OneDrive run, after the independent reproduction
+    ([`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md)).
 
 ### R-05 · Chronological default sort
 
@@ -234,10 +241,10 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `refreshFullTextSearchIfActive` (`NavigationModel.swift:697`, wired at `:184`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testOCRSearchShowsKeywordInContextSnippet`,
   `.testOCRSearchFieldExists`; `ArchiveReaderTests/ContentIndexTests.testBm25RankedSearch`, `.testOCRTextSearchSkipsNameAndClassification`.
-- **Runtime evidence:** [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md). On the `W40.c2` sample's real OCR text, and on that text replicated to 102,478
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md) (W40.h2, see History). Earlier: [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md). On the `W40.c2` sample's real OCR text, and on that text replicated to 102,478
   rows: single distinctive terms answer in 11–146 ms at 102k, `the` in 0.7 s, but `Bureau of the Budget` takes
   2.2 s on the sample and **41.7 s** at 102k (`-O`). Index build: 5,268 PDFs in 9.2 s, one pass. After `W40.fix-reader-fts-snippet-stall`: 12.8 ms on the sample and **271 ms** at 102k, all 215 previews ([`evidence/reader/W40.fix-reader-fts-snippet-stall.md`](evidence/reader/W40.fix-reader-fts-snippet-stall.md)). After `W40.fix-reader-fts-snippets`, hits the search left without a preview get one as their rows are drawn: at 102k the first 1,000 hits of each query have one wherever the row has body text, no fill call holding the index over 37 ms ([`evidence/reader/W40.fix-reader-fts-snippets.md`](evidence/reader/W40.fix-reader-fts-snippets.md)).
-- **Status:** `fixed-pending-recheck`
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d7 — `unproven` → `broken`: a multi-word query with common words takes 42 s at corpus size; filed `W40.fix-reader-fts-snippet-stall` (S2).
@@ -246,6 +253,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-11-05 W40.fix-reader-fts-snippets — `works` → `fixed-pending-recheck`: the owner's Reader session 1 (2026-11-04) found hits without a snippet after a slow query. Missing snippets are now filled in, off the main thread, as rows are drawn, and a query of stop words alone is quoted by scanning the body (one `snippet()` call for `the` took 0.9 s). At 102k, `Bureau of the Budget` 190 of 190 hits, `the` 981 of the first 1,000; the hits left without one are photographs with no text. [`evidence/reader/W40.fix-reader-fts-snippets.md`](evidence/reader/W40.fix-reader-fts-snippets.md).
   - 2026-11-06 W40.fix-reader-ocr-search-names — stays `fixed-pending-recheck`: the owner's Reader session 2 (row 22) found "Riesman" listing files with the word only in the file name. The box (and its smart-folder rule) now match the body column alone, `body : (…)`; Advanced Search's "Any text" still reaches names. Test with a name-only and a classification-only hit.
   - 2026-11-06 W40.g1-reader-2-ledger — stays `fixed-pending-recheck`. In the owner's session 2, before the fix above, every hit with text had its snippet (session 1's complaint, seen fixed on the owner's pages), but the box matched file names (row 22, B; the fix above). The name fix itself has not been seen by the owner ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md), task 6).
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`: new `NavigationUITests.testOCRSearchDoesNotMatchFileNames`
+    in the guest: once the index answers `California` with a snippet, `NOTEXT`, which is only in the name
+    `IMG_NOTEXT — Fixture.pdf`, shows "0 shown · 12 total" and "No matches". The snippet test and
+    `ContentIndexTests` pass; speed at size is the W40.fix-reader-fts-snippets evidence
+    ([`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md)).
 - **Notes:** **Drift.** The search runs as you type, after 150 ms. There is no `.onSubmit` on the field, so
   `SMOKE_TEST.md` step G's "Submit-on-Return" is out of date. The behaviour is arguably better, but the record
   is wrong.
@@ -424,23 +436,33 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 
 ### R-20 · Keyboard triage
 
-- **Promise:** ⌘] and ⌘[ jump to the next and previous unread file. ⌘⇧M marks the selection Read and moves to
-  the next unread. With the list focused, the bare keys `]`, `[` and `\` do the same, and they never fire
-  inside a text field.
-- **Promised in:** `CLAUDE.md` §Keyboard map (G4).
-- **Reached by:** ⌘] and ⌘[ (`ArchiveReaderCommands.swift:87-90`) and ⌘⇧M (`:101-102`). The bare keys are
-  `.onKeyPress` handlers on the table (`Views/NavigationWindowView.swift:149-156`). They call `selectNextUnread`
-  (`Views/NavigationModel.swift:1132`), `selectPreviousUnread` (`:1134`) and `markReadAndAdvance` (`:1160`).
-- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 1), ⌘⇧M only. For the pure helper, `ArchiveReaderTests/TriageTests.testNextUnreadSkipsReadRows`,
-  `.testNextUnreadWrapsAround` and `.testPreviousUnreadSkipsReadRowsAndWraps` test the pure `TriageNavigation`.
-  Nothing calls `markReadAndAdvance` or presses a key.
-- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): ⌘⇧M marked the file Read and selected the next Unread file in the list.
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Promise:** ⌥⌘] and ⌥⌘[ jump to the next and previous unread file (⌘] and ⌘[ until `W40.reader-back-forward`
+  gave them to Go ▸ Back and Forward). ⌘⇧M marks the selection Read and moves to the next unread. With the list
+  focused, the bare keys `]`, `[` and `\` do the same, and they never fire inside a text field.
+- **Promised in:** `REFERENCE.md` §Keyboard map, "Keyboard triage (G4)" (moved from `CLAUDE.md`).
+- **Reached by:** Go ▸ Next / Previous Unread (`ArchiveReaderCommands.swift:271-274`, keys in
+  `Core/ReaderCommandTable.swift:233-234`) and Mark Read & Next (`ArchiveReaderCommands.swift:285-288`). The bare
+  keys are `.onKeyPress` handlers on the table (`Views/NavigationWindowView.swift:265-267`). They call
+  `selectNextUnread` (`Views/NavigationModel.swift:2939`), `selectPreviousUnread` (`:2941`) and
+  `markReadAndAdvance` (`:2967`).
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageKeysStepBetweenUnreadFilesOnTheList`
+  (⌥⌘], ⌥⌘[, bare `]`, `[` and `\` on the list, with the whole root's tags checked after each);
+  `.testTriageWritesKeepEveryOtherTagColourAndByte` (step 1 ⌘⇧M; step 2a the bare keys typed into the inline
+  editor). For the pure helper, `ArchiveReaderTests/TriageTests.testNextUnreadSkipsReadRows`,
+  `.testNextUnreadWrapsAround` and `.testPreviousUnreadSkipsReadRowsAndWraps`.
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md) (W40.h2, see History). Earlier: 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): ⌘⇧M marked the file Read and selected the next Unread file in the list.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence for ⌘⇧M; stays `unproven`: ⌘]/⌘[ and the bare keys were not pressed. Whether the bare keys fire inside the inline editor is `S-015` (the Space key there does: `W40.fix-reader-inline-keys`).
   - 2026-10-31 W40.fix-reader-inline-keys — `fixed-pending-recheck`: the bare keys stand down while a field editor has focus; in the VM journey (step 2a) Space, `]`, `[` and `\` typed into the inline editor landed in the field and moved nothing. S-015 cleared. ⌘]/⌘[ and the bare keys on the list itself are still unpressed. [`evidence/reader/W40.fix-reader-inline-keys.md`](evidence/reader/W40.fix-reader-inline-keys.md).
   - 2026-11-06 W40.g1-reader-2-ledger — stays `fixed-pending-recheck`: in the owner's session 2 (task 4) ⇧⌘M in the list went through a run of unread files at a good pace ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)). The bare keys, ⌘]/⌘[ and ⇧⌘M from a document window were not reported on.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`. The promise named ⌘]/⌘[, which `W40.reader-back-forward`
+    (2026-11-13) moved to ⌥⌘]/⌥⌘[ as `REFERENCE.md` records; the row is corrected to the guide. New
+    `testTriageKeysStepBetweenUnreadFilesOnTheList` in the guest: ⌥⌘] and ⌥⌘[ and the bare `]` and `[` move
+    between two Unread files writing nothing to the 14 files; `\` marks the first Read and moves to the next; the
+    d8 journey's ⌘⇧M and inline-editor steps pass in the same session
+    ([`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md)).
 
 ### R-21 · Undo a tag change
 
@@ -773,7 +795,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `W40.fix-reader-doc-keys-focus`); the VM interaction check is
   `ArchiveReaderUITests/DocumentPaneKeysUITests.testDocumentPaneKeyboardFocusAndPan` (`W40.fix-reader-doc-keys-focus-ui`).
   Nothing tests the splitter, persistence or ⌥⌘0.
-- **Runtime evidence:** 2026-11-12 · macOS 27.2 guest, `DocumentPaneKeysUITests` on three generated PDFs (two single
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md) (W40.h2, see History). Earlier: 2026-11-12 · macOS 27.2 guest, `DocumentPaneKeysUITests` on three generated PDFs (two single
   pages with a text layer, one image + OCR text pair), 3 of 3 runs: a click in the extracted-text pane moves the focus
   border to it and Zoom In grows its text, not the image; a click on the image moves the border back; with the image
   zoomed past fit, ↓ ↑ → ← each pan the page (122 pt down, 126 pt across), ↑ at the top edge stays put, and no arrow
@@ -781,11 +803,18 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   two-page document (Zoom In zooms its OCR page) and back into extracted text; with the caret in Find, ⌘⇧↓ cycles
   and typing still goes into the field.
 - **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): the 12-pair *00114 Young papers.pdf* opened and paged, and the text size changes worked; the arrow keys did nothing in the document view (row 6), and a click in the text pane did not seem to move the focus (row 7).
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Status:** `fixed-pending-recheck` (builder is not verifier; the VM check cannot run, `W40.fix-reader-docpanekeys-vm-harness`)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `broken`: with the owner watching, ↑/↓ did not scroll (the owner expects the arrow keys to move the image) and a click did not give the text pane the focus border (rows 6, 7, both A; an A row that contradicts the promise counts, as in notes-1). Fix item `W40.fix-reader-doc-keys-focus` (S3). The View menu's "Show All Tabs" was unclear, and the owner asks for a tiled view of all pages (row 9: `W40.reader-tiled-pages`).
   - 2026-11-12 W40.fix-reader-doc-keys-focus-ui — `broken` → `fixed-pending-recheck`: the fix (`W40.fix-reader-doc-keys-focus`, 2026-11-07) passes `DocumentPaneKeysUITests` in the macOS 27.2 guest; the owner's next Reader session rechecks rows 6 and 7.
+  - 2026-11-26 W40.h2 — stays `fixed-pending-recheck`: both `DocumentPaneKeysUITests` fail in the guest at `8e327cfb`
+    at `the Original image page is in the window`, before any key is pressed. The same failure at `d3f04308`, the
+    commit where the test passed 3 of 3 on 2026-11-12, shows the guest's accessibility tree changed, not the app;
+    the screenshot shows the window drawn with the text pane's focus border after a click.
+    `ViewerUITests.testDocumentViewerOpens`, `DocumentPaneInputTests` and `DocumentViewerPagePairTests` pass.
+    Filed `W40.fix-reader-docpanekeys-vm-harness`
+    ([`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md)).
 - **Notes:** **Drift.**
   - No ⏎ handler was found. Only a double-click and ⌘O open the viewer.
   - ⌥⌘0 resets the split to the saved default, not to ⅔.
@@ -806,16 +835,20 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `ArchiveReaderTests/CopyTextCleanerTests.testSingleNewlinesBecomeSpaces`,
   `.testBlankLineIsParagraphBreak` and `.testDeHyphenationJoinsSplitWord` test the cleaner. The VM interaction
   check is `ArchiveReaderUITests/CopyTextPaneUITests` (`W40.fix-reader-copy-text-pane-ui`).
-- **Runtime evidence:** 2026-11-12 · macOS 27.2 guest, `CopyTextPaneUITests` on a generated one-page PDF: a word
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md) (W40.h2, see History). Earlier: 2026-11-12 · macOS 27.2 guest, `CopyTextPaneUITests` on a generated one-page PDF: a word
   double-clicked in the text pane enables Edit ▸ Copy and ⌘C / ⇧⌘C give it; a word double-clicked on the image page
   clears the text pane's highlight and moves the focus border, and both copies give the image's word; Select All in
   the text pane copies `alpha wel-\nfare bravo` plain and `alpha welfare bravo` cleaned.
 - **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): Copy Cleaned for Prose from the image page kept the paragraph breaks on real OCR (`W40.fix-reader-prose-paragraphs`, seen on the owner's pages for the first time). Edit ▸ Copy was greyed (row 10), and no copy command took the selection in the text pane (row 11).
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-06 owner session reader-2 — `unproven` → `broken` (recorded by W40.g1-reader-2-ledger): rows 10, 11 (B) — Edit ▸ Copy greyed, and every copy took the image page, never the text pane's selection; with both panes selected it was unclear which one a copy takes (row 12). Fix item `W40.fix-reader-copy-text-pane` (S2).
   - 2026-11-06 W40.fix-reader-copy-text-pane — `broken` → `fixed-pending-recheck` (recorded by W40.g1-reader-2-ledger; the fix did not edit this row): a one-page PDF's text pane is now a read-only AppKit text view, so ⌘C, ⌥⌘C and the services take its selection, and a selection in one pane clears the other. `DocumentCopyTextPaneTests`; the VM check waits on `W40.vm-macos27-reader`.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`: `CopyTextPaneUITests` passes in the guest, and
+    `DocumentCopyTextPaneTests` and `CopyTextCleanerTests` (including each rule switched off) on the host. The
+    Options toggles themselves are shown only through `AppSettings.copyOptions` in the cleaner calls, not by a
+    click ([`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md)).
 - **Notes:** the code tries the text pane first, then the image pane. If both panes hold a selection, the text
   pane wins.
 
@@ -946,7 +979,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/ViewerUITests.testJPEGImageSwitchIsAvailableAndSticky`;
   `ArchiveReaderTests/DocumentRenderGuardTests.testLinkedJPEGPartnerRendersAndPreferenceRestores`;
   `ArchiveReaderTests/ArchiveLinkWriterTests.testPageLinkCarriesOnlyTheCleanlyResolvedJPEGPartner`.
-- **Runtime evidence:** The W40.a3 screenshots show the JPEG fixture drawn in the preview and the viewer,
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md) (W40.h2, see History). Earlier: The W40.a3 screenshots show the JPEG fixture drawn in the preview and the viewer,
   but they were a suite run (see the header). 2026-11-06 · owner session reader-2, task 3
   ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): the toolbar's PDF / JPEG switch offered JPEG on
   *Cambridge/YUNG 2 8 Scans LLMed/00114 Young papers.pdf*, which has no JPEG (row 8). Checked in the session copy
@@ -956,11 +989,17 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   passed. Screenshots read: on the paired fixture the toolbar shows a live PDF / JPEG capsule with JPEG selected and the
   JPEG drawn; on `IMG_NOTEXT — Fixture.pdf` (no JPEG original) the same place reads a greyed "PDF only" with no capsule
   and no JPEG side, visibly not clickable.
-- **Status:** `fixed-pending-recheck` — `W40.fix-reader-jpeg-switch-missing` (S3); the owner's recheck is row 8's file.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `broken`: the switch is to appear only when the PDF has a JPEG partner (greyed with a tooltip since `W40.fix-reader-jpeg-toolbar`), and the owner saw it offer JPEG on a file with none (row 8, A; contradicts the promise). Fix item `W40.fix-reader-jpeg-switch-missing` (S3).
   - 2026-11-12 W40.fix-reader-jpeg-switch-missing-ui — `broken` → `fixed-pending-recheck`: fix `38a401ce` shipped; the VM UITest passes on macOS 27.2 and the unpaired screenshot shows the greyed "PDF only".
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`: `ViewerUITests.testJPEGImageSwitchIsAvailableAndSticky` and
+    `.testToolbarImageSourceSwitch` pass in the guest (screenshots: the PDF / JPEG capsule on the paired fixture,
+    a greyed "PDF only" on the unpaired one);
+    `DocumentImageSourceTests.testNumberSharedWithOtherJPEGsIsNotAPartner` (the owner's row-8 names on scratch)
+    and the render guard pass on the host
+    ([`evidence/reader/W40.h2-recheck.md`](evidence/reader/W40.h2-recheck.md)).
 - **Notes:** the preview sheet shows the choice but never saves it.
 
 ### R-44 · Durable archive links

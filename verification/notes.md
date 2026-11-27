@@ -13,7 +13,8 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 27 · works 22 · broken 0 · unreachable 0 · fixed-pending-recheck 3` (works: N-04, N-07, N-11, N-12, N-14, N-16, N-17, N-20, N-21, N-29, N-32, N-34, N-35, N-36, N-41, N-43, N-44, N-45, N-49, N-50, N-51, N-52; fixed-pending-recheck: N-19, N-26, N-37). Updated by `W40.g2-notes-2-ledger` from the owner's Notes session 2, 2026-11-06 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)) and what it left on disk ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)): of the nine rows waiting for that recheck, seven to `works`, N-26 to `broken`, and N-22 back to `unproven`; N-04, N-17, N-20, N-21, N-29, N-32, N-36 and N-43 to `works`; N-19 to `broken`. N-26 back to `fixed-pending-recheck` by W40.fix-notes-folder-drag-again (2026-11-08), N-19 by W40.fix-notes-date-cell-erase (2026-11-08, reconciled 2026-11-10).
+- **Count:** `unproven 27 · works 25` (2026-11-26, after `W40.h2` re-checked the `fixed-pending-recheck` rows at HEAD: works: N-04, N-07, N-11, N-12, N-14, N-16, N-17, N-19, N-20, N-21, N-26, N-29, N-32, N-34, N-35, N-36, N-37, N-41, N-43, N-44, N-45, N-49, N-50, N-51, N-52).
+  Earlier: Updated by `W40.g2-notes-2-ledger` from the owner's Notes session 2, 2026-11-06 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)) and what it left on disk ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)): of the nine rows waiting for that recheck, seven to `works`, N-26 to `broken`, and N-22 back to `unproven`; N-04, N-17, N-20, N-21, N-29, N-32, N-36 and N-43 to `works`; N-19 to `broken`. N-26 back to `fixed-pending-recheck` by W40.fix-notes-folder-drag-again (2026-11-08), N-19 by W40.fix-notes-date-cell-erase (2026-11-08, reconciled 2026-11-10).
 
 **Runtime evidence at the initial ledger pass.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -349,13 +350,19 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `ArchiveNotesTests/ItemSortDateTests.testItemSortDateMatchesArchiveCoreSharedFormula` (with `.testMedieval`,
   `.testDecadeStart1970s`, `.testUncertainDateStillSorts`); `NotesSmallSuspectTests.s016HeaderSort` and
   `NotesHeaderSortUITests.testTitleHeaderSortsRowsInBothDirections`.
-- **Runtime evidence:** W49.fix-notes-header-sort verified the Title header on three VM fixture rows. Date order
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md) (W40.h2, see History). Earlier: W49.fix-notes-header-sort verified the Title header on three VM fixture rows. Date order
   began with Moore, Lovelace, My First Note. Two clicks produced Lovelace, Moore, My First Note, then My First
   Note, Moore, Lovelace.
-- **Status:** `fixed-pending-recheck`
+- **Status:** `unproven` — the S-016 header fix holds (W40.h2); the secondary sort menu and the italic uncertain date have no run.
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-21 W49.fix-notes-header-sort — primary header sorting fixed, with both directions tested for Title.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `unproven`:
+    `NotesHeaderSortUITests.testTitleHeaderSortsRowsInBothDirections` passes in the macOS 27.2 guest (both
+    screenshots), and `NotesSortTests`, `ItemSortDateTests` and `NotesSmallSuspectTests.s016HeaderSort` pass on
+    the host, so S-016's defect is gone. Header right-click ▸ Set as Secondary Sort, a Date, Kind or Quality
+    header click and the italic uncertain date are not driven by any run
+    ([`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md)).
 - **Notes:** a non-empty search swaps the sort to relevance and swaps it back on clear
   (`Core/NotesNavigationModel.swift:474-477`). The promise draft records no W9.e2 result.
   W40.e5 raised `S-016` after finding the unused delegate callback.
@@ -749,12 +756,18 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   The uncertain flag goes through `setDateUncertain` (`Core/NotesModel.swift:896`).
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd`;
   `ArchiveNotesTests/FrontMatterDateWriteTests.impossibleDayDowngrades`; `.uncertainSortsByValue`.
-- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 3 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the inspector's typed date field at each precision ("great", owner), and `date: 1959` with `date_uncertain: true` in the store ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). But the list's Date cell erases the date when it is double-clicked and left unchanged (row 11, B). 2026-11-08 · `W40.fix-notes-date-cell-erase` (4ec1caff): `InspectorPanelUITests.testDateAndTagsEditInTheList` seeds a real date, blurs the cell unchanged, and the date stays visible with the Markdown byte-identical, on the macOS 27.2 off-screen VM.
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md) (W40.h2, see History). Earlier: 2026-11-06 · owner session notes-2, task 3 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the inspector's typed date field at each precision ("great", owner), and `date: 1959` with `date_uncertain: true` in the store ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). But the list's Date cell erases the date when it is double-clicked and left unchanged (row 11, B). 2026-11-08 · `W40.fix-notes-date-cell-erase` (4ec1caff): `InspectorPanelUITests.testDateAndTagsEditInTheList` seeds a real date, blurs the cell unchanged, and the date stays visible with the Markdown byte-identical, on the macOS 27.2 off-screen VM.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `broken`: with the owner watching, double-clicking a date in the list, changing nothing and clicking away cleared the date (row 11, B). The cell is the second route to this date (W40.notes-detail-layout; Edit Date in the row's menu is the same editor). Fix item `W40.fix-notes-date-cell-erase` (S2, Tier-2). The inspector's field worked.
   - W40.g2-notes-2-ledger (reconciled 2026-11-10) — `broken` → `fixed-pending-recheck`: `W40.fix-notes-date-cell-erase` shipped (4ec1caff) without moving this row; the cell now commits only an actual edit. Recheck by hand in the next Notes session.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`: in the guest
+    `InspectorPanelUITests.testDateAndTagsEditInTheList` (an unchanged double-click leaves 1968 in the cell and
+    the Markdown byte-identical; screenshot `list-date-unchanged`) and
+    `NotesGUITests.testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd` pass; `FrontMatterDateWriteTests`
+    passes on the host. With the owner's notes-2 run of the inspector field, every part of the promise has a run
+    ([`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md)).
 - **Notes:** `W23.l4-fu` names the off-screen UITest for the 2026-02-31 warning; W40.fix-notes-date-entry
   rewrote it for the typed field (Return applies; February 31 warns and saves the month; a bare year is a
   year; an emptied field clears).
@@ -939,7 +952,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `.testE2_QuickFolderDragOntoMiddleNests`;
   `.testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow`; `.testE2_FolderDropBelowAnOpenFolderBecomesItsFirstChild`;
   `.testE2_NoteDropOnAnyPartOfAFolderRowFilesIntoIt`; `ArchiveNotesUITests/NotesGUITests.testG18_DragFolderOntoFolderReparentsIt`.
-- **Runtime evidence:** 2026-11-08 W40.fix-notes-folder-drag-again: real VNC input in the macOS 27.2 VM
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md) (W40.h2, see History). Earlier: 2026-11-08 W40.fix-notes-folder-drag-again: real VNC input in the macOS 27.2 VM
   passes nesting, unselected-child unnesting, blank-area drag starts, parent-with-child moves and cycle
   refusal, with persisted organization checks; disclosure, click selection, menus and note dragging pass.
   The click-selection UITest passes; raw XCUITest drags still fail in the known macOS 27 harness. Re-run
@@ -951,13 +964,19 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the session store's three folders are all at
   the top level ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)),
   as row 15 says; a note dragged slowly across the folder list landed where the highlight was.
-- **Status:** `fixed-pending-recheck`
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 owner session notes-1 — `unproven` → `broken`: reordering by drag works, but a folder cannot be dragged onto another to nest it, and the drop highlight follows the pointer erratically ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) rows 30-31). Fix item `W40.fix-notes-folder-drag`.
   - 2026-11-05 W40.fix-notes-folder-drag — `broken` → `fixed-pending-recheck`: a sidebar label is 16 of the row's 32 pt, and the gaps around it belonged to the List's `onMove` (reorder only), so only an 8 pt band nested; the row now takes the whole height, and the highlight is drawn by the app from the same resolution the drop performs. Recheck by hand in notes-2.
   - 2026-11-06 owner session notes-2 — `fixed-pending-recheck` → `broken`: folder dragging did not work at all; notes still dragged correctly ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md), row 15).
   - 2026-11-08 W40.fix-notes-folder-drag-again — `broken` → `fixed-pending-recheck`: native List-row payload registration replaces the label's competing tap/drag handlers; real VNC checks pass both directions, including an unselected child and blank row space.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`: all nine `NotesE2FolderTests` pass in the guest, including
+    `testE2_QuickFolderDragOntoMiddleNests` and `testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow`, which
+    could not reach their drop before W40.vm-macos27-notes;
+    `NotesGUITests.testG18_DragFolderOntoFolderReparentsIt` passes;
+    `OrganizationStoreTests.moveFolderCycleGuardRefuses` and `NotesItemDragTests` pass on the host
+    ([`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md)).
 - **Notes:** the W9.e2 result: `W9.e2-folders` found both D1 doubts real. A gap drop re-parented instead of
   reordering (filed `W9.e2-fu1`, fixed `af7d049`), and there was no way back to the top level (fixed by Move to
   Top Level). XCUITest's synthesized drag nested even before the fix, so the tests prove the paths, not the
@@ -1272,13 +1291,18 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover`;
   `ArchiveNotesTests/ReaderRootChooserTests.pickingTheRightRootResolvesTheLink` and
   `.pickingTheWrongRootReportsMismatch`; `ArchiveNotesTests/DurableLinkE2ETests.linkResolvesThenSurvivesComputerMove`.
-- **Runtime evidence:** W49.fix-notes-moved-root, focused off-screen VM preview test with a generated archive.
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** 2026-11-26 · `8e327cfb` · [`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md) (W40.h2, see History). Earlier: W49.fix-notes-moved-root, focused off-screen VM preview test with a generated archive.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-21 W49.fix-notes-moved-root — `fixed-pending-recheck`. The off-screen VM preview offered a
     grant initially and opened the PDF after it was granted. After the folder moved during the session,
     the same preview said the search did not finish.
+  - 2026-11-26 W40.h2 — `fixed-pending-recheck` → `works`:
+    `NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover` passes in the guest (grant, open, then
+    the moved folder's incomplete search); `ReaderRootChooserTests` (right root, wrong root, the Notes folder
+    refused) and `DurableLinkE2ETests.linkResolvesThenSurvivesComputerMove` pass on the host
+    ([`evidence/notes/W40.h2-recheck.md`](evidence/notes/W40.h2-recheck.md)).
 - **Notes:** `W9.e2-paste` covered the grant step with `NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover`.
   W49.fix-notes-moved-root extended that test to reopen the same source after the granted folder moves during
   the session. The preview reports an incomplete search when Notes still holds the old path (S-014, owner call 29).
