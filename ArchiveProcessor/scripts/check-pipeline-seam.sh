@@ -25,8 +25,9 @@ while IFS= read -r -d '' f; do files+=("${f#./}"); done < <(find . -name '*.swif
     ! -name '*Contract.swift' ! -name 'SegmentationProofDriver.swift' ! -path "./$seam" -print0 | sort -z)
 hits=$(awk -v stages="$stages" '
     FNR == 1 { fn = "" }
-    # The enclosing member: a func at the type level (four spaces in), not a local func inside a body.
-    /^    [@A-Za-z ]*func [A-Za-z_]+/ { match($0, /func [A-Za-z_]+/); fn = substr($0, RSTART + 5, RLENGTH - 5) }
+    # The enclosing member: a func at the type level (exactly four spaces in), not a local func inside a body
+    # (the eight-space local restoredQualities inside startProcessing once read as the member holding its tail).
+    /^    ([@A-Za-z][@A-Za-z ]*)?func [A-Za-z_]+/ { match($0, /func [A-Za-z_]+/); fn = substr($0, RSTART + 5, RLENGTH - 5) }
     /^[ \t]*(\/\/|\*|\/\*)/ { next }
     {
         line = $0
@@ -47,7 +48,7 @@ while IFS= read -r hit; do
     status=1
 done <<<"$hits"
 # Every route calls the shared functions: the stages, and (except the pre-OCRed stage, whose caller files it) the end.
-body_of() { awk -v fn="$2" 'match($0, /func [A-Za-z_]+/) { cur = substr($0, RSTART + 5, RLENGTH - 5) } cur == fn' "$1"; }
+body_of() { awk -v fn="$2" '/^    ([@A-Za-z][@A-Za-z ]*)?func [A-Za-z_]+/ { match($0, /func [A-Za-z_]+/); cur = substr($0, RSTART + 5, RLENGTH - 5) } cur == fn' "$1"; }
 for route in "OCR/OCRProcessor+Pipeline.swift startProcessing completeRun" "OCR/OCRProcessor+Pipeline.swift resumeRun completeRun" \
              "OCR/OCRProcessor+Pipeline.swift resumeBatch completeRun" "OCR/OCRProcessor+OCR.swift performPreOCRedProcessing"; do
     read -r file fn end <<<"$route"
