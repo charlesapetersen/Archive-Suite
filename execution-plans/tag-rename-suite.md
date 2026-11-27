@@ -159,6 +159,20 @@ each app with its items and its writer:
   recorded in the change log above (Remove too, as an entry with an empty `to`, once the window ships it; schema 1
   readers skip an entry they cannot apply).
 - **Tag Changes from Other Apps** becomes a section of the window.
+- **Built (`W40.tag-window-core`, 2026-11-26).** ArchiveCore `TagInventory` (`Item(id, tags)` in; `subjects`,
+  `suiteTokens`, `entry(for:)`, `similarClusters()`; `renamePlan`, `mergePlan`, `removePlan`, nil for a suite
+  token or a change of nothing) and `TagChangePlan` (`applied(to:)` on an item's fresh tags, nil when it changes
+  nothing; `logEntries(app:)`; `summary(noun:)`). ArchiveCoreUI `TagsWindowModel(inventory:noun:writer:)`, which the
+  app refreshes with `update(_:)` and whose writer runs one plan as one Undo step and returns what it saved, and
+  `TagsWindowView(model:accessory:)`. A plan's semantics are the Reader's: into another existing tag it takes that
+  tag's spelling, and an item already carrying it keeps its own token; a target that is one of the sources re-spells
+  every spelling. The writer may spell the target by its own rule (Notes title-cases). Remove is not recorded yet:
+  schema 1 has no remove and `TagChangeLog.inbox` would settle an empty `to` without applying it, so recording one
+  needs a schema change in the apps that read the log (queued with Remove's first wiring, `W40.tag-window-reader`).
+  Left to the wiring: a padded token (`" Labor"`) is its own tag, as `tagKey` keys it everywhere; an item that already
+  carries the target as another tag keeps its own token, where Notes' `renameSubjects` re-spells it (Notes' wiring
+  decides which it keeps); a Finder colour name or a year is always a suite token here, so a subject `Red` is not
+  renamed (invariant 8, as `TagChangeLog.isRecordable`). The writer records `logEntries` only when it changed an item.
 - **Reader:** fed by its library, writes through TagWriter; `RenameTagSheet` and `SimilarTagsSheet` retire into it.
 - **Notes:** fed by its notes and extracts, writes through `renameSubject` and the bulk remove.
 - **Processor:** lists both of its vocabularies (the autocomplete spellings and the controlled list), each marked;

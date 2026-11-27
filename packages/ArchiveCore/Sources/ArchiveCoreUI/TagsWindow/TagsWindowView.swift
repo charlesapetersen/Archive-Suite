@@ -12,7 +12,8 @@ public struct TagsWindowView<Accessory: View>: View {
 
     @State private var renaming: TagInventory.Entry?
     @State private var merging: [TagInventory.Entry] = []
-    @State private var removing: TagChangePlan?
+    /// The tags a Remove confirmation is open for; its plan and count are worked out afresh as the list changes.
+    @State private var removing: [TagInventory.Entry] = []
     @State private var showsSuiteTokens = false
 
     public init(model: TagsWindowModel, @ViewBuilder accessory: () -> Accessory) {
@@ -36,17 +37,23 @@ public struct TagsWindowView<Accessory: View>: View {
         .sheet(isPresented: Binding(get: { !merging.isEmpty }, set: { if !$0 { merging = [] } })) {
             TagMergeSheet(model: model, entries: merging) { merging = [] }
         }
-        .confirmationDialog(removing.map { $0.summary(noun: model.noun) + "?" } ?? "",
-                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
-                            presenting: removing) { plan in
+        .confirmationDialog(removePlan.map { $0.summary(noun: model.noun) + "?" } ?? "",
+                            isPresented: Binding(get: { removePlan != nil }, set: { if !$0 { removing = [] } }),
+                            presenting: removePlan) { plan in
             Button("Remove from \(model.noun.count(plan.itemCount))", role: .destructive) {
                 Task { await model.perform(plan) }
             }
+            .disabled(model.isWorking)
             .accessibilityIdentifier("tags.remove.confirm")
             Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("The tag is taken off every \(model.noun.singular) that carries it. Edit ▸ Undo puts it back.")
+        } message: { plan in
+            Text("\(plan.sources.count == 1 ? "The tag is" : "The tags are") taken off every \(model.noun.singular) "
+                 + "that carries \(plan.sources.count == 1 ? "it" : "one"). Edit ▸ Undo puts \(plan.sources.count == 1 ? "it" : "them") back.")
         }
+    }
+
+    private var removePlan: TagChangePlan? {
+        removing.isEmpty ? nil : model.removePlan(removing.compactMap { model.inventory.entry(forKey: $0.id) })
     }
 
     private var controls: some View {
@@ -107,12 +114,12 @@ public struct TagsWindowView<Accessory: View>: View {
     @ViewBuilder
     private func menu(for picked: [TagInventory.Entry]) -> some View {
         if picked.count == 1 {
-            Button("Rename…") { renaming = picked[0] }
+            Button("Rename…") { renaming = picked[0] }.disabled(model.isWorking)
             if let show = model.showItems { Button("Show \(model.noun.plural.capitalized)") { show(picked[0]) } }
         }
-        if picked.count > 1 { Button("Merge \(picked.count) Tags…") { merging = picked } }
+        if picked.count > 1 { Button("Merge \(picked.count) Tags…") { merging = picked }.disabled(model.isWorking) }
         if !picked.isEmpty {
-            Button("Remove…") { removing = model.removePlan(picked) }
+            Button("Remove…") { removing = picked }.disabled(model.isWorking)
         }
     }
 
@@ -132,7 +139,7 @@ public struct TagsWindowView<Accessory: View>: View {
                 Button("Merge…") { merging = picked }
                     .disabled(picked.count < 2)
                     .accessibilityIdentifier("tags.merge")
-                Button("Remove…") { removing = model.removePlan(picked) }
+                Button("Remove…") { removing = picked }
                     .disabled(picked.isEmpty)
                     .accessibilityIdentifier("tags.remove")
                 if let show = model.showItems {
@@ -214,7 +221,7 @@ struct TagRenameSheet: View {
                 Button("Cancel", action: done).keyboardShortcut(.cancelAction)
                 Button(plan.map { "Rename on \(model.noun.count($0.itemCount))" } ?? "Rename", action: commit)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(plan == nil)
+                    .disabled(plan == nil || model.isWorking)
                     .accessibilityIdentifier("tags.rename.commit")
             }
         }
@@ -223,7 +230,7 @@ struct TagRenameSheet: View {
     }
 
     private func commit() {
-        guard let plan else { return }
+        guard let plan, !model.isWorking else { return }
         done()
         Task { await model.perform(plan) }
     }
@@ -279,7 +286,7 @@ struct TagMergeSheet: View {
                 Button("Cancel", action: done).keyboardShortcut(.cancelAction)
                 Button(plan.map { "Merge on \(model.noun.count($0.itemCount))" } ?? "Merge", action: commit)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(plan == nil)
+                    .disabled(plan == nil || model.isWorking)
                     .accessibilityIdentifier("tags.merge.commit")
             }
         }
@@ -288,7 +295,7 @@ struct TagMergeSheet: View {
     }
 
     private func commit() {
-        guard let plan else { return }
+        guard let plan, !model.isWorking else { return }
         done()
         Task { await model.perform(plan) }
     }

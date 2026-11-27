@@ -11,7 +11,7 @@ import Foundation
 // touches them (invariant 8). Design: execution-plans/tag-rename-suite.md §"The Tags window".
 
 /// Every tag carried by a set of items, by identity.
-public struct TagInventory: Sendable, Equatable {
+public struct TagInventory: Sendable {
     /// One item as the app sees it: a stable id (a path, a note's UUID, a vocabulary name) and its tags verbatim.
     public struct Item: Sendable, Equatable {
         public let id: String
@@ -47,18 +47,23 @@ public struct TagInventory: Sendable, Equatable {
     /// The suite's own tokens, by name.
     public let suiteTokens: [Entry]
     private let byKey: [String: Entry]
+    /// How the app spells a name it writes (Notes title-cases every subject); the Reader writes it as typed.
+    private let spell: @Sendable (String) -> String
 
-    public init(items: [Item]) {
+    /// `spell` is the app's rule for a name it writes, so a plan's target, count and log entries are what the app's
+    /// writer will actually write.
+    public init(items: [Item], spell: @escaping @Sendable (String) -> String = { $0 }) {
         self.items = items
+        self.spell = spell
         var order: [String] = []
         var holders: [String: [String]] = [:]
         var spelt: [String: [String: Int]] = [:]
         for item in items {
             var seen = Set<String>()
             var seenSpelling = Set<String>()
-            for raw in item.tags {
-                let tag = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !tag.isEmpty else { continue }
+            // Verbatim, as every app keys tags (`tagKey` does not trim): a padded token is its own tag here too.
+            for tag in item.tags {
+                guard !tag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
                 let key = tagKey(tag)
                 if holders[key] == nil { order.append(key) }
                 if seen.insert(key).inserted { holders[key, default: []].append(item.id) }
@@ -86,7 +91,7 @@ public struct TagInventory: Sendable, Equatable {
 
     /// The entry for a tag in any spelling, or nil when no item carries it.
     public func entry(for tag: String) -> Entry? {
-        byKey[tagKey(tag.trimmingCharacters(in: .whitespacesAndNewlines))]
+        byKey[tagKey(tag)] ?? byKey[tagKey(tag.trimmingCharacters(in: .whitespacesAndNewlines))]
     }
 
     /// The entry with this `tagKey` (an `Entry.id`).
@@ -120,10 +125,10 @@ public struct TagInventory: Sendable, Equatable {
     // MARK: Plans
 
     /// The spelling a typed name takes: an existing tag's spelling when one is carried (renaming into it merges
-    /// into it, as the Reader's rename does), else the name as typed, trimmed.
+    /// into it, as the Reader's rename does), else the name as typed, trimmed, in the app's spelling.
     public func spelling(for typed: String) -> String {
         let t = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        return entry(for: t)?.name ?? t
+        return entry(for: t)?.name ?? spell(t)
     }
 
     /// Rename `tag` to `typed` on every item carrying it. Into another existing tag, it merges into that tag's
@@ -132,7 +137,7 @@ public struct TagInventory: Sendable, Equatable {
     public func renamePlan(_ tag: String, to typed: String) -> TagChangePlan? {
         guard let source = entry(for: tag) else { return nil }
         let t = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        let target = isSameTag(t, source.name) ? t : spelling(for: t)
+        let target = isSameTag(t, source.name) ? spell(t) : spelling(for: t)
         return plan(.rename, sources: [source], target: target)
     }
 
@@ -145,7 +150,7 @@ public struct TagInventory: Sendable, Equatable {
         }
         let t = typed.trimmingCharacters(in: .whitespacesAndNewlines)
         // Into one of the merged tags: the spelling as typed, so choosing a variant re-spells the rest.
-        let target = sources.contains(where: { isSameTag($0.name, t) }) ? t : spelling(for: t)
+        let target = sources.contains(where: { isSameTag($0.name, t) }) ? spell(t) : spelling(for: t)
         return plan(sources.count > 1 ? .merge : .rename, sources: sources, target: target)
     }
 
@@ -200,7 +205,7 @@ public struct TagChangePlan: Sendable, Equatable {
     /// already carries the target (another tag) keeps its own token as it is. A target that is one of the sources
     /// re-spells every spelling of it.
     public func applied(to tags: [String]) -> [String]? {
-        func key(_ s: String) -> String { tagKey(s.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        func key(_ s: String) -> String { tagKey(s) }
         // A suite token is never moved, even one that shares a key with a source (the inventory lists such a key
         // apart, so this only guards a token that appeared since it was built).
         func moves(_ s: String) -> Bool { sourceKeys.contains(key(s)) && !TagInventory.isSuiteToken(s) }
@@ -225,7 +230,7 @@ public struct TagChangePlan: Sendable, Equatable {
     }
 
     /// The entries this change adds to the suite's change log (`TagChangeLog`), one per source tag: a rename or
-    /// merge only. A remove is not recorded yet (schema 1 has no remove; design note §"The Tags window").
+    /// merge only. The writer records them only when it changed an item. A remove is not recorded yet (schema 1 has no remove; design note §"The Tags window").
     public func logEntries(app: String, at date: Date = Date()) -> [TagChange] {
         guard let target else { return [] }
         return sources.filter { TagChangeLog.isRecordable(from: $0, to: target) }

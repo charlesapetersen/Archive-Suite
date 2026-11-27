@@ -19079,3 +19079,22 @@ the same three lines and landing them separately would silently revert part of t
   focus, as delete's does. No migration written: nothing to migrate. $0; bench cache: nothing created.
   Commits: e74c4b5a (design), checkpoints 2-4, and this one.
   <!-- /W40.tag-rename-suite -->
+- [x] **W40.tag-window-core — one Tags window, built once and shared by the three apps: every tag in use, with rename, merge and remove [M · Tier-2]** (lane: suite) (uses: build) · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) — SHIPPED 2026-11-26.
+  Owner, 2026-11-14: one place in each app to see every tag in use and rename, merge or remove; a window inside each
+  app, built once. Built: ArchiveCore `TagInventory` (items in as `(id, tags)`; each tag by `tagKey` with its
+  spellings, holders and count; the suite's own tokens apart; Find Similar clusters; an app spelling rule) and
+  `TagChangePlan` (rename, merge, remove as pure values whose `applied(to:)` runs on each item's freshly read tags
+  inside the app's writer: a tag added since is kept, an item that lost the tag is not written, a suite token never
+  moves; `logEntries` for the change log). ArchiveCoreUI `TagsWindowModel` (search, sort, Find Similar grouping, one
+  change at a time, a status line naming failures) and `TagsWindowView` (the list with counts and other spellings,
+  Rename / Merge sheets that name an existing tag before merging into it, Remove confirmation naming the count, Show
+  Items, the suite's tokens read-only, an accessory slot for Tag Changes from Other Apps). Tests: 14 in
+  `TagInventoryTests` (in-memory plans and scratch files written through `CoordinatedTagWriter`), 8 in a new
+  `ArchiveCoreUITests` target (a fake writer; a headless layout). Full ArchiveCore `swift test` green (552 + 8);
+  Reader and Notes build clean. Tier-2: an independent review (Opus) found nothing serious; its findings fixed
+  (actions disabled while a change runs; the app's spelling rule shapes the plan; tokens keyed verbatim as `tagKey`
+  does; the Remove count recomputed). Remove is not recorded yet (Reader KNOWN_ISSUES, queued: W40.tag-window-reader).
+  Design: execution-plans/tag-rename-suite.md §"The Tags window" (kept for the per-app items). No app wiring here: the
+  per-app W40.tag-window-* items. $0; bench cache: nothing created.
+  Commits: checkpoints 1-2 and this one.
+  <!-- /W40.tag-window-core -->

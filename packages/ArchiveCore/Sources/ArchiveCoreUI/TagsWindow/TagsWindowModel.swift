@@ -133,8 +133,10 @@ public final class TagsWindowModel: ObservableObject {
         status = Self.statusLine(plan, outcome, noun: noun)
         // The result stays selected: the target of a rename or merge, nothing after a remove. `update` drops it
         // again if the writer saved nothing.
-        selection.subtract(plan.sourceKeys)
-        if let target = plan.target, outcome.changed > 0 { selection.insert(tagKey(target)) }
+        if outcome.changed > 0 {
+            selection.subtract(plan.sourceKeys)
+            if let target = plan.target { selection.insert(tagKey(target)) }
+        }
         return outcome
     }
 

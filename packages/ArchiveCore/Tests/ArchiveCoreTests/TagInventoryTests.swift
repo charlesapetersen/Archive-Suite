@@ -112,6 +112,28 @@ final class TagInventoryTests: XCTestCase {
         XCTAssertNil(inv.renamePlan("Absent", to: "Labor"))
     }
 
+    func testAPaddedTokenIsItsOwnTagAsEverywhereInTheSuite() throws {
+        let inv = inventory([("a", [" Labor"]), ("b", ["Labor"])])
+        XCTAssertEqual(inv.subjects.count, 2, "tagKey does not trim")
+        let padded = try XCTUnwrap(inv.subjects.first { $0.name == " Labor" })
+        let plan = try XCTUnwrap(inv.renamePlan(padded.name, to: "Labor"))
+        XCTAssertEqual(plan.itemIDs, ["a"])
+        XCTAssertEqual(plan.applied(to: [" Labor", "Strikes"]), ["Labor", "Strikes"])
+        XCTAssertNil(try XCTUnwrap(inv.renamePlan("Labor", to: "Labour")).applied(to: [" Labor"]),
+                     "renaming the unpadded tag leaves the padded one alone, as the Reader's rename does")
+    }
+
+    func testTheAppsSpellingRuleShapesThePlan() throws {
+        let titled = TagInventory(items: [.init(id: "a", tags: ["Civil Rights"]), .init(id: "b", tags: ["Labor"])],
+                                  spell: { $0.capitalized })
+        XCTAssertNil(titled.renamePlan("Civil Rights", to: "civil rights"), "Notes would title-case it straight back")
+        let plan = try XCTUnwrap(titled.renamePlan("Labor", to: "labor history"))
+        XCTAssertEqual(plan.target, "Labor History")
+        XCTAssertEqual(plan.logEntries(app: TagChangeLog.notes).map(\.to), ["Labor History"])
+        XCTAssertEqual(try XCTUnwrap(titled.renamePlan("Labor", to: "civil rights")).target, "Civil Rights",
+                       "an existing tag keeps its spelling")
+    }
+
     // MARK: Executed on scratch files
 
     private var tempDir: URL!

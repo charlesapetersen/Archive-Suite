@@ -19,6 +19,9 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 - In catalogue mode a rename is recorded for Notes once the catalogue save reports, but its Undo runs through the
   catalogue's own journal, which does not mark the recorded entry withdrawn, so Notes still offers a rename the Reader
   has undone (queued: W40.tag-window-reader).
+- The shared Tags window's Remove (W40.tag-window-core) is not recorded for the other apps: schema 1 of
+  `tag-changes.json` has no remove, and `TagChangeLog.inbox` would settle an entry with an empty `to` without applying
+  it, so a tag removed in one app stays on the other app's items (queued: W40.tag-window-reader).
 - A rename is recorded only when the granted folder has a durable root marker (`RootFolderStore.rootMarker`); a root
   whose marker could not be written renames its files and tells Notes nothing (accepted: the marker is the archive's
   identity, and without it Notes cannot tell which archive a record belongs to; `RootMarkerState` already reports the
