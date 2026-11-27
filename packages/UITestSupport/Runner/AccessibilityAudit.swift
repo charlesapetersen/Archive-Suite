@@ -30,6 +30,14 @@
 // Anti-aliasing can only pull the text pixel towards the background, so the measure errs towards failing.
 // Under 1.1:1 nothing is drawn under the frame at all — text a sheet covers (the Reader's "Tags in view" behind
 // its preview sheet measured 1.01:1) — so it is counted as covered, not failed.
+// A contrast issue whose element XCTest cannot read back (`snapshot()` throws: no type, no frame) still names its
+// text in the detailed description ("Contrast failed for <text>"). It is placed by that text in the window's own
+// snapshot and measured there like any other. Text the window does not hold counts as outside it only when another
+// of the app's windows holds it; otherwise the issue stays unplaced and fails. What it cannot rule out: where the
+// flagged element itself has gone, a copy with the same text is what gets measured. (W49.proc-audit-range-contrast-
+// intermittent: one light-mode run failed the Processor's Range tab on a "(no element)" contrast issue nothing could
+// measure, while every Range text the audit names measures 13.9:1 or more, and 36 further audits of the tab never
+// named an unreadable element again.)
 //
 // ONE REPORT PER ISSUE. A sweep reports each distinct issue (audit type, element type, identifier, label, size)
 // once, on the first screen it shows up on, so a sheet over the window does not repeat the window's findings.
@@ -219,10 +227,15 @@ final class AccessibilityAudit {
         // Every element in the window, with how many labelled elements it holds, its parent's type, and the frame of
         // the scroll view that clips it (nil outside one).
         var inWindow: [String: (labelled: Int, parent: XCUIElement.ElementType?, clip: CGRect?)] = [:]
+        // And every element by its text, to place a contrast issue XCTest could not name (see the header).
+        typealias Place = (type: XCUIElement.ElementType, identifier: String, frame: CGRect, clip: CGRect?)
+        var byText: [String: [Place]] = [:]
         @discardableResult func collect(_ s: XCUIElementSnapshot, parent: XCUIElement.ElementType?, clip: CGRect?) -> Int {
             let inner = s.elementType == .scrollView ? s.frame : clip
             let inside = s.children.reduce(0) { $0 + collect($1, parent: s.elementType, clip: inner) }
             inWindow[Self.placeKey(s.elementType, s.identifier, s.frame)] = (inside, parent, clip)
+            let text = s.label.isEmpty ? ((s.value as? String) ?? "") : s.label
+            if !text.isEmpty { byText[text, default: []].append((s.elementType, s.identifier, s.frame, clip)) }
             return inside + (s.label.isEmpty ? 0 : 1)
         }
         collect(tree, parent: nil, clip: nil)
@@ -235,6 +248,33 @@ final class AccessibilityAudit {
         var knownHere: [String: [AuditFinding]] = [:]
         for var f in found {
             var clip: CGRect?
+            if f.audit == .contrast, f.type == nil, let text = Self.contrastSubject(f.detailed) {
+                let places = byText[text] ?? []
+                if places.isEmpty {
+                    // Outside only on evidence: the text is in another of the app's windows. Otherwise (a wording
+                    // the parse gets wrong, an element gone from every tree) it stays unplaced and fails, as before.
+                    if let all = try? app.snapshot(), Self.holds(all, text: text) {
+                        outside += 1
+                        print("[a11y-audit] \(screen): contrast issue XCTest could not name, for text in another "
+                              + "window: \(f.detailed)")
+                        continue
+                    }
+                } else {
+                    // Several elements with the same text: of those drawn on the window, the one that measures
+                    // lowest, so the placing errs towards failing (a covered copy, under 1.1:1, would hide a real one).
+                    let drawn = places.compactMap { p -> (place: Place, ratio: Double)? in
+                        guard visible.contains(p.frame), p.clip.map({ $0.contains(p.frame) }) != false,
+                              let ratio = pixels?.contrast(under: p.frame), ratio >= 1.1 else { return nil }
+                        return (p, ratio)
+                    }
+                    let place = drawn.min { $0.ratio < $1.ratio }?.place ?? places[0]
+                    f.type = place.type
+                    f.identifier = place.identifier
+                    f.label = text
+                    f.frame = place.frame
+                    print("[a11y-audit] \(screen): contrast issue XCTest could not name, placed by its text: \(f)")
+                }
+            }
             // An issue with no element left to name cannot be placed, so it is kept rather than dropped.
             if let type = f.type {
                 guard let n = inWindow[Self.placeKey(type, f.identifier, f.frame)] else { outside += 1; continue }
@@ -340,6 +380,23 @@ final class AccessibilityAudit {
             XCTFail("accessibility audit, \(appearance) — \(k.tag) no longer reproduces. If it has been fixed, "
                     + "delete its KnownIssue from this audit.", file: file, line: line)
         }
+    }
+
+    /// Whether `tree` holds an element whose label (or string value, where the label is empty) is `text`.
+    private static func holds(_ tree: XCUIElementSnapshot, text: String) -> Bool {
+        (tree.label.isEmpty ? ((tree.value as? String) ?? "") : tree.label) == text
+            || tree.children.contains { holds($0, text: text) }
+    }
+
+    /// The text a contrast issue's detailed description names, in either of the two forms Xcode writes.
+    nonisolated static func contrastSubject(_ detailed: String) -> String? {
+        for (head, tail) in [("Contrast failed for ", ""),
+                             ("Contrast is not high enough for ", " unless font size is larger.")] {
+            guard detailed.hasPrefix(head), detailed.hasSuffix(tail), detailed.count > head.count + tail.count
+            else { continue }
+            return String(detailed.dropFirst(head.count).dropLast(tail.count))
+        }
+        return nil
     }
 
     private static func placeKey(_ type: XCUIElement.ElementType, _ id: String, _ f: CGRect) -> String {

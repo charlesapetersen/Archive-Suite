@@ -43,6 +43,19 @@ final class AccessibilityAuditUITests: XCTestCase {
         try auditMainScreens(appearance: "dark", extra: LayoutGuard.darkSettingArguments)
     }
 
+    /// A contrast issue XCTest cannot name is placed by the text its description gives (W49.proc-audit-range-contrast-
+    /// intermittent). The wordings below are Xcode's own, copied from the Range tab's audits in the macOS 27.2 guest.
+    func testContrastIssueTextIsReadFromXcodesWording() {
+        XCTAssertEqual(AccessibilityAudit.contrastSubject("Contrast failed for free"), "free")
+        XCTAssertEqual(AccessibilityAudit.contrastSubject(
+            "Contrast failed for Red line: you chose to spend nothing, so only free choices fit."),
+            "Red line: you chose to spend nothing, so only free choices fit.")
+        XCTAssertEqual(AccessibilityAudit.contrastSubject(
+            "Contrast is not high enough for 70 unless font size is larger."), "70")
+        XCTAssertNil(AccessibilityAudit.contrastSubject("Contrast failed for "))
+        XCTAssertNil(AccessibilityAudit.contrastSubject("This element is not an accessibility child of the parent element."))
+    }
+
     private func auditMainScreens(appearance: String, extra: [String]) throws {
         app = .archiveProcessorUITestApp()
         app.launchArguments = UITestLaunch.arguments([
