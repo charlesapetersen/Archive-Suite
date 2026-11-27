@@ -762,15 +762,24 @@ final class NavigationUITests: FixtureUITestCase {
         let renameItem = app.menuItems["Rename Tag…"]
         XCTAssertTrue(renameItem.waitForExistence(timeout: 5), "Tags menu should expose Rename Tag…")
         renameItem.click()
-        let renameField = app.textFields["ar.renameTag.newName"]
-        XCTAssertTrue(renameField.waitForExistence(timeout: 5), "Rename Tag should present its name field")
+        // W40.tag-window-reader: Rename Tag… brings up Window ▸ Tags on the filtered tag.
+        let tagsWindow = app.windows["Tags"]
+        XCTAssertTrue(tagsWindow.waitForExistence(timeout: 10), "Rename Tag… should bring up the Tags window")
+        let rename = tagsWindow.buttons["tags.rename"]
+        let deadline = Date().addingTimeInterval(10)
+        while !rename.isEnabled, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+        rename.click()
+        let renameField = app.textFields["tags.rename.name"]
+        XCTAssertTrue(renameField.waitForExistence(timeout: 5), "Rename should present its name field")
         renameField.click()
+        renameField.typeKey("a", modifierFlags: .command)
         renameField.typeText(renamedTag)
-        let renameButton = app.buttons["ar.renameTag.commit"]
+        let renameButton = app.buttons["tags.rename.commit"]
         XCTAssertTrue(renameButton.waitForExistence(timeout: 5))
         renameButton.click()
         XCTAssertTrue(waitForTags(on: targetName, containing: ["Read", renamedTag], excluding: [addedTag]),
                       "the matched-identity rename should replace only the selected scratch tag")
+        tagsWindow.buttons[XCUIIdentifierCloseWindow].click()
         captureScreenshot("w21-vmgui-e-matched-identity-writes")
     }
 

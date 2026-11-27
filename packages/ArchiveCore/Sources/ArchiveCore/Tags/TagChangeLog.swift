@@ -89,11 +89,11 @@ public enum TagChangeLog {
     }
 
     /// Whether `change` may be recorded or applied: a rename `isRecordable(from:to:)` allows, or the remove of a
-    /// subject that is not a facet token.
+    /// subject that is none of the suite's own tokens (`TagInventory.isSuiteToken`: a facet, a read state, an OCR flag).
     public static func isRecordable(_ change: TagChange) -> Bool {
         guard change.isRemoval else { return isRecordable(from: change.from, to: change.to) }
         let f = change.from.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !f.isEmpty && !keepsExactCase(f)
+        return !f.isEmpty && !keepsExactCase(f) && !TagInventory.isSuiteToken(f)
     }
 
     /// Appends `changes` (those `isRecordable` allows) to the log at `root`, keeping the newest `maxEntries`.
@@ -190,7 +190,8 @@ public enum TagChangeLog {
     }
 
     /// Applies every unhandled entry of other apps in `doc` to `vocabulary` and `controlled`, oldest first, with no
-    /// question: a vocabulary is a list of spellings, not of anyone's items. A remove drops `from` from both. A withdrawal of an entry applied before
+    /// question: a vocabulary is a list of spellings, not of anyone's items. A remove drops `from` from both (but never
+    /// empties the controlled list). A withdrawal of an entry applied before
     /// puts `from` back in both (`to` stays: it may be in use by then). Returns the new controlled list, the ids to add
     /// to the handled and applied lists, and the withdrawals put back, which the caller removes from both lists so a
     /// later Redo applies again.
@@ -212,7 +213,9 @@ public enum TagChangeLog {
             if change.isRemoval {
                 vocabulary.remove(change.from)
                 let fromKey = tagKey(change.from.trimmingCharacters(in: .whitespacesAndNewlines))
-                result.controlled.removeAll { tagKey($0.trimmingCharacters(in: .whitespacesAndNewlines)) == fromKey }
+                let kept = result.controlled.filter { tagKey($0.trimmingCharacters(in: .whitespacesAndNewlines)) != fromKey }
+                // Never to an empty list: an empty list is no list, which would stop holding subjects to it at all.
+                if !kept.isEmpty { result.controlled = kept }
             } else {
                 vocabulary.rename(from: change.from, to: change.to)
                 result.controlled = renamed(result.controlled, from: change.from, to: change.to)
@@ -246,6 +249,9 @@ public enum TagChangeLog {
                 throw ContainerWriteError.refusedExisting(why)
             }
             guard edit(&doc) else { return }
+            // Written as this build's schema, so a schema 1 log that now holds a remove is read as newer by a schema 1
+            // build rather than settled without applying it.
+            doc.schemaVersion = TagChangeDocument.schemaVersion
             do {
                 try ContainerFileStore.write(doc, in: dir, name: fileName, version: TagChangeDocument.schemaVersion,
                                              expecting: stamp)

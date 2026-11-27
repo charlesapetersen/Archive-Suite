@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import AppKit
 import ArchiveCore
+import ArchiveCoreUI
 
 /// A node in the sidebar folder tree, derived from discovered file paths. `path` is the absolute
 /// directory path (identity); `fileCount` is the recursive number of files in the subtree.
@@ -3068,8 +3069,6 @@ final class NavigationModel: ObservableObject {
     // MARK: Corpus-wide tag rename (D1, Tier-2). Every file carrying `old` gets `old` removed + `new`
     // added, via the audited TagWriter — one grouped undo, partial failures surfaced, never all-or-nothing.
 
-    @Published var renamingTag: String?     // non-nil while the rename-tag sheet is open (the old tag)
-    @Published var showingSimilarTags = false   // near-duplicate subject-tag finder sheet
     /// Other apps' renames waiting for Apply or Skip, and withdrawals of ones applied here (W40.tag-rename-suite).
     @Published var tagChangeOffers: [ReaderTagChangeOffer] = []
     @Published var showingTagChanges = false
@@ -3078,8 +3077,16 @@ final class NavigationModel: ObservableObject {
     var tagChangeRefreshing = false
     /// Where the handled lists and the rename groups are kept: nil is the app's own settings; tests pass a suite.
     var tagChangeDefaultsSuite: String?
+    /// Window ▸ Tags (W40.tag-window-reader): its model once opened, and its list's rebuild state.
+    var tagsWindowModel: TagsWindowModel?
+    var tagsWindowBuilding = false
+    var tagsWindowStale = false
+    /// The tag Tags ▸ Rename Tag… asked for before the list was built.
+    var tagsWindowPendingTag: String?
+    /// How many catalogue records the last save changed (not merely verified), read by its `completed`.
+    var catalogueLastSaveChanged = 0
 
-    /// Number of files carrying `tag` (for the rename sheet's "affects N files").
+    /// Number of files carrying `tag` (for a Tag Changes offer's count).
     func affectedFileCount(forTag tag: String) -> Int {
         library.files.filter { isInsideMainArchive($0.url) && $0.hasSubject(tag) }.count
     }
@@ -3090,11 +3097,8 @@ final class NavigationModel: ObservableObject {
         library.files.contains { f in f.hasSubject(tag) && f.subjects.contains { $0 != tag && isSameTag($0, tag) } }
     }
 
-    /// Open the rename-tag sheet from a menu — seed with the active tag filter, else the top visible tag.
-    func beginRenameTag() {
-        renamingTag = filter.subjects.sorted().first ?? tagCloud.first?.tag
-        if renamingTag == nil { statusMessage = "No tags to rename in the current view."; announce(statusMessage) }
-    }
+    /// The tag Tags ▸ Rename Tag… opens the Tags window on: the active tag filter's, else the top visible tag.
+    var tagsWindowSeed: String? { filter.subjects.sorted().first ?? tagCloud.first?.tag }
 
     /// `recording` false when applying another app's change, which is already in the archive's log (W40.tag-rename-suite);
     /// `completed` gets the number of files changed and that could not be once the batch has reported.
@@ -3109,9 +3113,11 @@ final class NavigationModel: ObservableObject {
         guard !old.isEmpty, !new.isEmpty, new != old || hasOtherSpellings(of: old) else { completed?(0, 0); return }
         if library.usesCatalogue {
             let paths = library.files.filter { $0.hasSubject(old) }.map(\.path)
-            // Recorded, and reported to `completed`, once the save has reported what it wrote.
-            let started = editCatalogueSubjects(paths: paths, completed: { [weak self] verified in
-                if recording, !verified.isEmpty { self?.recordTagChange(id: UUID(), from: old, to: new) }
+            // Recorded, and reported to `completed`, once the save has reported what it wrote. Its id is the journal
+            // operation's, so the catalogue's Undo and Redo withdraw and restore it (`tagChangeReversed`).
+            let operation = UUID()
+            let started = editCatalogueSubjects(paths: paths, operationID: operation, completed: { [weak self] verified in
+                if recording, !verified.isEmpty { self?.recordTagChange(id: operation, from: old, to: new) }
                 completed?(verified.count, paths.count - verified.count)
             }) { subjects in
                 if isSameTag(old, new) {
@@ -3120,7 +3126,6 @@ final class NavigationModel: ObservableObject {
                 let retained = subjects.filter { !isSameTag($0, old) }
                 return retained.contains { isSameTag($0, new) } ? retained : retained + [new]
             }
-            // The catalogue's own journal holds its Undo, which does not withdraw the entry (KNOWN_ISSUES).
             if !started { completed?(0, max(paths.count, 1)) }
             return
         }

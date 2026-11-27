@@ -43,27 +43,38 @@ public final class TagsWindowModel: ObservableObject {
     /// (W40.tag-window-processor). Nil shows the count.
     public var itemsLabel: (@MainActor (TagInventory.Entry) -> String)?
     private let writer: Writer
-    private var clusterIndex: [String: Int] = [:]
+    /// Each subject's Find Similar group; worked out when first needed, or given by the app with the inventory.
+    private var clusterIndex: [String: Int]?
 
     public init(inventory: TagInventory, noun: TagNoun, writer: @escaping Writer) {
         self.inventory = inventory
         self.noun = noun
         self.writer = writer
-        reindex()
     }
 
     /// A new inventory after the app's items changed. The selection keeps the tags that are still carried.
-    public func update(_ inventory: TagInventory) {
+    /// `similarClusters` is the inventory's `similarClusters()` when the app worked it out off the main actor, as it
+    /// should for a large library (7,000 subjects took 2.5 s in a Debug build, W40.tag-window-reader); nil leaves it
+    /// to be worked out here the first time Find Similar needs it.
+    public func update(_ inventory: TagInventory, similarClusters: [[TagInventory.Entry]]? = nil) {
         self.inventory = inventory
-        reindex()
+        clusterIndex = similarClusters.map(Self.index)
         selection = selection.filter { inventory.entry(forKey: $0) != nil }
     }
 
-    private func reindex() {
-        clusterIndex = [:]
-        for (i, cluster) in inventory.similarClusters().enumerated() {
-            for entry in cluster { clusterIndex[entry.id] = i }
+    private var clusters: [String: Int] {
+        if let clusterIndex { return clusterIndex }
+        let index = Self.index(inventory.similarClusters())
+        clusterIndex = index
+        return index
+    }
+
+    private static func index(_ clusters: [[TagInventory.Entry]]) -> [String: Int] {
+        var index: [String: Int] = [:]
+        for (i, cluster) in clusters.enumerated() {
+            for entry in cluster { index[entry.id] = i }
         }
+        return index
     }
 
     // MARK: What the list shows
@@ -76,6 +87,7 @@ public final class TagsWindowModel: ObservableObject {
             query.isEmpty || entry.spellings.contains { $0.tag.localizedCaseInsensitiveContains(query) }
         }
         if similarOnly {
+            let clusterIndex = clusters
             list = list.filter { clusterIndex[$0.id] != nil }
             return list.sorted { a, b in
                 let (ga, gb) = (clusterIndex[a.id]!, clusterIndex[b.id]!)
@@ -93,7 +105,7 @@ public final class TagsWindowModel: ObservableObject {
     public var suiteTokens: [TagInventory.Entry] { inventory.suiteTokens }
 
     /// Which Find Similar group a subject is in, for the list's grouping; nil when it has no near-duplicate.
-    public func similarGroup(of entry: TagInventory.Entry) -> Int? { clusterIndex[entry.id] }
+    public func similarGroup(of entry: TagInventory.Entry) -> Int? { clusters[entry.id] }
 
     public var selectedEntries: [TagInventory.Entry] {
         rows.filter { selection.contains($0.id) }

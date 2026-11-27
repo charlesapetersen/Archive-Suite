@@ -35,8 +35,13 @@ public enum TagSimilarity {
     /// Group near-duplicate subject tags. `subjectCounts` maps each DISTINCT subject to its file
     /// count. Returns only clusters of size ≥ 2 (singletons are dropped); each cluster is sorted by
     /// count desc (so `.first` is the suggested canonical), and clusters are sorted by total files
-    /// desc (biggest blast-radius first). O(n²) over the distinct tag set — fine at a few thousand
-    /// distinct subjects; pairs whose lengths differ by more than the cap are short-circuited.
+    /// desc (biggest blast-radius first).
+    ///
+    /// Only candidate pairs are compared (W40.tag-window-reader): two forms within edit distance `k` of each other
+    /// share a form made by deleting at most `k` characters from each, so each form is indexed under its own deletion
+    /// forms (up to 2 deletions from 7 characters, 1 from 4: the cap's lengths) and only forms sharing one are
+    /// compared, and not at all once they are in one group already. The groups are exactly the all-pairs ones. The
+    /// all-pairs loop took 11 minutes over 7,000 subjects in a Debug build, on the Tags window's main thread.
     public static func clusters(subjectCounts: [String: Int]) -> [[TagVariant]] {
         // Deterministic, stable tag order so clusters are reproducible run to run.
         let tags = subjectCounts.keys.sorted()
@@ -53,8 +58,26 @@ public enum TagSimilarity {
         }
         func union(_ a: Int, _ b: Int) { parent[find(a)] = find(b) }
 
-        for i in 0..<n {
-            for j in (i + 1)..<n where similar(norms[i], norms[j]) { union(i, j) }
+        // A long form's deletion forms grow with the square of its length, so a form of `longForm` characters or more
+        // is compared directly with every form within 2 characters of its length instead (they are few).
+        var index: [String: [Int]] = [:]
+        var byLength: [Int: [Int]] = [:]
+        for (i, form) in norms.enumerated() {
+            byLength[form.count, default: []].append(i)
+            guard form.count < longForm else { continue }
+            for key in deletionForms(form) { index[key, default: []].append(i) }
+        }
+        for bucket in index.values where bucket.count > 1 {
+            for (k, i) in bucket.enumerated() {
+                for j in bucket[(k + 1)...] where find(i) != find(j) && similar(norms[i], norms[j]) { union(i, j) }
+            }
+        }
+        for (i, form) in norms.enumerated() where form.count >= longForm {
+            for length in (form.count - 2)...(form.count + 2) {
+                for j in byLength[length] ?? [] where j != i && find(i) != find(j) && similar(form, norms[j]) {
+                    union(i, j)
+                }
+            }
         }
 
         // Collect components, keeping only real clusters (≥ 2 members).
@@ -87,6 +110,30 @@ public enum TagSimilarity {
     /// trailing whitespace and collapses runs (default `omittingEmptySubsequences: true`).
     public static func normalize(_ s: String) -> String {
         s.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// The length from which a form is compared directly rather than through the deletion-form index.
+    static let longForm = 32
+
+    /// `form` and every form made by deleting up to as many characters as the cap could allow for a pair it is in:
+    /// 2 from 7 characters (a pair capped at 2 has a longer form of 9 or more, so both have 7 or more), 1 from 4.
+    static func deletionForms(_ form: [Character]) -> Set<String> {
+        let depth = form.count >= 7 ? 2 : form.count >= 4 ? 1 : 0
+        var out: Set<String> = [String(form)]
+        var level: Set<[Character]> = [form]
+        for _ in 0..<depth {
+            var next: Set<[Character]> = []
+            for f in level {
+                for i in f.indices {
+                    var d = f
+                    d.remove(at: i)
+                    next.insert(d)
+                }
+            }
+            for f in next { out.insert(String(f)) }
+            level = next
+        }
+        return out
     }
 
     /// Are two already-normalized forms near-duplicates? Equal → always (pure case/spacing variant);

@@ -42,8 +42,9 @@ final class LayoutGuardUITests: FixtureUITestCase {
         sweepTagCloud(main, appearance: appearance)
         checkNarrowestWindow(main, appearance: appearance)
 
-        // The tag sheets at the window's size (W40.fix-reader-tag-editor-chips): Edit Info over every row, so
-        // its subjects are a mix of full and partial chips, then Find Similar Tags. Done only dismisses.
+        // The tag editor at the window's size (W40.fix-reader-tag-editor-chips): Edit Info over every row, so
+        // its subjects are a mix of full and partial chips; then Window ▸ Tags on its Find Similar list
+        // (W40.tag-window-reader), closed again.
         app.typeKey("a", modifierFlags: .command)
         toolbarButton("ar.toolbar.editTags").click()
         let editorDone = app.buttons["ar.tagEditor.done"]
@@ -52,10 +53,11 @@ final class LayoutGuardUITests: FixtureUITestCase {
         editorDone.click()
         app.menuBars.menuBarItems["Tags"].click()
         app.menuItems["Find Similar Tags…"].click()
-        let similarDone = app.buttons["ar.similarTags.done"]
-        XCTAssertTrue(similarDone.waitForExistence(timeout: 5), "the Similar Tags sheet should open")
-        LayoutGuard.sweep(main, screen: "Similar Tags sheet, \(appearance)", in: self, resize: false)
-        similarDone.click()
+        let tagsWindow = app.windows["Tags"]
+        XCTAssertTrue(tagsWindow.waitForExistence(timeout: 5), "the Tags window should come up")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        LayoutGuard.sweep(tagsWindow, screen: "Tags window, \(appearance)", in: self, resize: false)
+        tagsWindow.buttons[XCUIIdentifierCloseWindow].click()
         clickRow(0)
 
         toolbarButton("ar.toolbar.preview").click()

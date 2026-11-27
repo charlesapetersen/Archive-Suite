@@ -99,10 +99,13 @@ extension NavigationModel {
     }
 
     /// Use the same owner resolution and duplicate handling for inline and Inspector subject edits.
+    /// `operationID` is the journal operation's id, given when a change recorded for the other apps must follow its
+    /// Undo and Redo (W40.tag-window-reader: the entry's id is the operation's, as a file rename's is its ledger group).
     @discardableResult
-    func editCatalogueSubjects(paths: [String], completed: ((Set<String>) -> Void)? = nil,
+    func editCatalogueSubjects(paths: [String], title: String = "Subjects Change", operationID: UUID? = nil,
+                               completed: ((Set<String>) -> Void)? = nil,
                                _ update: ([String]) -> [String]) -> Bool {
-        editCatalogue(title: "Subjects Change", paths: paths, completed: completed) { facts in
+        editCatalogue(title: title, paths: paths, operationID: operationID, completed: completed) { facts in
             facts.catalogueDocumentEdit { id, fields in
                 CatalogueEdit(.document(id, .subjects), .set(.names(update(Self.value(fields.subjects) ?? []))))
             }
@@ -154,6 +157,7 @@ extension NavigationModel {
             let scope = reader.snapshot(.init(relativePDFPaths: [], isComplete: false), including: selected)
             let writer = CatalogueWriter(reader: reader)
             var result = CatalogueActionResult()
+            result.reversal = .init(group: group.operation.id, by: operation.id, redo: redo)
             for inverse in group.inverses.reversed() {
                 try result.attempt(operation, occurrence: inverse.occurrence, journal: journal) {
                     let base = try scope.facts(at: inverse.occurrence.relativePath).file.get()
@@ -167,7 +171,8 @@ extension NavigationModel {
 
     @discardableResult
     private func editCatalogue(title: String, paths: [String]?, physicalPageIndex: Int? = nil,
-                               observed: [ItemFacts]? = nil, completed: ((Set<String>) -> Void)? = nil,
+                               observed: [ItemFacts]? = nil, operationID: UUID? = nil,
+                               completed: ((Set<String>) -> Void)? = nil,
                                edit: (ItemFacts) -> (ItemFacts.FileFacts, CatalogueEdit)?) -> Bool {
         guard !catalogueEditSaving else {
             reportCatalogue("Wait for the current catalogue change to finish, then try again.")
@@ -233,7 +238,7 @@ extension NavigationModel {
         }
         runCatalogueAction(reader: reader, verb: "Saved", completed: completed) { journal in
             let writer = CatalogueWriter(reader: reader)
-            let operation = CatalogueEditJournal.Operation(title: title)
+            let operation = CatalogueEditJournal.Operation(title: title, id: operationID ?? UUID())
             var result = CatalogueActionResult()
             result.unavailable = preflightRefusals
             result.failures = preflightFailures
@@ -258,11 +263,15 @@ extension NavigationModel {
             let output = await Task.detached(priority: .userInitiated) {
                 Result { try journal.withSession { session in (try execute(session), session.history.heads) } }
             }.value
-            guard let self else { return }
+            // `completed` hears of every save that started, a refused one included, so a caller waiting on it
+            // (the Tags window, W40.tag-window-reader) is never left waiting.
+            guard let self else { completed?([]); return }
             self.catalogueEditSaving = false
+            self.catalogueLastSaveChanged = 0
             guard self.catalogueReader?.rootInstanceID == reader.rootInstanceID, self.library.usesCatalogue else {
                 self.catalogueHistoryRootID = nil
                 self.refreshCatalogueEditHistory()
+                completed?([])
                 return
             }
             switch output {
@@ -279,13 +288,19 @@ extension NavigationModel {
                     })
                 }
                 self.catalogueEditFailures = result.failures
+                self.catalogueLastSaveChanged = result.changed
                 self.reportCatalogue(result.message(verb: verb, pending: heads.uncertainCount))
+                // A recorded tag change follows the Undo or Redo that changed something (W40.tag-window-reader).
+                if let r = result.reversal, result.changed > 0 {
+                    self.tagChangeReversed(group: r.group, by: r.by, redo: r.redo)
+                }
                 completed?(result.verifiedPaths)
             case .failure:
                 self.catalogueHistoryRootID = nil
                 self.refreshCatalogueEditHistory()
                 self.library.rescan()
                 self.reportCatalogue("Catalogue history could not be saved. Check the current values before trying again.")
+                completed?([])
             }
         }
     }
@@ -439,6 +454,9 @@ private struct CatalogueEditPlan: Sendable {
 }
 
 private struct CatalogueActionResult: Sendable {
+    /// An Undo or Redo: the journal operation it reverses and its own.
+    struct Reversal: Sendable { let group: UUID, by: UUID, redo: Bool }
+    var reversal: Reversal?
     var changed = 0
     var unavailable = 0
     var uncertain = 0

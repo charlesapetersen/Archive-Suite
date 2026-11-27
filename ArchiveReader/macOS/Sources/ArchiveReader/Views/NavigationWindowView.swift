@@ -97,13 +97,6 @@ struct NavigationWindowView: View {
         .onChange(of: model.sort) { model.filterOrSortChanged() }
         .onChange(of: calendarsEnabled) { model.refreshDisplayedRows() }
         .onChange(of: model.showingEditor) { _, visible in infoVisible = visible }
-        .sheet(isPresented: Binding(get: { model.renamingTag != nil },
-                                    set: { if !$0 { model.renamingTag = nil } })) {
-            if let t = model.renamingTag { RenameTagSheet(model: model, oldTag: t) }
-        }
-        .sheet(isPresented: $model.showingSimilarTags) {
-            SimilarTagsSheet(model: model, size: SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: contentSize))
-        }
         .sheet(isPresented: $model.showingTagChanges) { TagChangesSheet(model: model) }
         .sheet(isPresented: $model.showingSaveDialog) { SaveSearchSheet(model: model) }
         .sheet(isPresented: Binding(get: { model.containerLevelsDraft != nil },
@@ -507,8 +500,15 @@ struct NavigationWindowView: View {
                                     else { model.filter.insertSubject(item.tag) }
                                 }
                                 Button("Filter to only this tag") { model.filter.subjects = [item.tag] }
-                                Button("Rename tag…") { model.renamingTag = item.tag }
-                                Button("Find similar tags…") { model.showingSimilarTags = true }
+                                // Both open Window ▸ Tags (W40.tag-window-reader).
+                                Button("Rename tag…") {
+                                    openWindow(id: WindowID.tags)
+                                    model.showTagInTagsWindow(item.tag)
+                                }
+                                Button("Find similar tags…") {
+                                    openWindow(id: WindowID.tags)
+                                    model.showSimilarInTagsWindow()
+                                }
                                 Divider()
                                 Button("Select files with this tag") { model.selectFiles(withTag: item.tag) }
                             }

@@ -76,6 +76,16 @@ struct ArchiveReaderApp: App {
         }
         .defaultSize(documentDefaultSize)   // DV-1: open at the remembered size (or the full screen) — no post-show resize flash
 
+        // Window ▸ Tags (W40.tag-window-reader): every tag in the library, with rename, merge and remove.
+        Window("Tags", id: WindowID.tags) {
+            if ArchiveTestHost.isUnitTestHost {
+                ArchiveTestHost.HiddenWindowStub()
+            } else {
+                ReaderTagsWindow().environmentObject(deepLinkRouter)
+            }
+        }
+        .defaultSize(width: 560, height: 640)
+
         Settings {
             OptionsView()
                 .environmentObject(deepLinkRouter)   // the navigation window's root, for Excluded folders
@@ -94,6 +104,7 @@ struct ArchiveReaderApp: App {
 enum WindowID {
     static let navigation = "navigation"
     static let document = "document"
+    static let tags = "tags"
 }
 
 /// The payload that opens a document window: the files the user chose to read together.

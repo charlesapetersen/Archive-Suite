@@ -200,6 +200,20 @@ enum TagWriter {
         } }
     }
 
+    /// A change from the Tags window (W40.tag-window-reader): a rename, merge or remove as ArchiveCore
+    /// `TagChangePlan`, made on the FRESH read inside coordination (`plan.applied(to:)`), so a tag added since the
+    /// window listed the file is kept, and a file that no longer carries a source tag is left unwritten. Only the
+    /// source tags' tokens move; the suite's own tokens and the label never do.
+    static func applyPlan(_ plan: TagChangePlan, on url: URL, expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
+        let op: AuditLedger.Operation = plan.kind == .remove ? .apply : .rename
+        return try recorded(op, url, poorOCR: PoorOCRFlagGuard.requested(add: plan.target.map { [$0] } ?? [],
+                                                                         remove: plan.sources)) {
+            try journalledWrite(url, expectedIdentity: identity) { current, label in
+                plan.applied(to: current).map { ($0, label) }
+            }
+        }
+    }
+
     /// The shared writer, with the action's write-ahead intent made durable once the transform has
     /// decided to write, inside coordination and before any tag reaches the disk
     /// (W40.fix-reader-ledger-durability). A no-op or a refused write journals nothing.

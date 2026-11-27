@@ -10,6 +10,16 @@ extension FocusedValues {
     }
 }
 
+// The navigation model the Tags window shows (W40.tag-window-reader): with it in front, Edit ▸ Undo and Redo and the
+// Tags menu's corpus-wide commands act on that library, as from the navigation window.
+struct TagsWindowNavigationKey: FocusedValueKey { typealias Value = NavigationModel }
+extension FocusedValues {
+    var tagsWindowNavigation: NavigationModel? {
+        get { self[TagsWindowNavigationKey.self] }
+        set { self[TagsWindowNavigationKey.self] = newValue }
+    }
+}
+
 // The undo manager of the window in front, which container edits are registered on (W49.reader-undo-menu-names).
 struct WindowUndoManagerKey: FocusedValueKey { typealias Value = UndoManager }
 extension FocusedValues {
@@ -32,6 +42,7 @@ struct ArchiveReaderCommands: Commands {
     @FocusedValue(\.archiveLinkContext) private var linkContext: ArchiveLinkContext?
     @FocusedValue(\.documentTagActions) private var documentTags: DocumentTagActions?
     @FocusedValue(\.windowUndoManager) private var windowUndo: UndoManager?
+    @FocusedValue(\.tagsWindowNavigation) private var tagsWindowNav: NavigationModel?
     @Environment(\.openWindow) private var openWindow
     /// Holds the navigation window's model whichever window is in front, so File ▸ Choose Archive Folder…
     /// can reach it from a document window or with no window open (W40.fix-reader-choose-folder-shortcut).
@@ -52,9 +63,8 @@ struct ArchiveReaderCommands: Commands {
     private var noTagTarget: Bool { nav != nil ? noSelection : !(docTags?.canTag ?? false) }
     /// Reveal in Finder and Copy Link(s) need only a file, so a document window offers them without the library.
     private var noFileTarget: Bool { nav != nil ? noSelection : !(docTags?.canActOnFile ?? false) }
-    /// The model the corpus-wide tag sheets (Rename, Find Similar) open in; from a document window they open
-    /// over the navigation window, which is brought forward.
-    private var tagSheetNav: NavigationModel? { nav ?? docTags?.navigation }
+    /// The model whose library the Tags window and the Tag Changes sheet show, whichever window is in front.
+    private var tagSheetNav: NavigationModel? { nav ?? docTags?.navigation ?? tagsWindowNav }
     /// The Inspector in the window in front is open; it names the View menu's Show/Hide Inspector.
     private var inspectorShown: Bool { nav?.showingEditor ?? docTags?.viewer.showingTagEditor ?? false }
     /// No viewer, or a viewer with no find bar (the preview sheet) — see the Find items below.
@@ -66,7 +76,7 @@ struct ArchiveReaderCommands: Commands {
     /// the window's container edits and the catalogue's saves, and are named for it. The toolbar Undo uses the same
     /// route (W49.reader-toolbar-undo).
     private var undoRoute: ReaderUndoRoute {
-        ReaderUndoRoute(nav: nav, doc: doc, docTags: docTags, windowUndo: windowUndo)
+        ReaderUndoRoute(nav: nav ?? tagsWindowNav, doc: doc, docTags: docTags, windowUndo: windowUndo)
     }
 
     var body: some Commands {
@@ -286,14 +296,18 @@ struct ArchiveReaderCommands: Commands {
                 if let nav { nav.markReadAndAdvance() } else { docTags?.markReadAndNextUnread() }
             }
             .keyboardShortcut(.markReadAndNext).disabled(noTagTarget)
+            // W40.tag-window-reader: both open Window ▸ Tags, on the tag in question or on its Find Similar list.
             Button(ReaderCommand.renameTag.title) {
-                if nav == nil { openWindow(id: WindowID.navigation) }
-                tagSheetNav?.beginRenameTag()
+                guard let target = tagSheetNav else { return }
+                let tag = target.tagsWindowSeed
+                openWindow(id: WindowID.tags)
+                target.showTagInTagsWindow(tag)
             }
             .disabled(tagSheetNav == nil)
             Button(ReaderCommand.findSimilarTags.title) {
-                if nav == nil { openWindow(id: WindowID.navigation) }
-                tagSheetNav?.showingSimilarTags = true
+                guard let target = tagSheetNav else { return }
+                openWindow(id: WindowID.tags)
+                target.showSimilarInTagsWindow()
             }
             .disabled(tagSheetNav == nil)
             Button(ReaderCommand.tagChanges.title) {

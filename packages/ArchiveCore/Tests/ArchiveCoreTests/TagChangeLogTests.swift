@@ -145,7 +145,8 @@ final class TagChangeLogTests: XCTestCase {
     // MARK: Removes (schema 2, W40.tag-window-reader)
 
     func testARemoveIsRecordedWithAnEmptyToAndAFacetRemoveIsNot() throws {
-        try TagChangeLog.record([change("Q1", ""), change("  ", ""), change("Draft", "")], root: root)
+        try TagChangeLog.record([change("Q1", ""), change("  ", ""), change("Unread", ""), change("OCR Poor", ""),
+                                 change("Draft", "")], root: root)
         XCTAssertEqual(changes().map(\.from), ["Draft"])
         XCTAssertTrue(changes()[0].isRemoval)
         XCTAssertFalse(changes()[0].isRespelling)
@@ -165,6 +166,8 @@ final class TagChangeLogTests: XCTestCase {
         XCTAssertEqual(doc.changes.map(\.from), ["A tag"])
         try TagChangeLog.record([change("C tag", "")], root: root)
         XCTAssertEqual(changes().map(\.from), ["A tag", "C tag"])
+        guard case .loaded(let after, _) = TagChangeLog.load(root: root) else { return XCTFail("reads") }
+        XCTAssertEqual(after.schemaVersion, 2, "written back as schema 2, so a schema 1 build leaves it alone")
     }
 
     func testInboxOffersARemoveOfACarriedTagAndFollowsAChainIntoIt() {
@@ -196,6 +199,10 @@ final class TagChangeLogTests: XCTestCase {
         XCTAssertEqual(back.unapplied, [remove.id])
         XCTAssertTrue(vocab.snapshot().contains { isSameTag($0, "Draft") })
         XCTAssertFalse(vocab.remove("Nobody"))
+        // A remove never empties the controlled list (an empty list is no list).
+        let only = TagChangeLog.follow(TagChangeDocument(changes: [change("Oil", "")]), app: TagChangeLog.processor,
+                                       handled: [], applied: [], vocabulary: vocab, controlled: ["Oil"])
+        XCTAssertEqual(only.controlled, ["Oil"])
     }
 
     // MARK: The inbox

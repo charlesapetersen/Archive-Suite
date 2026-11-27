@@ -20,17 +20,3 @@ final class PreviewSheetSizeTests: XCTestCase {
         XCTAssertEqual(PreviewSheet.fittedSize(in: .zero), PreviewSheet.preferredSize)
     }
 }
-
-/// W40.fix-reader-tag-editor-chips — the Similar Tags sheet fits inside the minimum window too.
-@MainActor
-final class TagSheetSizeTests: XCTestCase {
-    func testTagSheetsShrinkInsideTheMinimumWindow() {
-        let window = CGSize(width: 900, height: 560)
-        XCTAssertEqual(SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: window), CGSize(width: 520, height: 520))
-    }
-
-    func testTagSheetsKeepTheirPreferredSizeInALargeWindow() {
-        let window = CGSize(width: 1600, height: 1000)
-        XCTAssertEqual(SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: window), SimilarTagsSheet.preferredSize)
-    }
-}

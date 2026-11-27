@@ -127,4 +127,55 @@ final class TagSimilarityTests: XCTestCase {
         XCTAssertEqual(TagSimilarity.levenshtein(Array(""), Array("abc")), 3)
         XCTAssertEqual(TagSimilarity.levenshtein(Array("environment"), Array("environtment")), 1)
     }
+
+    // MARK: The candidate index is exact (W40.tag-window-reader)
+
+    /// The groups found through the deletion-form index are the all-pairs groups, on a set built to have near
+    /// misses at every cap boundary: lengths 3 to 14, one and two edits, transpositions, spacing and case.
+    func testTheCandidateIndexFindsExactlyTheAllPairsGroups() {
+        var generator = SystemRandomNumberGenerator()
+        let alphabet = Array("abcde ")
+        var counts: [String: Int] = [:]
+        for _ in 0..<400 {
+            // Up to past `longForm`, so the long forms' direct comparison is covered too.
+            let length = Int.random(in: 3...14, using: &generator) + (Bool.random(using: &generator) ? 0 : 22)
+            let tag = String((0..<length).map { _ in alphabet.randomElement(using: &generator)! })
+            counts[tag, default: 0] += 1
+            var edited = Array(tag)
+            for _ in 0..<Int.random(in: 1...2, using: &generator) {
+                let i = Int.random(in: 0..<edited.count, using: &generator)
+                switch Int.random(in: 0...3, using: &generator) {
+                case 0: edited[i] = alphabet.randomElement(using: &generator)!
+                case 1: if edited.count > 1 { edited.remove(at: i) }
+                case 2: edited.insert(alphabet.randomElement(using: &generator)!, at: i)
+                default: if i + 1 < edited.count { edited.swapAt(i, i + 1) }
+                }
+            }
+            counts[String(edited).uppercased(), default: 0] += 1
+        }
+        let fast = TagSimilarity.clusters(subjectCounts: counts).map { Set($0.map(\.tag)) }
+        XCTAssertEqual(Set(fast), Set(allPairs(counts)), "\(counts.count) tags")
+        XCTAssertFalse(fast.isEmpty)
+    }
+
+    /// The rule applied to every pair, as `clusters` did before the index.
+    private func allPairs(_ counts: [String: Int]) -> [Set<String>] {
+        let tags = counts.keys.sorted()
+        let norms = tags.map { Array(TagSimilarity.normalize($0)) }
+        var parent = Array(tags.indices)
+        func find(_ x: Int) -> Int { var r = x; while parent[r] != r { r = parent[r] }; return r }
+        for i in tags.indices {
+            for j in (i + 1)..<tags.count {
+                let (a, b) = (norms[i], norms[j])
+                let maxLen = max(a.count, b.count)
+                let cap = maxLen >= 9 ? 2 : maxLen >= 5 ? 1 : 0
+                guard a == b || (cap > 0 && abs(a.count - b.count) <= cap
+                                 && TagSimilarity.levenshtein(a, b) <= cap) else { continue }
+                parent[find(i)] = find(j)
+            }
+        }
+        var groups: [Int: Set<String>] = [:]
+        for i in tags.indices { groups[find(i), default: []].insert(tags[i]) }
+        return groups.values.filter { $0.count > 1 }
+    }
 }

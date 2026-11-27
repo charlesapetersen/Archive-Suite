@@ -185,15 +185,24 @@ final class TriageJourneyUITests: FixtureUITestCase {
         XCTAssertTrue(waitFor { self.rowCount == 3 }, "the tag filter should show the three group files")
         app.menuBars.menuBarItems["Tags"].click()
         app.menuItems["Rename Tag…"].click()
-        let renameField = app.textFields["ar.renameTag.newName"]
-        XCTAssertTrue(renameField.waitForExistence(timeout: 5), "Rename Tag should present its field")
+        // W40.tag-window-reader: Rename Tag… brings up Window ▸ Tags on the filtered tag.
+        let tagsWindow = app.windows["Tags"]
+        XCTAssertTrue(tagsWindow.waitForExistence(timeout: 10), "Rename Tag… should bring up the Tags window")
+        let rename = tagsWindow.buttons["tags.rename"]
+        XCTAssertTrue(waitFor { rename.isEnabled }, "the tag should be selected in the Tags window")
+        rename.click()
+        let renameField = app.textFields["tags.rename.name"]
+        XCTAssertTrue(renameField.waitForExistence(timeout: 5), "Rename should present its field")
         renameField.click()
+        renameField.typeKey("a", modifierFlags: .command)
         renameField.typeText(renamedTag)
-        let renameCommit = app.buttons["ar.renameTag.commit"]
-        XCTAssertEqual(renameCommit.title.isEmpty ? renameCommit.label : renameCommit.title, "Rename 3 Files",
+        let renameCommit = app.buttons["tags.rename.commit"]
+        XCTAssertEqual(renameCommit.title.isEmpty ? renameCommit.label : renameCommit.title, "Rename on 3 files",
                        "R-28: the sheet should show how many files the rename affects")
         log("[d8]   rename sheet button: \(renameCommit.title.isEmpty ? renameCommit.label : renameCommit.title)")
         renameCommit.click()
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        tagsWindow.buttons[XCUIIdentifierCloseWindow].click()
         before = check("4 Rename Tag across 3 files", from: before,
                        expect: Dictionary(uniqueKeysWithValues: group.map {
                            ($0.path, Delta(remove: [groupTag], add: [renamedTag])) }))
@@ -428,26 +437,28 @@ final class TriageJourneyUITests: FixtureUITestCase {
         button.click()
     }
 
+    /// W40.tag-window-reader: Find Similar Tags… brings up Window ▸ Tags on its Find Similar list; the two variants
+    /// are selected there and merged into the kept spelling.
     private func mergeVariantIntoKeep() {
         app.menuBars.menuBarItems["Tags"].click()
         app.menuItems["Find Similar Tags…"].click()
-        let key = [mergeKeep, mergeVariant].sorted().joined(separator: "|")
-        let merge = app.buttons["ar.similarTags.merge.\(key)"]
-        XCTAssertTrue(merge.waitForExistence(timeout: 10), "Find Similar Tags should group the two variants")
-        let sheetScroll = app.sheets.firstMatch.scrollViews.firstMatch
-        let keep = app.radioButtons.matching(NSPredicate(format: "label BEGINSWITH %@", mergeKeep + " ")).firstMatch
-        XCTAssertTrue(keep.waitForExistence(timeout: 5), "the cluster should offer \(mergeKeep) to keep")
-        scrollIntoView(keep, within: sheetScroll)
+        let tagsWindow = app.windows["Tags"]
+        XCTAssertTrue(tagsWindow.waitForExistence(timeout: 10), "Find Similar Tags… should bring up the Tags window")
+        let keepRow = tagsWindow.descendants(matching: .any)["tags.row.\(mergeKeep)"]
+        let variantRow = tagsWindow.descendants(matching: .any)["tags.row.\(mergeVariant)"]
+        XCTAssertTrue(keepRow.waitForExistence(timeout: 10) && variantRow.waitForExistence(timeout: 10),
+                      "Find Similar should list the two variants")
+        keepRow.click()
+        XCUIElement.perform(withKeyModifiers: .command) { variantRow.click() }
+        tagsWindow.buttons["tags.merge"].click()
+        let keep = app.buttons["tags.merge.pick.\(mergeKeep)"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), "Merge should offer \(mergeKeep) to keep")
         keep.click()
-        scrollIntoView(merge, within: sheetScroll)
-        merge.click()
-        let commit = app.buttons["ar.renameTag.commit"]
-        XCTAssertTrue(commit.waitForExistence(timeout: 5), "Merge should open the rename sheet")
-        let field = app.textFields["ar.renameTag.newName"]
-        XCTAssertEqual(field.value as? String, mergeKeep, "the rename sheet should be seeded with the kept tag")
-        commit.click()
+        let field = app.textFields["tags.merge.name"]
+        XCTAssertEqual(field.value as? String, mergeKeep, "the merge sheet should name the kept tag")
+        app.buttons["tags.merge.commit"].click()
         RunLoop.current.run(until: Date().addingTimeInterval(1))
-        app.buttons["Done"].firstMatch.click()
+        tagsWindow.buttons[XCUIIdentifierCloseWindow].click()
     }
 
     private func saveSmartFolder(named name: String) {

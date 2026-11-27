@@ -185,19 +185,15 @@ final class VisualReviewUITests: FixtureUITestCase {
             } else { missing.append("Save Search alert"); escape() }
         }
 
-        if menu("Tags", "Rename Tag…") {
-            if app.textFields["ar.renameTag.newName"].waitForExistence(timeout: 3) {
-                shoot("rename-tag-sheet")
-            } else { missing.append("Rename Tag sheet") }
-            escape()
-        }
-
-        if menu("Tags", "Find Similar Tags…") {
-            pause(1)
-            shoot("similar-tags-sheet")
-            if windowButton("Done").exists { windowButton("Done").click() }
-            else if windowButton("Close").exists { windowButton("Close").click() }
-            else { escape() }
+        // W40.tag-window-reader: both bring up Window ▸ Tags.
+        for (item, name) in [("Rename Tag…", "tags-window"), ("Find Similar Tags…", "tags-window-similar")]
+            where menu("Tags", item) {
+            let tags = app.windows["Tags"]
+            if tags.waitForExistence(timeout: 5) {
+                pause(1)
+                shoot(name)
+                tags.buttons[XCUIIdentifierCloseWindow].click()
+            } else { missing.append("Tags window (\(item))") }
         }
 
         for title in ["File", "View", "Selection", "Tags", "Sort & Filter"] {

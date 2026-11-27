@@ -156,7 +156,7 @@ each app with its items and its writer:
 - **Window:** a searchable, sortable list of subjects with counts; Rename (into an existing tag merges), Merge of
   several selected into one spelling, Remove from every item (a confirmation that names the count), Find Similar as a
   filter, and a click that shows the items carrying the tag. Each change is one Undo, and each rename or merge is
-  recorded in the change log above (Remove too, as an entry with an empty `to`, once the window ships it; schema 1
+  recorded in the change log above (Remove too, as an entry with an empty `to`, schema 2; schema 1
   readers skip an entry they cannot apply).
 - **Tag Changes from Other Apps** becomes a section of the window.
 - **Built (`W40.tag-window-core`, 2026-11-26).** ArchiveCore `TagInventory` (`Item(id, tags)` in; `subjects`,
@@ -166,14 +166,20 @@ each app with its items and its writer:
   app refreshes with `update(_:)` and whose writer runs one plan as one Undo step and returns what it saved, and
   `TagsWindowView(model:accessory:)`. A plan's semantics are the Reader's: into another existing tag it takes that
   tag's spelling, and an item already carrying it keeps its own token; a target that is one of the sources re-spells
-  every spelling. The writer may spell the target by its own rule (Notes title-cases). Remove is not recorded yet:
-  schema 1 has no remove and `TagChangeLog.inbox` would settle an empty `to` without applying it, so recording one
-  needs a schema change in the apps that read the log (queued with Remove's first wiring, `W40.tag-window-reader`).
+  every spelling. The writer may spell the target by its own rule (Notes title-cases). A remove is recorded as an
+  entry with an empty `to` since schema 2 (`W40.tag-window-reader`, below).
   Left to the wiring: a padded token (`" Labor"`) is its own tag, as `tagKey` keys it everywhere; an item that already
   carries the target as another tag keeps its own token, where Notes' `renameSubjects` re-spells it (Notes' wiring
   decides which it keeps); a Finder colour name or a year is always a suite token here, so a subject `Red` is not
   renamed (invariant 8, as `TagChangeLog.isRecordable`). The writer records `logEntries` only when it changed an item.
 - **Reader:** fed by its library, writes through TagWriter; `RenameTagSheet` and `SimilarTagsSheet` retire into it.
+  **Built (`W40.tag-window-reader`, 2026-11-26):** Window ▸ Tags (`ReaderTagsWindow`, `NavigationModel+TagsWindow`);
+  `TagWriter.applyPlan`; one ledger group per change (a catalogue journal operation in catalogue mode, whose Undo now
+  withdraws the entries); every change recorded, one entry per source tag. A remove is recorded as an entry with an
+  empty `to` in `tag-changes.json` schema 2, which Notes applies (`renameSubjects(_, to: "")`, one Undo) and the
+  Processor follows (`TagChangeLog.follow`, never emptying the controlled list). `TagSimilarity.clusters` indexes
+  deletion forms instead of comparing every pair (659 s to 2.3 s at 7,000 subjects, Debug), and the window takes the
+  groups built off the main actor.
 - **Notes:** fed by its notes and extracts, writes through `renameSubject` and the bulk remove.
 - **Processor (built, `W40.tag-window-processor`, 2026-11-26):** Window ▸ Tags (and Settings ▸ Output ▸ Tags Window)
   lists both vocabularies as two items, "Suggestions" and "Subject list", the count column naming which
