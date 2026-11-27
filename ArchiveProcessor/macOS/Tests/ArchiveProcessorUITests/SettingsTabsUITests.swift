@@ -146,9 +146,11 @@ final class SettingsTabsUITests: XCTestCase {
         XCTAssertEqual(monthFirst.value.map { String(describing: $0) }, "1", "the collection inherits month first again")
     }
 
-    /// An Advanced setting in use is named on Processing, with View and Reset (§5.5).
+    /// An Advanced setting in use is named on Processing, with View and Reset (§5.5). It starts with nothing Advanced in
+    /// use whatever ran before it in the guest, and presses the dialog's own Reset: a general setting an earlier test left
+    /// (a money ceiling, Keep pages on this Mac) puts a row Reset on Processing too (W49.proc-fix-advanced-reset-uitest-order).
     func testAdvancedSettingInUseIsNamedOnProcessing() throws {
-        guard let settings = launch() else { return }
+        guard let settings = launch(["-APUITestClearAdvanced"]) else { return }
         XCTAssertTrue(app.showSettingsPanel("Processing"))
         let banner = settings.descendants(matching: .any)["ap.settings.advancedInUse"].firstMatch
         XCTAssertFalse(banner.exists, "nothing Advanced is in use at the start")
@@ -165,10 +167,19 @@ final class SettingsTabsUITests: XCTestCase {
                       "View opens the Advanced tab")
         XCTAssertTrue(app.showSettingsPanel("Processing"))
         settings.buttons["ap.settings.advancedInUse.reset"].firstMatch.click()
-        let confirm = app.descendants(matching: .button).matching(NSPredicate(format: "label == %@", "Reset")).firstMatch
-        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Reset asks first")
+        let dialog = app.descendants(matching: .any).matching(NSPredicate(
+            format: "elementType == %d OR elementType == %d",
+            XCUIElement.ElementType.sheet.rawValue, XCUIElement.ElementType.dialog.rawValue)).firstMatch
+        XCTAssertTrue(dialog.waitForExistence(timeout: 5), "Reset asks first")
+        let confirm = dialog.buttons.matching(NSPredicate(format: "label == %@", "Reset")).firstMatch
+        guard confirm.waitForExistence(timeout: 5) else { return XCTFail("the dialog's Reset: \(dialog.debugDescription)") }
         confirm.click()
+        XCTAssertTrue(waitUntil { !dialog.exists }, "the dialog closes")
         XCTAssertTrue(waitUntil { !banner.exists }, "Reset puts the Advanced setting back")
+        // The stored key itself went back, not only the line: the Advanced tab's switch is off again.
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        XCTAssertEqual(log.value.map { String(describing: $0) }, "0", "the log file switch is off after Reset")
     }
 
     /// A preset fills the reader, and the rows below follow it.

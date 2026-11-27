@@ -24,6 +24,7 @@ struct ArchiveProcessorApp: App {
             }
             MoneyJourneyFixture.configureIfRequested()
             ProcessorUITestConfiguration.clearKeyChips()   // no chip left over from an earlier suite
+            ProcessorUITestConfiguration.clearAdvancedSettingsIfRequested()
             MessageJourneyFixture.resetKeyWizardIfRequested()
             ProcessorUITestConfiguration.installScratchCollectionSettings()   // the range view's click check
             ProcessorUITestConfiguration.installScratchTagLists()   // the Tags window's check (W40.tag-window-processor)

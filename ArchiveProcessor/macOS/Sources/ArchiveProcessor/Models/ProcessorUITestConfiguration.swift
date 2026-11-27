@@ -40,6 +40,20 @@ enum ProcessorUITestConfiguration {
         }
     }
 
+    /// W49.proc-fix-advanced-reset-uitest-order: `-APUITestClearAdvanced` starts the launch with no Advanced setting in
+    /// use, whatever an earlier test in the same guest left in the app's defaults or the general layer. Launch arguments
+    /// still apply: they sit in the argument domain, which this does not touch.
+    @MainActor static func clearAdvancedSettingsIfRequested() {
+        guard isActive, arguments.contains("-APUITestClearAdvanced") else { return }
+        let store = SettingsLayerStore.shared
+        for group in SettingsAdvanced.groups {
+            SettingsAdvanced.reset(group)
+            for key in group.layered where store.general.entry(key) != nil {
+                precondition(store.resetGeneral(key), "Could not clear the general layer's \(key.rawValue)")
+            }
+        }
+    }
+
     /// W49.proc-managed-local-ocr: the guest has too little memory for the managed page readers; this run says 18 GB.
     static var managedOCRMemoryGB: Double? { isActive && arguments.contains("-APUITestManagedOCR") ? 18 : nil }
     /// W49.proc-local-ocr-onboarding: in that run a started download fetches nothing and waits until cancelled.
