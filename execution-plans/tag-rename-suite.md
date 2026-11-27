@@ -175,9 +175,14 @@ each app with its items and its writer:
   renamed (invariant 8, as `TagChangeLog.isRecordable`). The writer records `logEntries` only when it changed an item.
 - **Reader:** fed by its library, writes through TagWriter; `RenameTagSheet` and `SimilarTagsSheet` retire into it.
 - **Notes:** fed by its notes and extracts, writes through `renameSubject` and the bulk remove.
-- **Processor:** lists both of its vocabularies (the autocomplete spellings and the controlled list), each marked;
-  rename, merge and remove edit them and record the change. It does not walk the output folder: those files are the
-  Reader's library, so the Reader applies the change to them.
+- **Processor (built, `W40.tag-window-processor`, 2026-11-26):** Window ▸ Tags (and Settings ▸ Output ▸ Tags Window)
+  lists both vocabularies as two items, "Suggestions" and "Subject list", the count column naming which
+  (`TagsWindowModel.itemsLabel`: Both, Suggestions, Subject list). A plan runs on each list as it is now and is kept as
+  an ArchiveCore `TagSpellingChange` per list (`TagVocabulary.apply`, the settings key), one Undo with Redo that moves
+  only the tags it changed. Renames and merges are recorded in every known archive (`ProcessorTagChanges.record`;
+  Undo withdraws, Redo restores); a removal is not (schema 1), and the window says the files keep the tag. A change
+  that would empty a non-empty subject list leaves it as it is (empty means free-form tagging). It does not walk the
+  output folder: those files are the Reader's library, so the Reader applies the change to them.
 
 ## Tier-2 and tests
 

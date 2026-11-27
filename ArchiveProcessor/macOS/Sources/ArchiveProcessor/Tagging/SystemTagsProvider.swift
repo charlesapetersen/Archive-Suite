@@ -255,6 +255,9 @@ final class SystemTagsProvider: ObservableObject {
 
     // MARK: - Publishing
 
+    /// Publishes the vocabulary now, after the Tags window changed it (W40.tag-window-processor).
+    func republish() { publishSnapshot() }
+
     private func publishSnapshot() {
         tags = ProcessorTagVocabulary.shared.snapshot()
     }

@@ -19098,3 +19098,25 @@ the same three lines and landing them separately would silently revert part of t
   per-app W40.tag-window-* items. $0; bench cache: nothing created.
   Commits: checkpoints 1-2 and this one.
   <!-- /W40.tag-window-core -->
+- [x] **W40.tag-window-processor — the Processor's Tags window, over the tags it offers and writes [S-M · Tier-2]** · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) (lane: processor) (uses: build,vm) — SHIPPED 2026-11-26.
+  Window ▸ Tags (SwiftUI lists the Window scene itself) and Settings ▸ Output ▸ Tags Window open the shared Tags window
+  over the Processor's two lists as two items, "Suggestions" (the autocomplete vocabulary) and "Subject list" (the
+  controlled list Automatic tagging chooses from); the count column names which (new `TagsWindowModel.itemsLabel`:
+  Both, Suggestions, Subject list; the cell has `tags.items.<tag>`). The design note settled "both lists, never the
+  output folder": those files are the Reader's library and the Reader applies a recorded change to them.
+  `ProcessorTagsController` runs a plan on each list as it is now, keeps each as an ArchiveCore `TagSpellingChange`
+  (new: what each changed tag was and became, undone and redone on a list changed since, a replacement keeping the
+  dropped tag's place; `TagVocabulary.apply`, drops before adds), one Undo with Redo on the window's undo manager.
+  Renames and merges are recorded in every known archive (`ProcessorTagChanges.archives`/`record`; Undo withdraws,
+  Redo restores, all writes on one ordered chain and to the archives found when the change was made); a removal is
+  not (schema 1, queued: W40.tag-window-processor-remove) and the window says the files keep the tag. A change that
+  would empty a non-empty subject list (free-form tagging) leaves it and says so; Undo/Redo never fill an emptied list
+  nor empty one. `follow` re-applies against a subject list the window edited mid-follow instead of writing over it.
+  No output file is written. Tier-2: an independent Opus review found two serious (an Undo could withdraw before the
+  record landed; the UI-test seed wrote the real subject-list setting, now a scratch suite) and six minor, all fixed.
+  Tests: ArchiveCore TagSpellingChangeTests 6, TagsWindowModelTests +1, full `swift test` 560 + 10 green; Processor
+  build-for-testing clean, no new warnings; write-surface lint clean; VM: ArchiveProcessorUITests/TagsWindowUITests
+  (lists marked, rename on 2 lists recorded in the scratch archive's log, Edit ▸ Undo puts it back and withdraws the
+  entry, remove with its note; screenshots read). No migration written: nothing to migrate. $0; bench cache: nothing
+  created. Commits: checkpoint 1 and this one.
+  <!-- /W40.tag-window-processor -->

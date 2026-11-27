@@ -94,6 +94,7 @@ public struct TagsWindowView<Accessory: View>: View {
             }
             TableColumn(model.noun.plural.capitalized) { entry in
                 Text(model.itemsLabel?(entry) ?? "\(entry.itemCount)").monospacedDigit()
+                    .accessibilityIdentifier("tags.items.\(entry.name)")
             }
             .width(min: 50, ideal: model.itemsLabel == nil ? 70 : 150, max: model.itemsLabel == nil ? 110 : 220)
         }

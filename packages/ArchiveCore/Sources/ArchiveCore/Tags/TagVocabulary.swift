@@ -191,13 +191,11 @@ public final class TagVocabulary: @unchecked Sendable {
     public func apply(_ change: TagSpellingChange) -> Bool {
         lock.lock()
         let before = names
+        // Drops first, so a rename's Undo at the ceiling makes room for the name it puts back.
+        for (key, spelling) in change.spellings where spelling == nil { names.removeValue(forKey: key) }
         for (key, spelling) in change.spellings {
-            if let spelling {
-                guard names[key] != nil || names.count < Self.maxNames else { continue }
-                names[key] = spelling
-            } else {
-                names.removeValue(forKey: key)
-            }
+            guard let spelling, names[key] != nil || names.count < Self.maxNames else { continue }
+            names[key] = spelling
         }
         let changed = names != before
         lock.unlock()

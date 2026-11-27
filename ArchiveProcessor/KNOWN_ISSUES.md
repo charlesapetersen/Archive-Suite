@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## OPEN (2026-11-26) — A tag removed in the Processor's Tags window stays on the files and comes back
+
+- Window ▸ Tags (W40.tag-window-processor) removes a tag from the Processor's two lists only: a removal is not yet
+  recorded in the archive's change log (schema 1 has no remove), so the Reader is not offered it, the files keep the
+  tag, and the next harvest of the output folder puts it back in Suggestions. The window says so after a removal.
+  Renames and merges are recorded; once the Reader applies one, the harvest no longer brings the old name back.
+  (queued: W40.tag-window-processor-remove)
+
 ## OPEN (2026-11-26) — The live-capture journey exceeds the heavy lock's memory limit
 
 - `PROCESSOR_JOURNEY=livecapture` (W40.d5: the macOS 27.2 guest plus the host's headless Android emulator) was stopped

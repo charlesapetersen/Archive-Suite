@@ -64,6 +64,9 @@ targets:
         buildPhase: resources
     dependencies:
       - package: ArchiveCore
+        product: ArchiveCore
+      - package: ArchiveCore
+        product: ArchiveCoreUI
       - package: VisionOCRKit
         product: VisionOCRKit
       - package: ProcessorCore

@@ -25,6 +25,7 @@ struct ArchiveProcessorApp: App {
             MoneyJourneyFixture.configureIfRequested()
             MessageJourneyFixture.resetKeyWizardIfRequested()
             ProcessorUITestConfiguration.installScratchCollectionSettings()   // the range view's click check
+            ProcessorUITestConfiguration.installScratchTagLists()   // the Tags window's check (W40.tag-window-processor)
         }
 #endif
         // The Appearance setting (W48.appearance-processor), before the first window; a UI test's forced mode wins.
@@ -42,6 +43,12 @@ struct ArchiveProcessorApp: App {
             ProcessorFileCommands()
             ProcessingCommands()
         }
+
+        // Window ▸ Tags (W40.tag-window-processor): the shared Tags window over the Processor's two lists.
+        Window("Tags", id: ProcessorTagsWindow.id) {
+            ProcessorTagsWindow()
+        }
+        .defaultSize(width: 560, height: 520)
 
         Settings {
             SettingsView()

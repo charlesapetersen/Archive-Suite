@@ -27,6 +27,7 @@ struct SettingsOutputTab: View {
     @AppStorage(DefaultsKeys.itemTypeColourFolder) private var itemTypeColourFolder: Int = 0
     @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
     @State private var editingVocabulary = false
+    @Environment(\.openWindow) private var openWindow
 
     private typealias SizingBounds = SessionProcessingConfig.Bounds
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .standard }
@@ -203,8 +204,13 @@ struct SettingsOutputTab: View {
             let tags = tagVocabulary.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
             LabeledContent {
-                Button("Edit or import…") { editingVocabulary = true }
-                    .accessibilityIdentifier("ap.settings.vocabulary.edit")
+                HStack {
+                    Button("Edit or import…") { editingVocabulary = true }
+                        .accessibilityIdentifier("ap.settings.vocabulary.edit")
+                    // Rename, merge or remove a tag in both lists, told to the other apps (W40.tag-window-processor).
+                    Button("Tags Window") { openWindow(id: ProcessorTagsWindow.id) }
+                        .accessibilityIdentifier("ap.settings.vocabulary.tagsWindow")
+                }
             } label: {
                 VStack(alignment: .leading, spacing: 1) {
                     HelpLabel("Subject vocabulary", help: "When set, Automatic tagging chooses subject tags only from this list. Leave it empty for free-form tags.")

@@ -467,6 +467,7 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 │   ├── TagGenerator.swift             # LLM-based tag generation
 │   ├── CollectionSegmenter.swift      # Collection identification and organization
 │   ├── MacOSTagger.swift              # macOS Finder tag application (+ trailing "Unread")
+│   ├── ProcessorTagsWindow.swift      # Window ▸ Tags: rename, merge, remove over both vocabularies
 │   └── SystemTagsProvider.swift       # Subject autocomplete over the persisted TagVocabulary
 ├── Capture/                           # Live Capture
 │   ├── CaptureModels.swift            # CapturedPhoto, CaptureGroup, MacSegmentTags

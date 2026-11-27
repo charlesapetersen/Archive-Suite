@@ -463,6 +463,9 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   CollectionSegmenter.swift    Group files into box/folder collections.
   ProcessorTagChanges.swift    Both vocabularies follow the Reader's and Notes' renames, read from each known
                                archive's .archivesuite/tag-changes.json without asking (W40.tag-rename-suite).
+  ProcessorTagsWindow.swift    Window ▸ Tags (W40.tag-window-processor): the suite's shared Tags window over both
+                               vocabularies; rename, merge and remove as one Undo, renames and merges recorded in
+                               each known archive's change log. Never writes an output file.
   SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.

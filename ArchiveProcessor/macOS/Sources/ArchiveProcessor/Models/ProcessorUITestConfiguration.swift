@@ -304,6 +304,31 @@ enum ProcessorUITestConfiguration {
             .set(SettingsSheetModel.overrideKey("dating"), .string("gemini3.8-flash-oneshot"), doc: nil)
     }
 
+    /// The Tags window's subject list under `-APUITestTagLists`: a scratch suite emptied at launch, never the app's
+    /// own settings, so the test run on a Mac leaves its real list alone.
+    nonisolated(unsafe) static let tagListsDefaults: UserDefaults? = {   // UserDefaults is thread-safe
+        guard isActive, arguments.contains("-APUITestTagLists"), KeychainHelper.isHeadlessTestMode else { return nil }
+        let name = "com.archiveprocessor.app.uitest-tag-lists"
+        UserDefaults().removePersistentDomain(forName: name)
+        return UserDefaults(suiteName: name)
+    }()
+
+    /// `-APUITestTagLists` (W40.tag-window-processor): the Tags window's two lists seeded, and the test's scratch output
+    /// folder made a Reader archive (its root marker), so the window's renames are recorded in its change log. Headless
+    /// only: the suggestions are then the test's own file (`ARCHIVEPROC_TAGVOCAB_FILE`, else the scratch store), the
+    /// subject list `tagListsDefaults`.
+    @MainActor static func installScratchTagLists() {
+        guard let defaults = tagListsDefaults else { return }
+        defaults.set("Labor\nStrikes\nCivil Rights", forKey: DefaultsKeys.tagVocabulary)
+        ProcessorTagVocabulary.shared.add(rawTags: ["Labor", "Environment", "Environtment"])
+        ProcessorTagVocabulary.shared.flush()
+        if let folder = outputDirectory {
+            do { _ = try RootMarker.ensure(at: folder, kind: .reader, name: "Scratch archive") } catch {
+                preconditionFailure("Could not mark the scratch output folder: \(error)")
+            }
+        }
+    }
+
     /// A headless driver launch (`ARCHIVEPROC_HEADLESS=1`, the gate's recovery and retry-backend checks) must not
     /// restore the window state an earlier run saved. When that state names the main window, SwiftUI's restorer
     /// returns no window and AppKit then opens no default one, so `ContentView.onAppear` never runs and no driver
