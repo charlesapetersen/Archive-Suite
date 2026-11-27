@@ -11,7 +11,7 @@ import VisionOCRKit
 /// B, the header list, `PDFHeaderCarrier`), stored unfiltered as `ArchivalFinish` stores Quartz's; an sRGB output
 /// intent; and the trailer `/ID` qpdf writes. `--newline-before-endstream` is PDF/A's stream rule (6.1.7.1). The
 /// document info dictionary is dropped (`--empty`), so it cannot disagree with the XMP.
-/// Used for a new searchable output, a merge with searchable pages and the date-evidence rewrite of one; Quartz stays
+/// Used for a new searchable output, a merge with searchable pages and the class rewrite of one; Quartz stays
 /// the writer where qpdf is missing (the pages then are not compressed either) and for files of pairs only.
 enum SearchableArchival {
     enum Failure: LocalizedError {

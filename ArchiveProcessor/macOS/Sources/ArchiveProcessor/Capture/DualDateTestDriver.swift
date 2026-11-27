@@ -222,6 +222,7 @@ enum DualDateTestDriver {
             return h.documentDate == nil && h.sentWith == nil && h.dateEvidence == nil
         }
         check("both enclosure pages file the same dates, and neither page 2 (one a placeholder) carries a date line",
+              ["E1.jpg", "E1c.jpg"].allSatisfy { processor.appliedGeneratedTags[u($0)] != nil } &&
               ["E1.jpg", "E1c.jpg"].allSatisfy {
                   filedDates($0) == ("1957", "Mar 1958") && noDateLines($0)
               } && content("E1c.jpg")?.strippedBody == "No text returned by model.")

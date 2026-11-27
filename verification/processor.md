@@ -652,8 +652,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Reached by:** no control: the OCR prompt asks for `[enclosure]` (`OCR/OCRPrompt.swift:25`, parsed `:103`) →
   `DocumentSegmenter.segment(enclosureFlags:)` (`Tagging/DocumentSegmenter.swift:16`, from
   `OCR/OCRProcessor+Tagging.swift:1322`) → `EnclosureDates.applySentWith` (`:1160`, `:1204`); JSON `:1302`. PDF
-  source-date lines: `EnclosureDates.pdfSourceDates` (`Tagging/DocumentSegmenter.swift:210`), used only by Live
-  Capture (`Capture/LiveCaptureProcessor.swift:1387-1399`).
+  source-date lines: retired for new output (catalogue record; W49.storage-drop-dead-copies removed the unused
+  `EnclosureDates.pdfSourceDates`); the parser still reads them in older files.
 - **Real-path test:** `scripts/test-dual-date.sh` (`DUAL_DATE_TEST=1`, `Capture/DualDateTestDriver.swift`): marker,
   relation, `Sent With`, JSON and resume round-trips, header lines. Not covered: a real OCR reply, the manual UI.
 - **Runtime evidence:** 2026-11-21 · `d1ec616d` · [S-047 scratch run](evidence/processor/W49.proc-s047-verify.md).

@@ -933,8 +933,29 @@ enum DateRouteTestDriver {
             return (EnclosureDates.ownDate(of: tags)?.display, tags.sentWith?.display,
                     p.enclosureDateReviews[f]?.decision?.headerEvidence(giving: tags))
         }
+        // What `rememberCatalogueFields` files for the page in a catalogue run, from the same tags and decision.
+        func record(_ p: OCRProcessor, _ f: URL) -> ProcessorCatalogueRecord.DocumentFields? {
+            guard let tags = p.appliedGeneratedTags[f] else { return nil }
+            return ProcessorCatalogueRecord.documentFields(tags: tags, type: nil, dateIsUserSet: false,
+                                                          subjectsAreUserSet: false,
+                                                          dating: p.enclosureDateReviews[f]?.decision,
+                                                          itemFields: nil, entities: nil)
+        }
+        check("4 e2e: every page was tagged (so a nil below is an answer, not a missing page)",
+              gFiles.allSatisfy { g.appliedGeneratedTags[$0] != nil })
         check("4 e2e: no page 2 carries a date, Sent with, evidence or item-field line",
               ["DOCA", "DOCB", "DOCC", "DOCD", "DOCE"].allSatisfy { noDateLines(gOut, $0) })
+        let bRecord = record(g, gFiles[2]), eRecord = record(g, gFiles[1])
+        check("4 e2e catalogue: B's date with the image evidence and its quote; E's inherited date and Sent with",
+              bRecord?.documentDate?.value?.date == ArchiveDate.parse(wireValue: "1961-03-30")
+              && bRecord?.documentDate?.evidence?.first?.source == "image"
+              && bRecord?.documentDate?.evidence?.first?.quote == "March 30, 1961"
+              && eRecord?.documentDate?.value?.date == ArchiveDate.parse(wireValue: "1947")
+              && eRecord?.documentDate?.value?.uncertain == true
+              && eRecord?.documentDate?.evidence?.first?.source == "inherited"
+              && eRecord?.sentWith?.value?.date == ArchiveDate.parse(wireValue: "1947-03-03")
+              && record(g, gFiles[4])?.documentDate == nil,
+              "\(String(describing: bRecord?.documentDate?.evidence?.first)) \(String(describing: eRecord?.documentDate?.evidence?.first))")
         check("4 e2e A and D: no evidence (an explicit text year; no year)",
               filed(g, gFiles[0]).evidence == nil && filed(g, gFiles[4]).evidence == nil)
         check("4 e2e: explicit date, no date, image date and enclosure pair as filed",

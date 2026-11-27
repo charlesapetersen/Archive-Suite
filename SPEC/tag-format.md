@@ -326,8 +326,8 @@ keeps its text page (owner, 2026-11-17). Readers need nothing new; a file may mi
 - **Compressed (W42.int-s5-compress)** where `jbig2` and `qpdf` are found: the page is the image's own area of the
   pair's letter page, rebuilt as Vision OCR rebuilds its pages (a 1-bit JBIG2 image or MRC layers, VisionOCRKit
   `CompressedPage`), and the file is finished without a redraw (`SearchableArchival`: qpdf copies the pages and adds
-  the XMP, unfiltered, and an sRGB output intent; no Info dictionary). Merges with a searchable page and the
-  date-evidence rewrite go the same way. Without the tools the page is written as before (the image as embedded,
+  the XMP, unfiltered, and an sRGB output intent; no Info dictionary). Merges with a searchable page and a
+  class rewrite of one go the same way. Without the tools the page is written as before (the image as embedded,
   through Quartz) and the run log says so. Readers see no difference: the roles, the list and the layer are the same.
 - Still PDF/A-2b; veraPDF validates the extension schema. No migration is written because there is nothing to migrate.
 
@@ -429,11 +429,10 @@ Image straightened: <magnitude> degrees <direction>  ← OPTIONAL, after all oth
   fresh Finder tags remain authoritative. Exact case-sensitive prefixes, after Classification/Kind,
   consumed only within the same ordered header block. Catalogue-filed output (every Live Capture Finish and
   every standard Process Files run) carries none of these lines: its catalogue record holds the dates
-  (W49.storage-processor). For an output filed without a catalogue run, Process Files adds the resolved document
-  and covering-letter dates to each generated page in the same verified rewrite as the evidence and item fields,
-  before merging. For a searchable output the fields are
-  in the page's XMP header. A reclassification that changes enclosure dating also updates the affected lines
-  on outputs eligible for the rewrite.
+  (W49.storage-processor). No Processor step adds them to a rendered page any more, after tagging or after a review
+  (W49.storage-drop-dead-copies retired both rewrites; every Process Files run is catalogue-filed). A file that already
+  carries them, in its text page or, for a searchable output, its XMP header, keeps them as a historical snapshot:
+  Improve OCR and a class rewrite carry them over, and the parser reads them.
 - **Date evidence (W46.date-route-header; owner call 9, 2026-11-06).** The evidence behind a NON-explicit document
   year: one line, exact case-sensitive prefix `Date evidence: `, after the source-date lines in the same ordered
   header block (a source-date line after it starts the body). Written only for a year read off the page image,
@@ -452,12 +451,10 @@ Image straightened: <magnitude> degrees <direction>  ← OPTIONAL, after all oth
   comma, the quote is cut to 60 characters with `…`, and the line is fitted to one physical line, so it never
   holds the provenance separator nor wraps into the body. It goes with the Finder-tag year (an output-time
   snapshot; the tags stay authoritative) and with the sidecar's `dating` object, which carries the same evidence
-  in full. Process Files writes the source dates and any evidence after resolving the dates, before tagging the output:
-  it lays out the text page of a one-pair output again from its parsed header and the run's OCR text and keeps the
-  image page. It verifies that the requested fields, the other header lines and the body read back as expected
-  before replacing the output through a verified sibling write and one rename. An output that aliases its source,
-  an output of more than one pair or an output that fails verification keeps its existing bytes. Improve OCR
-  keeps the line. No migration is written because there is nothing to migrate.
+  in full. No Processor step writes the line any more (W49.storage-drop-dead-copies): the evidence is a catalogue fact
+  beside the document date (SPEC/catalogue-fields.md) and stays in the optional segment JSON's `dating` object. The
+  format above describes the line in files that already carry it. Improve OCR keeps the line. No migration is written
+  because there is nothing to migrate.
 - **Item fields (W47.item-fields-build, owner 2026-10-21).** The document's own catalogue fields, from the Processor's
   item-field call (`Tagging/ItemFieldExtractor.swift`). Gemini 3.7 Flash on the gateway uses the bench's image prompt.
   Optional lines after the date-evidence line, in the order `Document kind: `, `Title: `, `Byline: `, `Publication: `,
@@ -477,9 +474,9 @@ Image straightened: <magnitude> degrees <direction>  ← OPTIONAL, after all oth
   cut to 120 characters with `…`, and the line is fitted like the evidence line. The publication date is the issue
   date printed with the piece; it is shown and exported apart from the document's date tags and never written over
   them. An output-time snapshot: the sidecar's `item_fields` object carries the same fields with the quotes they were
-  read from and, under `not_filled`, the fields read but left empty and why (never their values). Process Files writes
-  the lines in the date-evidence rewrite (one pass for both) on output filed without a catalogue run; catalogue-filed
-  output of either route carries none, its catalogue record holding the fields; Improve OCR keeps them, and refuses a page that would lose them. No migration is written
+  read from and, under `not_filled`, the fields read but left empty and why (never their values). No Processor step
+  writes the lines any more (W49.storage-drop-dead-copies): output of either route carries none, its catalogue record
+  holding the fields; a file that already carries them keeps them, and Improve OCR refuses a page that would lose them. No migration is written
   because there is nothing to migrate.
   **Mac item fields (W47.wh-item-fields-mac-fill, owner 2026-11-19, call 23).** For automatic tagging (catalogue-filed
   output or segment JSON on; not pre-OCRed input), a Mac model or Local Agent run uses the two 4-bit MLX models on the Mac by default. Qwen3-VL 8B reads the
@@ -697,8 +694,9 @@ A role-looking subject is still a subject-collision risk: facet parsing must nev
 Date edits use explicit exact-token deltas against a fresh read, preserving untouched tokens and
 multiplicity through the existing audited writers. Notes projection retains its exact ownership ledger.
 
-For newly generated PDFs, add optional **Document date:** and **Sent with:** lines to the OCR-text
-header, before its separating blank line, repeating the document-unit pair on that unit's text pages.
+W37 added optional **Document date:** and **Sent with:** lines to newly generated PDFs' OCR-text header, before its
+separating blank line, repeating the document-unit pair on that unit's text pages. New output no longer prints them:
+its catalogue record holds the dates (W49.storage-processor, W49.storage-drop-dead-copies); files that carry them keep them.
 These are source-document dates, distinct from the provider/model line's **OCR processing date**.
 Both shared-header body stripping and classification extraction must recognize the new lines together;
 Reader keeps its existing full-header search behaviour. Reader edits remain metadata-only: they must
