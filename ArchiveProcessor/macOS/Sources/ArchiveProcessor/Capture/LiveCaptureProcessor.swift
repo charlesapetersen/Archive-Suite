@@ -2819,9 +2819,12 @@ final class LiveCaptureProcessor: ObservableObject {
         do {
             plans = try Self.pinCatalogueDestinations(requestedPlans, alreadyStaged: staged, outputRoot: outputDir)
         } catch {
+            // W40.fix-livecapture-fail-phase-warning — both early returns here file nothing, so each summary
+            // carries the "⚠️" `summaryReportsProblem` reads; without it the pane drew the green check over the
+            // failure (measured in the VM journey: an unwritable output folder fails here, in `withDirectory`).
             isFinalizing = false
             showFinalizeSheet = false
-            finalizeSummary = "The catalogue filing destination could not be saved. Choose the original output folder to resume filing. Staged files and original photos are in the Backup Folder."
+            finalizeSummary = "⚠️ The photos could NOT be filed: the catalogue filing destination could not be saved. Check that the output folder exists and can be written to (or choose the original output folder if it was changed), then click Finish again. Staged files and original photos are KEPT in the Backup Folder (nothing deleted)."
             return
         }
         let pinned = Dictionary(plans.flatMap(\.segments).map { ($0.groupId, $0) },
@@ -2830,7 +2833,7 @@ final class LiveCaptureProcessor: ObservableObject {
         guard persistManifest(synchronize: true) else {
             isFinalizing = false
             showFinalizeSheet = false
-            finalizeSummary = "The filing plan could not be saved. Check disk space or permissions and click Finish again. Staged files and original photos are in the Backup Folder."
+            finalizeSummary = "⚠️ The photos could NOT be filed: the filing plan could not be saved. Check disk space or permissions and click Finish again. Staged files and original photos are KEPT in the Backup Folder (nothing deleted)."
             return
         }
         // W47.ct-processor-capture — each read marker's fields, snapshotted here so the container write runs inside
