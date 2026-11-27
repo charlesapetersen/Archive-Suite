@@ -182,7 +182,8 @@ struct CostEstimator {
         measuredRoute: Bool = false,
         /// The Dates card's "image on every document" switch (`SettingsKey.dateImageEveryDocument`).
         dateImageEveryDocument: Bool = false,
-        /// The run writes JSON sidecars, which hold the item fields and correspondence names.
+        /// The run reads item fields and correspondence names: it writes JSON sidecars, or it reads fresh OCR and
+        /// records them in the catalogue (Live Capture always; Process Files unless the input is pre-read text).
         sidecars: Bool = false,
         /// Fraction of tagged documents expected to make the names call (`EntityRunPolicy.estimatedCallShare`).
         namesCallShare: Double = 0

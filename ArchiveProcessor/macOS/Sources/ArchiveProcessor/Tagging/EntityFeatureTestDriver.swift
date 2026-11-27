@@ -17,8 +17,8 @@ import ArchiveCore
 ///   5. End to end through `performTaggingPhase`, a cloud route and a route on this Mac, on scratch outputs.
 ///   6. Live Capture (W46.ent-feature-live): through the real ingest → finalize path with the $0 OCR stand-in, the
 ///      sidecar's `entities` object, the names kept in the staging manifest, a rotation-review regeneration that
-///      carries them with no second call, and no call with sidecars off or "No names". Needs the scratch backup root
-///      (`ARCHIVEPROC_TEST_BACKUP_ROOT`) and refuses to run without it.
+///      carries them with no second call, the call with sidecars off (the catalogue records the names) and none with
+///      "No names". Needs the scratch backup root (`ARCHIVEPROC_TEST_BACKUP_ROOT`) and refuses to run without it.
 @MainActor
 enum EntityFeatureTestDriver {
     nonisolated static let envKey = "ENTITY_FEATURE_TEST"
@@ -197,7 +197,7 @@ enum EntityFeatureTestDriver {
               abs(ranked.totalStandard - base.totalStandard - expected) < 1e-9
               && abs(ranked.totalBatch - base.totalBatch - expected) < 1e-9
               && ranked.addingOCR(1).namesCost == ranked.namesCost)
-        check("3 names estimate: sidecars off is zero", estimate(share: share(), sidecars: false).namesCost == 0)
+        check("3 names estimate: zero when the run reads no names or fields (pre-read text, sidecars off)", estimate(share: share(), sidecars: false).namesCost == 0)
         check("3 names estimate: Auto date and subscription are zero", share(mode: .autoDate) == 0 && share(plan: true) == 0)
         check("3 names estimate: Vision supplies no page kind for the names policy", share(vision: true) == 0)
         let mistral = LLMModel.mistralModels[0]
@@ -657,11 +657,17 @@ enum EntityFeatureTestDriver {
               && reloadedUnranked.liveProcessor._entityTestRetainedJSONTags("V") != nil
               && reloadedUnranked.liveProcessor._entityTestRetainedJSONTags("L")?.authorName == "Tagging Sender")
 
-        // Sidecars off: the names have no output, so no call; "No names": no call either.
+        // Sidecars off: the catalogue still records the names (W49.storage-processor), so the call runs on the same
+        // documents and L's record carries the quoted sender; "No names": no call.
         wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
-        _ = await session("nosidecars", sidecars: false, settings: ranked)
-        check("6 Live, sidecars off: tagged, no entity call", wire.tagging == 5 && wire.entity.isEmpty,
+        let (noSidecars, _, _) = await session("nosidecars", sidecars: false, settings: ranked)
+        let record = noSidecars.liveProcessor.staged.first { $0.groupId == "L" }?.catalogueRecords?.first
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        check("6 Live, sidecars off: tagged, the entity call on L, V and F, no sidecar",
+              wire.tagging == 5 && wire.entity.sorted() == ["DOCF", "DOCL", "DOCV"] && sidecar(noSidecars, "L").isEmpty,
               "\(wire.tagging) \(wire.entity)")
+        check("6 Live, sidecars off: L's catalogue record carries the read names", record.contains("entity-quote"),
+              String(record.prefix(300)))
         wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
         let (none, _, _) = await session("nonames", settings: ranked.merging([
             SettingsSheetModel.overrideKey("entities").rawValue: ResolvedSetting(value: .string("none"))]) { a, _ in a })
