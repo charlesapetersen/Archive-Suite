@@ -1415,9 +1415,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   Retry per pass), then reads the job status, the run's failed-file count and the output folder.
 - **Would clear it:** the job is marked failed or re-written by some later step, or a re-hold cannot happen after
   the first pass.
-- **Status:** `open` — verification queued as `W49.proc-s056-verify`.
+- **Status:** `fixed` — verified and fixed by Gemini (`W49.proc-s056-verify`, 2026-11-27).
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 5, silent failure).
+  - 2026-11-27 W49.proc-s056-verify — confirmed and fixed in `materializeDeferredOutputs` backstop (`recordOutputWrite(OutputWriteOutcome(success: false), ...)` fails the job and records `failedFiles`); regression test added in `DeferredOutputContract.swift` (`scripts/test-deferred-output.sh` ALL PASS).
 
 ### S-057 · A single-file Retry after a run decides its Preservation Copy from today's setting, not the run's
 
@@ -1431,9 +1432,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a scratch run with copies off, the setting turned on, one page retried: a Preservation Copy
   appears for that page only.
 - **Would clear it:** `activeRunConfig`'s value reaches `beginCatalogueRun` some other way.
-- **Status:** `open` — verification queued as `W49.proc-s057-verify`.
+- **Status:** `fixed` — verified and fixed by Gemini (`W49.proc-s057-verify`, 2026-11-27).
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 1, multi-path drift).
+  - 2026-11-27 W49.proc-s057-verify — confirmed and fixed in `OCRProcessor+Pipeline.swift` `retryOne` (passes `keepPreservationCopies: effectiveRunConfig.keepPreservationCopies`); bidirectional regression test added in `DeferredOutputContract.swift` (`scripts/test-deferred-output.sh` ALL PASS).
 
 ### S-058 · A managed page-reader download keeps running after the Processor quits
 
@@ -1448,9 +1450,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a headless scratch download with a stub downloader that sleeps; quit the app; the stub is
   still alive (`pgrep`).
 - **Would clear it:** the child is in the app's process group or watches its parent and exits.
-- **Status:** `open` — verification queued as `W49.proc-s058-verify`.
+- **Status:** `fixed` — verified and fixed by Gemini (`W49.proc-s058-verify`, 2026-11-27).
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 2, uncoordinated subprocess).
+  - 2026-11-27 W49.proc-s058-verify — confirmed and fixed: `ManagedLocalOCR.cancelAll()` called in `ProcessorAppDelegate.applicationWillTerminate`, and `LocalModelSupervisor.stopAll()` synchronously cancels `activeInstallCanceller` (`LocalAgentClient.runAsync` accepts the tracked `ProcessCanceller`); regression test added in `ManagedLocalOCRContract.swift` (`scripts/test-local-models.sh` ALL PASS).
 
 ### S-059 · The handwriting placer can run beside a resident managed page reader (about 14–16 GB)
 

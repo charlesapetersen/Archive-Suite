@@ -261,6 +261,69 @@ enum DeferredOutputContract {
                 && !fm.fileExists(atPath: manifest.path),
               "\(filed.map(\.path)) — \(resumed.statusMessage)")
 
+        // 7. S-056: an output still held after three write passes fails its job and records failedFiles.
+        let s56Out = root.appendingPathComponent("s56", isDirectory: true)
+        let s56Missing = s56Out.appendingPathComponent("gone", isDirectory: true).appendingPathComponent("s056.pdf")
+        let s56 = OCRProcessor()
+        s56.jobs = [OCRJob(sourceURL: pages[0])]
+        s56.jobs[0].result = reading(0)
+        s56.jobs[0].status = .succeeded
+        s56.outputURLMap[pages[0]] = s56Missing
+        let s56Req = s56.outputWriteRequest(imageURL: pages[0], source: pages[0], outputURL: s56Missing,
+                                            result: reading(0), model: model, runConfig: config)
+        s56.deferredOutputs[s56Missing] = DeferredOutput(request: s56Req)
+        var s56Passes = 0
+        OCRProcessor.deferredWritePassHook = { proc in
+            s56Passes += 1
+            proc.deferredOutputs[s56Missing] = DeferredOutput(request: s56Req)
+        }
+        await s56.materializeDeferredOutputs()
+        OCRProcessor.deferredWritePassHook = nil
+        check("S-056: a held output still held after three passes fails its job and records failedFiles",
+              s56Passes == 3 && s56.outputURLMap[pages[0]] == nil && s56.deferredOutputs.isEmpty
+                && s56.jobs[0].status == .failed && s56.jobs[0].result?.errorCode == "pdf_write_failed"
+                && !s56.failedFiles.isEmpty && !fm.fileExists(atPath: s56Missing.path),
+              "passes=\(s56Passes) status=\(s56.jobs[0].status) err=\(s56.jobs[0].result?.errorCode ?? "nil") failed=\(s56.failedFiles.count)")
+
+        // 8. S-057: standalone retryOne uses the run's frozen keepPreservationCopies, not the live general layer.
+        let s57Page = input.appendingPathComponent("s57-text.jpg")
+        let s57ImageOK = makeTextJPEG(s57Page, text: "ARCHIVE SUITE S057 TEST 1954")
+        let s57OutOff = root.appendingPathComponent("s57-off", isDirectory: true)
+        let s57OutOn = root.appendingPathComponent("s57-on", isDirectory: true)
+        try? fm.createDirectory(at: s57OutOff, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: s57OutOn, withIntermediateDirectories: true)
+        let prevPreservation = SettingsLayerStore.shared.keepsPreservationCopies
+        defer { _ = SettingsLayerStore.shared.setGeneral(.keepPreservationCopies, .bool(prevPreservation), source: .setByUser(Date())) }
+        // Case A: run had keepPreservationCopies=false, live setting is now true -> no Preservation Copy.
+        _ = SettingsLayerStore.shared.setGeneral(.keepPreservationCopies, .bool(true), source: .setByUser(Date()))
+        var s57ConfigOff = config
+        s57ConfigOff.provider = .appleVision
+        s57ConfigOff.model = model
+        s57ConfigOff.keepPreservationCopies = false
+        let s57Off = OCRProcessor()
+        s57Off.taggingMode = .none
+        s57Off.rotationMode = .off
+        s57Off.jobs = [OCRJob(sourceURL: s57Page)]
+        s57Off.activeRunConfig = s57ConfigOff
+        let s57OffOK = await s57Off.retryOne(index: 0, outputDirectory: s57OutOff, runConfig: s57ConfigOff)
+        let s57OffHasPres = (try? fm.contentsOfDirectory(atPath: s57OutOff.appendingPathComponent("Preservation").path))?.isEmpty == false
+        try? fm.removeItem(at: OCRProcessor.pendingCatalogueURL)
+        // Case B: run had keepPreservationCopies=true, live setting is now false -> Preservation Copy written.
+        _ = SettingsLayerStore.shared.setGeneral(.keepPreservationCopies, .bool(false), source: .setByUser(Date()))
+        var s57ConfigOn = s57ConfigOff
+        s57ConfigOn.keepPreservationCopies = true
+        let s57On = OCRProcessor()
+        s57On.taggingMode = .none
+        s57On.rotationMode = .off
+        s57On.jobs = [OCRJob(sourceURL: s57Page)]
+        s57On.activeRunConfig = s57ConfigOn
+        let s57OnOK = await s57On.retryOne(index: 0, outputDirectory: s57OutOn, runConfig: s57ConfigOn)
+        let s57OnHasPres = (try? fm.contentsOfDirectory(atPath: s57OutOn.appendingPathComponent("Preservation").path))?.isEmpty == false
+        try? fm.removeItem(at: OCRProcessor.pendingCatalogueURL)
+        check("S-057: standalone retryOne honours runConfig.keepPreservationCopies over live general setting",
+              s57ImageOK && s57OffOK && !s57OffHasPres && s57OnOK && s57OnHasPres,
+              "img=\(s57ImageOK) offOK=\(s57OffOK) offPres=\(s57OffHasPres) onOK=\(s57OnOK) onPres=\(s57OnHasPres)")
+
         finish(results)
     }
 
@@ -272,6 +335,26 @@ enum DeferredOutputContract {
               let pixels = bitmap.bitmapData else { return false }
         memset(pixels, Int32(shade * 255), bitmap.bytesPerRow * bitmap.pixelsHigh)
         guard let data = bitmap.representation(using: .jpeg, properties: [:]) else { return false }
+        try? data.write(to: url)
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    private static func makeTextJPEG(_ url: URL, text: String) -> Bool {
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let size = NSSize(width: 600, height: 160)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 32, weight: .bold),
+            .foregroundColor: NSColor.black
+        ]
+        (text as NSString).draw(at: NSPoint(x: 24, y: 60), withAttributes: attrs)
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let data = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.95]) else { return false }
         try? data.write(to: url)
         return FileManager.default.fileExists(atPath: url.path)
     }

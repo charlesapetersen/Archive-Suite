@@ -118,6 +118,34 @@ enum ManagedLocalOCRContract {
         // `small` is still installed: the shared software stays for it.
         check("3 the shared software stays while another model is installed",
               fm.fileExists(atPath: root.appending(path: "uv-aarch64-apple-darwin/uv").path))
+
+        // 3b. S-058: quitting mid-download (cancelAll + stopAll) terminates the active installer child synchronously.
+        let pidFile = scratch.appending(path: "s058-uv.pid")
+        let uvPath = root.appending(path: "uv-aarch64-apple-darwin/uv")
+        try? Data("#!/bin/sh\necho $$ > \"\(pidFile.path)\"\nexec sleep 30\n".utf8).write(to: uvPath)
+        try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: uvPath.path)
+        manager.download(other3)
+        var childPID: pid_t = 0
+        for _ in 0..<200 {
+            if let text = try? String(contentsOf: pidFile, encoding: .utf8),
+               let parsed = pid_t(text.trimmingCharacters(in: .whitespacesAndNewlines)), parsed > 0 {
+                childPID = parsed
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        let startedAlive = childPID > 0 && kill(childPID, 0) == 0
+        manager.cancelAll()
+        s.stopAll()
+        var exited = false
+        for _ in 0..<80 {
+            if childPID > 0, kill(childPID, 0) != 0 { exited = true; break }
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        if childPID > 0, !exited { kill(childPID, SIGKILL) }
+        check("3b S-058: cancelAll + stopAll stops an active download child on quit",
+              startedAlive && exited, "pid=\(childPID) startedAlive=\(startedAlive) exited=\(exited)")
+        seedUV()
         try? await s.remove(small)
         check("3 removing the last model removes the shared software", !fm.fileExists(atPath: root.path))
 

@@ -262,12 +262,17 @@ final class LocalModelSupervisor {
         }
     }
 
+    private var activeInstallCanceller: LocalAgentClient.ProcessCanceller?
+
     private func run(_ binary: URL, _ arguments: [String], model: Model, timeout: TimeInterval,
                      failure: Failure) async throws {
         try Task.checkCancellation()
+        let canceller = LocalAgentClient.ProcessCanceller()
+        activeInstallCanceller = canceller
+        defer { if activeInstallCanceller === canceller { activeInstallCanceller = nil } }
         let result = await LocalAgentClient.runAsync(binaryPath: binary.path, args: arguments, stdinText: "",
                                                      timeout: timeout, currentDirectory: root,
-                                                     environment: environment(model))
+                                                     environment: environment(model), canceller: canceller)
         try Task.checkCancellation()
         guard result.exitCode == 0, !result.timedOut else { throw failure }
     }
@@ -385,9 +390,11 @@ final class LocalModelSupervisor {
         retire(child)
     }
 
-    /// Stops everything at once (the app is quitting). A read in flight fails as `stopped`.
+    /// Stops everything at once (the app is quitting). Active downloads and reads in flight are stopped synchronously.
     func stopAll() {
         generation += 1
+        activeInstallCanceller?.cancel()
+        activeInstallCanceller = nil
         idle?.cancel()
         idle = nil
         if let child = resident {

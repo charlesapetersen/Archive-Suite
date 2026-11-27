@@ -3980,7 +3980,8 @@ extension OCRProcessor {
                 statusMessage = "Retry needs the PDF preparation tool. The existing files are intact."
                 return false
             }
-            guard await beginCatalogueRun(outputRoot: outputDirectory, sources: [source]) else { return false }
+            guard await beginCatalogueRun(outputRoot: outputDirectory, sources: [source],
+                                          keepPreservationCopies: effectiveRunConfig.keepPreservationCopies) else { return false }
             isProcessing = true
             defersOutputWrites = false   // a retry after the run files its output itself, at once
         }

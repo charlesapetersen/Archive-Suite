@@ -9,6 +9,7 @@ final class ProcessorAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        ManagedLocalOCR.shared.cancelAll()
         ManagedGemma.shared.stop()
         LocalModelSupervisor.shared.stopAll()
     }

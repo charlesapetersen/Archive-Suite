@@ -661,8 +661,8 @@ struct LocalAgentClient: Sendable {
     /// stops the child (SIGTERM, then SIGKILL) and returns a run marked `cancelled`.
     static func runAsync(binaryPath: String, args: [String], stdinText: String,
                          timeout: TimeInterval, currentDirectory: URL? = nil,
-                         unsetEnvironment: [String] = [], environment: [String: String]? = nil) async -> CLIRun {
-        let canceller = ProcessCanceller()
+                         unsetEnvironment: [String] = [], environment: [String: String]? = nil,
+                         canceller: ProcessCanceller = ProcessCanceller()) async -> CLIRun {
         return await withTaskCancellationHandler {
             await withCheckedContinuation { cont in
                 DispatchQueue.global(qos: .userInitiated).async {

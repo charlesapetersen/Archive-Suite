@@ -211,6 +211,11 @@ extension OCRProcessor {
 
     // MARK: - The one output write (W49.proc-unified-pipeline-2)
 
+#if DEBUG
+    /// Test hook called in `writeHeldOutputs` right before the generation match check (S-056).
+    nonisolated(unsafe) static var deferredWritePassHook: (@MainActor (OCRProcessor) -> Void)?
+#endif
+
     /// Write every output held back since OCR (`handleOCRResult`), once, with the page's settled rotation and class
     /// (its job's current reading), then the last tags a review aimed at it. Called after the reviews and before
     /// tagging; a no-op when nothing is held. A stopped run leaves the rest unwritten: their readings are in the
@@ -224,12 +229,14 @@ extension OCRProcessor {
             await writeHeldOutputs()
         }
         guard !Task.isCancelled else { return }
-        // Backstop: an output still held now is never written, so nothing may point at it.
-        for (url, held) in deferredOutputs where outputURLMap[held.request.source] == url
-            && !FileManager.default.fileExists(atPath: url.path) {
-            outputURLMap[held.request.source] = nil
-        }
+        // Backstop: an output still held now is never written, so nothing may point at it and its job must fail (S-056).
+        let stillHeld = deferredOutputs
         deferredOutputs = [:]
+        for (url, held) in stillHeld where outputURLMap[held.request.source] == url
+            && !FileManager.default.fileExists(atPath: url.path) {
+            let jobIndex = jobs.firstIndex { $0.sourceURL == held.request.source && outputURLMap[$0.sourceURL] == url }
+            recordOutputWrite(OutputWriteOutcome(success: false), request: held.request, jobIndex: jobIndex)
+        }
     }
 
     /// One pass of `materializeDeferredOutputs`.
@@ -277,6 +284,9 @@ extension OCRProcessor {
                 running -= 1
                 // Stopped mid-write: nothing is recorded, and the reading stays in the journal for the resume.
                 if Task.isCancelled && !written.success { continue }
+#if DEBUG
+                Self.deferredWritePassHook?(self)
+#endif
                 // A newer reading was held meanwhile: the next pass writes it over this one.
                 guard deferredOutputs[request.outputURL]?.generation == generation else { continue }
                 let jobIndex = jobs.firstIndex { $0.sourceURL == request.source && outputURLMap[$0.sourceURL] == request.outputURL }

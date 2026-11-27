@@ -150,6 +150,9 @@ final class ManagedLocalOCR: ObservableObject {
 
     func cancel(_ m: ManagedOCRModel) { installations[m]?.cancel() }
 
+    /// Cancels every in-flight download task (e.g. on app termination, S-058).
+    func cancelAll() { for m in Array(installations.keys) { installations[m]?.cancel() } }
+
     /// Removes the model's files. If it was the Reader, Apple Vision becomes the Reader, so a run never waits on a model
     /// that is gone.
     func remove(_ m: ManagedOCRModel, defaults d: UserDefaults = .standard) async {
