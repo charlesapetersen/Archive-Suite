@@ -23,18 +23,33 @@ folder is refused too.
 1. **Inventory**, read-only. It walks every PDF under the source, tagged or not, and records its path, size, page
    count, verbatim Finder tags and colour label. It never asks a cloud provider to download a file. It writes
    `adoption-manifest.json` and `inventory-report.md`, and never overwrites a manifest already in the state folder.
-2. **Review.** Each entry has a `decision`: `accept`, `skip` or `review`. Clean entries start as `accept` and
+2. **Classify**, optional (W49.proc-backfill-classify-optin, owner calls 21 and 31). For an archive whose box and
+   folder photos carry no tag or colour, it reads each one-page file the inventory gave no item type, not yet
+   converted, with Vision on this Mac, from the matched original or else the PDF's page rendered to a temporary
+   file. The Processor's text-only page classifier then judges the text: `vision-heuristic` is its keyword rules ($0,
+   nothing leaves the Mac), and `<provider>:<model id>` sends the Vision text, never the image, to that model with the
+   user's key. Run alone, it prints the estimated time (Vision timed on up to three of the files, plus the model's
+   calls) and the most it can cost (the longest text the classifier sends, a token a character, and the whole reply
+   allowance; a Gemini model that thinks gets the lowest thinking budget, which is counted) and changes nothing. It
+   runs only when asked, with a cost cap at least that figure; a model whose price is not listed is refused, and no
+   call is made that could take the run past its cap. The cap is for one run. A found label becomes a proposed item
+   type with rule `classifier:<route>` and waits for review (`type-classified`), even an entry accepted before. Every
+   verdict, `document` and `unread` (Vision found no text) included, is kept in the entry's `classified` and saved
+   as the pass goes, so a later pass reads only what it has not. A page that could not be read and a model reply with
+   no tag are left for a later pass. The keyword rules propose any short page that names an archive or opens with a
+   number range, so their findings need checking. It writes only the manifest and its report.
+3. **Review.** Each entry has a `decision`: `accept`, `skip` or `review`. Clean entries start as `accept` and
    anything uncertain starts as `review`. A reviewer edits the manifest, or decides a reason group at once (`decide`
    accepts or skips the waiting entries whose reasons all fall in the group).
-3. **Convert** files each accepted entry at the same relative path in the destination, which must be new or empty.
+4. **Convert** files each accepted entry at the same relative path in the destination, which must be new or empty.
    The step copies the PDF with a new catalogue identity (`SearchableArchival.catalogueCopy`: only the identity is
    added) and writes its companion. It preserves the matched original's exact bytes when the PDF has one page. The
    derived PDF carries no Finder tags or colour; its facts live in the companion. A source whose bytes, tags or
    colour changed since the inventory is refused for a new inventory.
-4. **Verify** reports every accepted entry that did not land, then re-reads the derived archive through `CatalogueReader`. For each converted entry it checks that the
+5. **Verify** reports every accepted entry that did not land, then re-reads the derived archive through `CatalogueReader`. For each converted entry it checks that the
    pair reads, the companion is the one filed, the page count matches, every proposed fact reads back, a preserved
    original matches its source image, and the source's bytes and tags are unchanged. Convert runs it too.
-5. **Labels**, optional. It reads each converted Box or Folder file's label from its matched original (Vision on
+6. **Labels**, optional. It reads each converted Box or Folder file's label from its matched original (Vision on
    this Mac, $0) and proposes the derived directory's container runs through the shared backfill engine. It writes
    `.archivesuite/containers.json` in the derived archive only, and only when asked to apply. A folder whose files
    are not all converted or skipped is not written, since a run covers the files after its label. A label without
@@ -52,13 +67,13 @@ untouched source.
 
 ## Proposed facts
 
-Every fact names its `rule` and quotes its `evidence`. Converted fields have origin `imported` and carry the same
-rule and quote as evidence. An old `Checked Date` or `Checked Sent With` tag becomes a current check on that date. The tags are read with the suite's own grammar (`DocumentTags`), and the raw tokens stay in
+Every fact names its `rule` and quotes its `evidence`. Converted fields have origin `imported`, or `model` for an item type the
+classifier proposed, and carry the same rule and quote as evidence. An old `Checked Date` or `Checked Sent With` tag becomes a current check on that date. The tags are read with the suite's own grammar (`DocumentTags`), and the raw tokens stay in
 the manifest.
 
 | Fact | Rule |
 |---|---|
-| Item type (`box`, `folder`) | An explicit `Box` or `Folder` tag (`tag`), else the colour preset (`colour:red-box-purple-folder`). The preset `none` reads no colour as a type. |
+| Item type (`box`, `folder`) | An explicit `Box` or `Folder` tag (`tag`), else the colour preset (`colour:red-box-purple-folder`). The preset `none` reads no colour as a type. The optional classifier proposes one for an untyped file (`classifier:<route>`, quoting the Vision text). |
 | Colour | The Finder label, always kept as display metadata (`finder-label`), even when it also gave the type. |
 | Date, Sent with | The date tags (`date-tags`, `sent-with-tag`) with their uncertainty. A Year supersedes a Decade. |
 | Subjects | Every other tag, verbatim. A date-like or unrecognised spelling stays a subject. |
@@ -79,6 +94,7 @@ the manifest.
 | `original-shared` | One original is claimed by several PDFs; none keeps it until the reviewer says which. | yes |
 | `original-multipage` | One original for a PDF of several pages. | yes, without an original |
 | `original-offline` | The matched original is a cloud placeholder; copying it would download it. | yes, without an original |
+| `type-classified` | The optional classifier proposed the item type. | yes |
 | `pdf-unreadable` | The PDF does not open, has no pages, or is encrypted. | no |
 | `pdf-offline` | A cloud placeholder whose data is not on this Mac. | no |
 | `pdf-ineligible` | Signed, certified, or otherwise unable to take a catalogue identity unchanged. | no |
@@ -90,7 +106,7 @@ the manifest.
 `W49.storage-pilot` runs the tool on representative scratch copies with the rest of the catalogue rollout. The
 owner then reviews that pilot (`W49.corpus-adoption-owner-review`), including which old spellings the tag grammar
 reads as subjects and whether a label photo without an original may be read from its PDF.
-The optional label classifier for unmarked photos is `W49.proc-backfill-classify-optin`. A general folder-map or
+A general folder-map or
 filename rule beyond the two pairing tiers above is not included. The historical bench's number, folder and image
 tiers (`segbench/corpus_pairs.py`) remain evidence for review. Retiring the apps' legacy paths waits until the owner
 has adopted the real archive (`W49.corpus-legacy-retire`). Adopted pages carry the role `page`, as the Processor's

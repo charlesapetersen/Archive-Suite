@@ -10,14 +10,16 @@ import Foundation
 /// manifest: a found label becomes a proposed item type that waits for review (`type-classified`).
 enum AdoptionClassify {
     /// The page's text for the classifier, given the entry's path and the image to read: Vision on this Mac, $0 and
-    /// no network. nil when Vision read nothing.
-    typealias TextReader = @Sendable (String, URL) async -> String?
+    /// no network. nil when Vision read the page and found no text; it throws when the page could not be read.
+    typealias TextReader = @Sendable (String, URL) async throws -> String?
     /// The judgement on one page's text.
     typealias Judge = @Sendable (String) async throws -> DocumentClassification?
 
     static let visionText: TextReader = { _, image in
-        let text = try? await PageReaders.visionReader().read(.init(imageURL: image)).detail.text
-        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard FileManager.default.fileExists(atPath: image.path) else { throw CocoaError(.fileNoSuchFile) }
+        let detail = try await PageReaders.visionReader().read(.init(imageURL: image)).detail
+        if let error = detail.errorMessage { throw OCRError.networkError(error) }
+        let trimmed = detail.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmed.isEmpty ? nil : trimmed
     }
 
@@ -45,15 +47,26 @@ enum AdoptionClassify {
             }
         }
 
-        /// One file's price by the Processor's own estimate for a text-only classification (`CostEstimator`: 600
-        /// tokens in, 10 out); Mistral's text calls go to Mistral Small at its own rates. nil when the price is not known.
+        /// Gemini's text call sets no output limit, so a model that thinks is held to the lowest thinking budget.
+        /// Every other route's call is bounded by `maxTokens` (OpenAI and OpenRouter count reasoning inside it, and
+        /// Anthropic is asked for no thinking).
+        var thinkingLevel: ThinkingLevel? {
+            guard case .model(let model) = self, model.provider == .gemini, model.supportsThinking else { return nil }
+            return .low
+        }
+
+        /// The most one file can cost: the prompt with the longest text the classifier sends (2,000 characters, counted
+        /// as a token each), the prompt's own words at three characters a token, and the whole output allowance with
+        /// any thinking budget. Mistral's text calls go to Mistral Small at its own rates. nil when the price is not known.
         var dollarsPerPage: Double? {
             guard case .model(let model) = self else { return 0 }
             if model.unpriced == true { return nil }
             let rates = model.provider == .mistral ? LLMTextClient.mistralTextRates
                 : (input: model.inputCostPer1M, output: model.outputCostPer1M)
-            return (CostEstimator.estimatedClassificationInputTokens * rates.input
-                    + CostEstimator.estimatedClassificationOutputTokens * rates.output) / 1_000_000
+            let template = OCRPrompt.buildClassificationOnly(text: "", previousText: nil)
+            let input = (Double(template.count) / 3).rounded(.up) + Double(textLimit)
+            let output = Double(maxTokens + (thinkingLevel?.budgetTokens(for: .textCompletion) ?? 0))
+            return (input * rates.input + output * rates.output) / 1_000_000
         }
 
         var secondsPerCall: Double {
@@ -70,9 +83,7 @@ enum AdoptionClassify {
                 return { text in
                     let reply = try await LLMTextClient.complete(
                         prompt: OCRPrompt.buildClassificationOnly(text: text, previousText: nil),
-                        // The lowest thinking level keeps a reasoning model's reply near the estimate.
-                        provider: model.provider, model: model, thinkingLevel: model.supportsThinking ? .low : nil,
-                        apiKey: apiKey,
+                        provider: model.provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
                         gatewayConfig: nil, maxTokens: maxTokens, timeout: 30)
                     return OCRPrompt.parseResponse(reply).0
                 }
@@ -81,6 +92,8 @@ enum AdoptionClassify {
     }
 
     static let maxTokens = 64
+    /// `OCRPrompt.buildClassificationOnly` sends at most this many characters of the page's text.
+    static let textLimit = 2_000
     static let sampleSize = 3
     static let rulePrefix = "classifier:"
 
@@ -101,6 +114,8 @@ enum AdoptionClassify {
         var documents = 0
         var unread: [String] = []
         var failed: [String] = []
+        /// Left unread because one more call could have passed the cap.
+        var overCap: [String] = []
         var calls = 0
     }
 
@@ -126,12 +141,12 @@ enum AdoptionClassify {
         return image == pdf ? nil : (image, true)
     }
 
+    /// nil when the page could not be read (no image, or the reader failed); `.some(nil)` when it had no text.
     private static func read(_ entry: AdoptionManifest.Entry, manifest: AdoptionManifest,
                              reader: TextReader) async -> String?? {
         guard let (url, rendered) = await image(for: entry, manifest: manifest) else { return .none }
-        let text = await reader(entry.path, url)
-        if rendered { try? FileManager.default.removeItem(at: url) }
-        return .some(text)
+        defer { if rendered { try? FileManager.default.removeItem(at: url) } }
+        do { return .some(try await reader(entry.path, url)) } catch { return .none }
     }
 
     /// Times Vision on up to `sampleSize` candidates ($0) and prices the rest. Changes nothing.
@@ -151,47 +166,71 @@ enum AdoptionClassify {
     }
 
     /// Classifies every candidate and records each verdict in `manifest`. A box or folder label becomes a proposed
-    /// item type with the classifier as its rule and waits for review; a document or an unread page keeps no type.
+    /// item type with the classifier as its rule and waits for review, even if it was accepted before; a document or
+    /// an unread page keeps no type. A model call is made only while the calls so far, each at the most a file can
+    /// cost, stay within `cap`. A page that could not be read, or a model reply with no tag, is left for a later run.
+    /// `save` receives the manifest every `saveEvery` verdicts and when the run stops, so verdicts already paid for
+    /// survive an interruption.
     static func run(_ manifest: inout AdoptionManifest, ledger: AdoptionLedger?, route: Route, judge: Judge,
-                    reader: TextReader = visionText) async throws -> Result {
+                    cap: Double? = nil, reader: TextReader = visionText, saveEvery: Int = 10,
+                    save: @Sendable (AdoptionManifest) throws -> Void = { _ in }) async throws -> Result {
         var result = Result()
         let rule = rulePrefix + route.name
-        for index in candidates(manifest, ledger: ledger) {
-            try Task.checkCancellation()
-            let entry = manifest.entries[index]
-            guard case .some(let outcome) = await read(entry, manifest: manifest, reader: reader) else {
-                result.failed.append(entry.path); continue
+        let perCall = route.dollarsPerPage ?? .infinity
+        var unsaved = 0
+        do {
+            for index in candidates(manifest, ledger: ledger) {
+                try Task.checkCancellation()
+                let entry = manifest.entries[index]
+                if case .model = route, let cap, Double(result.calls + 1) * perCall > cap {
+                    result.overCap.append(entry.path); continue
+                }
+                guard case .some(let outcome) = await read(entry, manifest: manifest, reader: reader) else {
+                    result.failed.append(entry.path); continue
+                }
+                guard let text = outcome else {
+                    manifest.entries[index].classified = .init(value: "unread", rule: rule, evidence: "Vision read no text")
+                    result.unread.append(entry.path)
+                    unsaved += 1
+                    if unsaved >= saveEvery { try save(manifest); unsaved = 0 }
+                    continue
+                }
+                let verdict: DocumentClassification?
+                do {
+                    if case .model = route { result.calls += 1 }
+                    verdict = try await judge(text)
+                } catch {
+                    result.failed.append(entry.path); continue
+                }
+                guard let verdict else { result.failed.append(entry.path); continue }
+                let quote = String(text.prefix(120)).replacingOccurrences(of: "\n", with: " ")
+                let evidence = "[\(verdict.rawValue)] from Vision text \"\(quote)\""
+                let type: ItemType? = switch verdict {
+                case .boxLabel: .box
+                case .folderLabel: .folder
+                case .documentStart, .documentContinuation: nil
+                }
+                manifest.entries[index].classified = .init(value: type.map { $0.rawValue.lowercased() } ?? "document",
+                                                           rule: rule, evidence: evidence)
+                if let type {
+                    manifest.entries[index].proposal.itemType = .init(value: type.rawValue.lowercased(), rule: rule,
+                                                                      evidence: evidence)
+                    if !manifest.entries[index].review.contains(.typeClassified) {
+                        manifest.entries[index].review.append(.typeClassified)
+                    }
+                    manifest.entries[index].decision = .review
+                    if type == .box { result.boxes.append(entry.path) } else { result.folders.append(entry.path) }
+                } else {
+                    result.documents += 1
+                }
+                unsaved += 1
+                if unsaved >= saveEvery { try save(manifest); unsaved = 0 }
             }
-            guard let text = outcome else {
-                manifest.entries[index].classified = .init(value: "unread", rule: rule, evidence: "Vision read no text")
-                result.unread.append(entry.path)
-                continue
-            }
-            let verdict: DocumentClassification?
-            do {
-                if case .model = route { result.calls += 1 }
-                verdict = try await judge(text)
-            } catch {
-                result.failed.append(entry.path); continue
-            }
-            let quote = String(text.prefix(120)).replacingOccurrences(of: "\n", with: " ")
-            let type: ItemType? = switch verdict {
-            case .boxLabel: .box
-            case .folderLabel: .folder
-            default: nil
-            }
-            let tag = verdict.map { "[\($0.rawValue)]" } ?? "no tag"
-            manifest.entries[index].classified = .init(value: type.map { $0.rawValue.lowercased() } ?? "document",
-                                                       rule: rule, evidence: "\(tag) from Vision text \"\(quote)\"")
-            guard let type else { result.documents += 1; continue }
-            manifest.entries[index].proposal.itemType = .init(value: type.rawValue.lowercased(), rule: rule,
-                                                              evidence: "\(tag) from Vision text \"\(quote)\"")
-            if !manifest.entries[index].review.contains(.typeClassified) {
-                manifest.entries[index].review.append(.typeClassified)
-            }
-            manifest.entries[index].decision = .review
-            if type == .box { result.boxes.append(entry.path) } else { result.folders.append(entry.path) }
+        } catch {
+            try? save(manifest)
+            throw error
         }
+        try save(manifest)
         return result
     }
 }

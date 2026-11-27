@@ -374,7 +374,7 @@ enum AdoptionTestDriver {
         env["ARCHIVE_ADOPT_CLASSIFY_KEY"] = "not-a-key"
         let (shown, shownOK) = await AdoptionCommand.run(step: "classify", env: env)
         check("9 without run it shows time and cost and changes nothing",
-              shownOK && shown.contains("Estimated time") && shown.contains("Estimated cost: $") && shown.contains("Files to read: 3")
+              shownOK && shown.contains("Estimated time") && shown.contains("Estimated cost: at most $") && shown.contains("Files to read: 3")
                 && (try? Data(contentsOf: manifestURL)) == manifestBefore
                 && fm.fileExists(atPath: state.appendingPathComponent("classify-estimate.md").path), shown)
         env["ARCHIVE_ADOPT_CLASSIFY_RUN"] = "1"
@@ -386,6 +386,23 @@ enum AdoptionTestDriver {
                 && (try? Data(contentsOf: manifestURL)) == manifestBefore, uncapped + capped)
 
         do {
+            // A cap that allows one call stops before the second; a reply with no tag and a page that fails to read are
+            // left for a later run, and verdicts are saved as they come.
+            var capped = manifest
+            let perCall = route.dollarsPerPage ?? 0
+            let one = try await AdoptionClassify.run(&capped, ledger: nil, route: route, judge: judge, cap: perCall * 1.5,
+                                                     reader: reader)
+            check("9 no call is made that could pass the cap", one.calls == 1 && one.overCap.count == 1, "\(one)")
+            var silent = manifest
+            nonisolated(unsafe) var saves = 0
+            let untagged = try await AdoptionClassify.run(&silent, ledger: nil, route: route, judge: { _ in nil },
+                                                          reader: { path, image in
+                                                              if path.hasSuffix("Blank.pdf") { throw CocoaError(.fileReadUnknown) }
+                                                              return try await reader(path, image)
+                                                          }, saveEvery: 1, save: { _ in saves += 1 })
+            check("9 an untagged reply and an unreadable page are left for a later run, and progress is saved",
+                  untagged.failed.count == 3 && untagged.unread.isEmpty
+                    && silent.entries.allSatisfy { $0.classified == nil } && saves == 1, "\(untagged) saves \(saves)")
             let result = try await AdoptionClassify.run(&manifest, ledger: nil, route: route, judge: judge, reader: reader)
             check("9 the pass reads each candidate once and asks the model only for read text",
                   result.boxes == ["Box A/Label.pdf"] && result.documents == 1 && result.unread == ["Box A/Blank.pdf"]

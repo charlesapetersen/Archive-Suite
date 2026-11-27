@@ -554,6 +554,7 @@ Adoption/                      W49 the pre-app archive's adoption tool (Tier-2: 
   AdoptionInventory.swift      Read-only walk: tag/colour facts, original pairing, review routing, corpus refusal.
   AdoptionConversion.swift     Catalogue pairs and Preservation originals in a new root, frozen first in the ledger.
   AdoptionVerification.swift   Re-reads the derived archive against the manifest and the untouched source.
+  AdoptionClassify.swift       Optional label classifier for unmarked photos: estimate first, then a capped run.
   AdoptionLabels.swift         The old label backfill: Box/Folder labels from originals into container runs.
   AdoptionCommand.swift        The headless steps (`ARCHIVE_ADOPT`, Debug) and their reports.
   AdoptionTestDriver.swift     $0 self-test on a fixture tree (`scripts/test-adoption.sh`).

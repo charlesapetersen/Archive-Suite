@@ -11,7 +11,8 @@ import Foundation
 ///   classify   optional, before convert: finds box and folder photos with no tag or colour mark.
 ///              ARCHIVE_ADOPT_CLASSIFY_ROUTE (`vision-heuristic`, $0, or `<provider>:<model id>` with its key in
 ///              ARCHIVE_ADOPT_CLASSIFY_KEY). Alone it prints the estimated time and cost and changes nothing;
-///              ARCHIVE_ADOPT_CLASSIFY_RUN=1 with ARCHIVE_ADOPT_CLASSIFY_MAX_COST (dollars) runs it within that cap.
+///              ARCHIVE_ADOPT_CLASSIFY_RUN=1 with ARCHIVE_ADOPT_CLASSIFY_MAX_COST (dollars, at least the estimate)
+///              runs it; no call is made that could take this run past the cap.
 ///   decide     ARCHIVE_ADOPT_DECISION (accept|skip|review) for waiting entries whose reasons are all in
 ///              ARCHIVE_ADOPT_REASONS (comma-separated codes); ARCHIVE_ADOPT_KEEP_ORIGINAL=0 drops their originals.
 ///   convert    ARCHIVE_ADOPT_DEST, a new or empty folder (or the one this state folder's ledger names).
@@ -113,7 +114,8 @@ enum AdoptionCommand {
                 return (report, true)
             case "classify":
                 var manifest = try AdoptionManifest.decode(Data(contentsOf: manifestURL))
-                let ledger = AdoptionInventory.canonicalDirectory(state).flatMap { try? AdoptionLedger.load(from: $0) }
+                // A ledger that does not load is refused, as conversion refuses it: its filed entries' facts are fixed.
+                let ledger = try AdoptionInventory.canonicalDirectory(state).flatMap { try AdoptionLedger.load(from: $0) }
                 guard let route = AdoptionClassify.Route(env["ARCHIVE_ADOPT_CLASSIFY_ROUTE"] ?? "") else {
                     return ("ARCHIVE_ADOPT_CLASSIFY_ROUTE must be \(AdoptionClassify.Route.heuristicName) or "
                             + "<provider>:<model id> from the Processor's model list\n", false)
@@ -130,18 +132,17 @@ enum AdoptionCommand {
                 guard let dollars = estimate.dollars else {
                     return (report + "\nNot run: the model's price is not known, so its cost cannot be shown first.\n", false)
                 }
-                if dollars > 0 {
-                    guard let cap = env["ARCHIVE_ADOPT_CLASSIFY_MAX_COST"].flatMap(Double.init), cap >= dollars else {
-                        return (report + "\nNot run: ARCHIVE_ADOPT_CLASSIFY_MAX_COST must be at least "
-                                + "\(CostEstimate.money(dollars)).\n", false)
-                    }
+                let cap = env["ARCHIVE_ADOPT_CLASSIFY_MAX_COST"].flatMap(Double.init)
+                if dollars > 0, (cap ?? -1) < dollars {
+                    return (report + "\nNot run: ARCHIVE_ADOPT_CLASSIFY_MAX_COST must be at least "
+                            + "\(CostEstimate.money(dollars)).\n", false)
                 }
-                let result = try await AdoptionClassify.run(&manifest, ledger: ledger, route: route,
-                                                            judge: route.judge(apiKey: key))
-                try manifest.encoded().write(to: manifestURL, options: .atomic)
+                let result = try await AdoptionClassify.run(
+                    &manifest, ledger: ledger, route: route, judge: route.judge(apiKey: key), cap: cap,
+                    save: { try $0.encoded().write(to: manifestURL, options: .atomic) })
                 report += "\n" + AdoptionReport.classified(result, route: route)
                 try write(report, "classify-report.md", in: state)
-                return (report, result.failed.isEmpty)
+                return (report, result.failed.isEmpty && result.overCap.isEmpty)
             case "decide":
                 var manifest = try AdoptionManifest.decode(Data(contentsOf: manifestURL))
                 guard let decision = AdoptionManifest.Decision(rawValue: env["ARCHIVE_ADOPT_DECISION"] ?? "") else {
@@ -244,15 +245,16 @@ enum AdoptionReport {
             : "Vision on this Mac: not timed, no files to read")
         switch route {
         case .heuristic:
-            lines.append("Classifier: the Processor's keyword rules on this Mac; nothing is sent anywhere")
+            lines.append("Classifier: the Processor's keyword rules on this Mac; nothing is sent anywhere. They propose "
+                         + "any short page naming an archive or opening with a number range, so check each one found")
         case .model(let model):
             lines.append("Classifier: \(model.displayName), sent the Vision text only (never the image), "
                          + "about \(String(format: "%.1f", estimate.secondsPerCall)) s a call")
         }
         lines.append("Estimated time: \(TimeEstimate.fmt(estimate.seconds))")
         if let dollars = estimate.dollars, let each = estimate.dollarsPerPage {
-            lines.append("Estimated cost: \(CostEstimate.money(dollars)) (\(CostEstimate.money(each)) a file, the Processor's "
-                         + "estimate for a text-only classification; a reasoning model may cost more)")
+            lines.append("Estimated cost: at most \(CostEstimate.money(dollars)) (\(CostEstimate.money(each)) a file, "
+                         + "counting the longest text sent and the whole reply allowance; usually much less)")
         } else {
             lines.append("Estimated cost: unknown, the model's price is not listed")
         }
@@ -264,9 +266,12 @@ enum AdoptionReport {
                      "- box labels: \(result.boxes.count)", "- folder labels: \(result.folders.count)",
                      "- documents: \(result.documents)", "- no text read: \(result.unread.count)"]
         if case .model = route { lines.append("- model calls: \(result.calls)") }
-        lines.append("Labels found wait for review as `type-classified`.")
+        lines.append("Labels found wait for review as `type-classified`, including any accepted before.")
         for path in (result.boxes + result.folders).prefix(listLimit) { lines.append("- \(path)") }
-        for path in result.failed { lines.append("- FAILED \(path): not read; a later run tries it again") }
+        for path in result.failed { lines.append("- FAILED \(path): not read or no answer; a later run tries it again") }
+        if !result.overCap.isEmpty {
+            lines.append("- \(result.overCap.count) files left unread: one more call could have passed the cost cap")
+        }
         return lines.joined(separator: "\n") + "\n"
     }
 

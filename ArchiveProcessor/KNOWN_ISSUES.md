@@ -529,9 +529,11 @@ When label reading needs Gemma, the Processor checks the existing local servers 
   already filed, so its run starts after them (the numbering, not the label read). (accepted: a failure path only; the numbers stay unique).
 
 ## ⚠️ LIMITATION (W47.ct-backfill, 2026-11-19): Tools ▸ Read Box and Folder Labels
-- **Markers are found by tag or colour only.** The label classifier is not run over existing material, so a box or
-  folder photo with neither a `Box`/`Folder` tag nor the colour given for older material is read as a document
-  (queued: W49.proc-backfill-classify-optin).
+- **Markers are found by tag or colour only.** This menu command does not run the label classifier, so a box or
+  folder photo with neither a `Box`/`Folder` tag nor the colour given for older material is read as a document here.
+  Existing material is brought in through the adoption tool, whose optional `classify` step finds such photos with
+  the classifier after showing its time and cost (`SPEC/adoption.md`; this command retires with the legacy paths)
+  (queued: W49.corpus-legacy-retire).
 - **Vision reads the page as stored.** No turn is tried, so a label photographed sideways may read nothing and is
   listed as a marker with no read; the PDF's own text layer is never a fallback (accepted: owner, 2026-10-30, no
   ABBYY text; `ct-read.md` read the corpus's markers at their stored turn, and trying the others doubled the time).
