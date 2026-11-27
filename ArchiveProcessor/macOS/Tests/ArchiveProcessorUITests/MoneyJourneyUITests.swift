@@ -141,8 +141,9 @@ final class MoneyJourneyUITests: XCTestCase {
         XCTAssertTrue(try requestRecords().isEmpty)
     }
 
-    /// W49.proc-fix-s026 (S-026): batch scales by the same file-size target as the direct path, so a dense scan over
-    /// the standard size goes up reduced in both, not as the original file in batch.
+    /// W49.proc-fix-s026 (S-026): batch scales by the same size target as the direct path, so a dense scan over
+    /// the standard size goes up reduced in both, not as the original file in batch. W49.proc-ocr-scale-by-pixels: the
+    /// target is now checked against the upload JPEG (this noise scan's is ~3.4 MB, so it is reduced only slightly).
     func testGeminiDirectAndBatchSendTheSameImageSize() throws {
         let directInput = try preparePhotos(count: 1, width: 2000, height: 1500)
         launch(provider: "Gemini")

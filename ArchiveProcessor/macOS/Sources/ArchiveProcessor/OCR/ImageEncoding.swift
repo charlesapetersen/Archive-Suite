@@ -16,6 +16,31 @@ enum ImageEncoding {
     /// collection-move sibling-image lookup keeps its original iteration order.
     static let acceptedImageExtensions: [String] = ["jpg", "jpeg", "png", "tiff", "tif", "heic"]
 
+    /// The image's long edge in pixels, read from the file header (nil when it cannot be read).
+    static func pixelLongEdge(url: URL) -> Int? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+        let longEdge = max(props[kCGImagePropertyPixelWidth] as? Int ?? 0, props[kCGImagePropertyPixelHeight] as? Int ?? 0)
+        return longEdge > 0 ? longEdge : nil
+    }
+
+    /// Whether `loadImageAsJPEG` at full scale sends the file's own bytes: an upright RGB/Gray JPEG within the cap.
+    static func sendsOwnBytesAtFullScale(url: URL) -> Bool {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return false }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        return sendsOwnBytes(sourceType: CGImageSourceGetType(source) as? String, props: props)
+    }
+
+    private static func sendsOwnBytes(sourceType: String?, props: [CFString: Any]?,
+                                      maxDimension: Int = maxOCRDimension) -> Bool {
+        let maxDim = max(props?[kCGImagePropertyPixelWidth] as? Int ?? 0, props?[kCGImagePropertyPixelHeight] as? Int ?? 0)
+        let colorModel = props?[kCGImagePropertyColorModel] as? String
+        let isRGBorGray = colorModel == (kCGImagePropertyColorModelRGB as String)
+            || colorModel == (kCGImagePropertyColorModelGray as String)
+        return sourceType == "public.jpeg" && (props?[kCGImagePropertyOrientation] as? Int ?? 1) == 1
+            && maxDim > 0 && maxDim <= maxDimension && isRGBorGray
+    }
+
     /// Load an image as JPEG for upload — efficiently. Reads dimensions from the file header and
     /// decodes straight to the target long edge (honoring EXIF orientation) via a thumbnail request,
     /// so the full-resolution bitmap is never materialized. `scale` (0–1) applies the user's
@@ -25,7 +50,6 @@ enum ImageEncoding {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let sourceType = CGImageSourceGetType(source) as? String
-        let orientation = props?[kCGImagePropertyOrientation] as? Int ?? 1
         let pixelW = props?[kCGImagePropertyPixelWidth] as? Int ?? 0
         let pixelH = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
         let maxDim = max(pixelW, pixelH)
@@ -38,10 +62,7 @@ enum ImageEncoding {
         // no decode. Restricted to RGB/Gray: a CMYK/exotic JPEG is a valid `public.jpeg` but is rejected
         // by the vision APIs, so those must fall through to the re-encode path below (which normalizes
         // to RGB/Gray).
-        let colorModel = props?[kCGImagePropertyColorModel] as? String
-        let isRGBorGray = colorModel == (kCGImagePropertyColorModelRGB as String)
-            || colorModel == (kCGImagePropertyColorModelGray as String)
-        if sourceType == "public.jpeg" && orientation == 1 && maxDim > 0 && target >= maxDim && isRGBorGray {
+        if sendsOwnBytes(sourceType: sourceType, props: props, maxDimension: maxDimension) && target >= maxDim {
             return try? Data(contentsOf: url)
         }
 

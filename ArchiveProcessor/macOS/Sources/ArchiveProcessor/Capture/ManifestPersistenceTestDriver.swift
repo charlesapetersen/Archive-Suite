@@ -2,6 +2,7 @@
 import Foundation
 import ArchiveCore
 import AppKit
+import ImageIO
 
 /// Headless, $0 self-test of the Live Capture session-manifest persistence (B5-ii), gated by
 /// `LIVECAPTURE_MANIFESTTEST=1` (does nothing in normal use). Proves — with synthetic data in a temp dir,
@@ -460,19 +461,63 @@ enum ManifestPersistenceTestDriver {
               && !fallbackLateSettings.exportOriginals)
 
         // W16.cfg6: `targetDimensionScale` requires its size target, so two runs cannot share one. The
-        // same 1 MB file yields a different scale per caller, and neither call can influence the other.
-        let sizedInput = tmp.appendingPathComponent("b8-one-megabyte.jpg")
-        try? Data(repeating: 0x42, count: 1_000_000).write(to: sizedInput)
+        // same scan yields a different scale per caller, and neither call can influence the other.
+        // W49.proc-ocr-scale-by-pixels: the target is measured against the JPEG upload, so the scan is a real
+        // uncompressed TIFF (2000×1500 noise, ~12 MB on disk) and each scale is checked against that JPEG's size.
+        func syntheticScan(_ name: String, noise: Bool, type: String = "public.tiff",
+                              properties: [CFString: Any] = [:]) -> URL {
+            let url = tmp.appendingPathComponent(name)
+            let (w, h) = (2000, 1500)
+            var pixels = [UInt8](repeating: 200, count: w * h * 4)
+            var value: UInt32 = 7
+            for i in pixels.indices where noise && i % 4 != 3 {
+                value = value &* 1_664_525 &+ 1_013_904_223
+                pixels[i] = UInt8(value >> 24)
+            }
+            let image = pixels.withUnsafeMutableBytes { raw in
+                CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                          space: CGColorSpaceCreateDeviceRGB(),
+                          bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)?.makeImage()
+            }
+            if let image, let dest = CGImageDestinationCreateWithURL(url as CFURL, type as CFString, 1, nil) {
+                CGImageDestinationAddImage(dest, image, properties as CFDictionary)
+                _ = CGImageDestinationFinalize(dest)
+            }
+            return url
+        }
+        let sizedInput = syntheticScan("b8-dense-scan.tiff", noise: true)
+        let sizedBytes = (try? fm.attributesOfItem(atPath: sizedInput.path))?[.size] as? Int ?? 0
+        let fullJPEG = ImageEncoding.loadImageAsJPEG(url: sizedInput)?.count ?? 0
         let explicitScale = OCRProcessor.targetDimensionScale(
             forFileAt: sizedInput, sizeFraction: 1, standardImageMB: 0.5)
+        let otherRunTarget = Double(fullJPEG) / 1_000_000 + 0.5   // just over the scan's own JPEG
         let otherRunScale = OCRProcessor.targetDimensionScale(
-            forFileAt: sizedInput, sizeFraction: 1, standardImageMB: 3)
+            forFileAt: sizedInput, sizeFraction: 1, standardImageMB: otherRunTarget)
         let explicitScaleAgain = OCRProcessor.targetDimensionScale(
             forFileAt: sizedInput, sizeFraction: 1, standardImageMB: 0.5)
         check("B8: each caller's own size snapshot decides its scale; a second caller changes nothing",
-              abs(explicitScale - 0.5.squareRoot()) < 0.0001   // 0.5 MB target under a 1 MB file
-              && otherRunScale == 1                            // 3 MB target ≥ 1 MB file → full res
+              fullJPEG > 500_000
+              && abs(explicitScale - (500_000 / Double(fullJPEG)).squareRoot()) < 0.001   // 0.5 MB under its JPEG
+              && otherRunScale == 1                                                    // target ≥ its JPEG
               && explicitScaleAgain == explicitScale)
+        // The owner's case (2026-11-25): a smooth scan is large on disk only because it is uncompressed. Its JPEG is
+        // far under 3 MB, so it goes up at full scale; the old raw-byte rule shrank it to about half the width.
+        let smoothScan = syntheticScan("b8-smooth-scan.tiff", noise: false)
+        let smoothBytes = (try? fm.attributesOfItem(atPath: smoothScan.path))?[.size] as? Int ?? 0
+        check("W49.proc-ocr-scale-by-pixels: an uncompressed scan over the target on disk is not shrunk when its JPEG fits",
+              sizedBytes > 3_000_000 && smoothBytes > 3_000_000
+              && OCRProcessor.targetDimensionScale(forFileAt: smoothScan, sizeFraction: 1, standardImageMB: 3) == 1)
+        // A small, maximum-quality JPEG would otherwise go up as its own bytes: over the target, it is judged by its
+        // re-encode (the dense scan's ~3.4 MB, not its ~12 MB file), and when that fits it is re-encoded, not shrunk.
+        let fineJPEG = syntheticScan("b8-dense-scan-q100.jpg", noise: true, type: "public.jpeg",
+                                        properties: [kCGImageDestinationLossyCompressionQuality: 1.0])
+        let fineBytes = (try? fm.attributesOfItem(atPath: fineJPEG.path))?[.size] as? Int ?? 0
+        let fineScale = OCRProcessor.targetDimensionScale(forFileAt: fineJPEG, sizeFraction: 1,
+                                                          standardImageMB: otherRunTarget)
+        let fineUpload = ImageEncoding.loadImageAsJPEG(url: fineJPEG, scale: fineScale)?.count ?? .max
+        check("W49.proc-ocr-scale-by-pixels: a high-quality JPEG over the target is re-encoded at full size when that fits",
+              Double(fineBytes) > otherRunTarget * 1_000_000 && fineScale < 1 && fineScale > 0.999
+              && Double(fineUpload) <= otherRunTarget * 1_000_000)
 
         let explicitlyStamped = tmp.appendingPathComponent("b8-explicit-stamp.txt")
         let explicitlyPlain = tmp.appendingPathComponent("b8-explicit-plain.txt")

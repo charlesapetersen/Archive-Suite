@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import ArchiveCore
+import ProcessorCore
 
 
 @MainActor
@@ -159,9 +160,11 @@ class OCRProcessor: ObservableObject {
     }
 
     /// The resolution slider is a **size target**, not a dimension %: `sizeFraction` (0–1) × the
-    /// standard size gives a target file size; the dimension scale is ~√(target/actual), clamped to
-    /// ≤1 (never upscale). So larger files are downscaled more; files already at/under target are
-    /// left full-resolution. Returns 1.0 (full) at fraction ≥ 1 for average/small files.
+    /// standard size gives a target upload size. W49.proc-ocr-scale-by-pixels (owner, 2026-11-25): the target is
+    /// checked against the JPEG the page would be sent as (full scale, 2,048 px cap), not the input file's bytes,
+    /// so an uncompressed TIFF/PNG is not over-shrunk; only a JPEG over the target is scaled down, by
+    /// ~√(target/encoded) (`OCRUploadScale`). Never upscales. A file that cannot be decoded keeps the old
+    /// fallback: the fraction as a dimension scale. Direct and batch OCR both call this, so they send the same bytes.
     ///
     /// `standardImageMB` is **required** (W16.cfg6): every caller — Live Capture, Process Files,
     /// resumes, retries, Tools diagnostics — supplies its own run's value, so no two concurrent runs
@@ -172,12 +175,22 @@ class OCRProcessor: ObservableObject {
         standardImageMB: Double
     ) -> Double {
         let targetBytes = max(0.01, sizeFraction) * standardImageMB * 1_000_000
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let bytes = (attrs[.size] as? NSNumber)?.doubleValue, bytes > 0 else {
-            return min(1.0, sizeFraction)   // unknown size → treat the fraction as a dimension scale
+        guard let sourceLongEdge = ImageEncoding.pixelLongEdge(url: url),
+              var fullScale = ImageEncoding.loadImageAsJPEG(url: url) else {
+            return min(1.0, sizeFraction)   // unreadable image → treat the fraction as a dimension scale
         }
-        guard bytes > targetBytes else { return 1.0 }
-        return min(1.0, (targetBytes / bytes).squareRoot())
+        // A small upright JPEG goes up as its own bytes, so a high-quality one over the target is judged by the JPEG
+        // it would be re-encoded as: a scale just under 1 makes the encoder re-encode (one pixel short on the long
+        // edge), and that is the ceiling when the re-encode fits.
+        var ceiling = 1.0
+        if Double(fullScale.count) > targetBytes, ImageEncoding.sendsOwnBytesAtFullScale(url: url),
+           let reencoded = ImageEncoding.loadImageAsJPEG(url: url, scale: 1.0.nextDown), reencoded.count < fullScale.count {
+            fullScale = reencoded
+            ceiling = 1.0.nextDown
+        }
+        return min(ceiling, OCRUploadScale.dimensionScale(
+            sourceLongEdge: sourceLongEdge, encodedLongEdge: min(sourceLongEdge, ImageEncoding.maxOCRDimension),
+            encodedBytes: fullScale.count, targetBytes: targetBytes))
     }
 
     /// Source URLs the user removed during segmentation review; excluded from segments, tagging, and output.
