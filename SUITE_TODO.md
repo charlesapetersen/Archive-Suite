@@ -97,6 +97,10 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
 - `integration/` — **APPROVED 2026-10-14 (W42.int, the suite)**: Vision OCR's engine inside Archive Processor. Stages 1-3,
   5 and 7 filed 2026-11-06 in §"Vision OCR's engine"; stages 4 and 6 replaced by §"The settings layer — W46.settings".
 - `reader-owner-notes-2026-11-10.md` — **FILED 2026-11-10 (Archive Reader, with Processor and suite items)**: the owner's fifteen points from using the Reader on the full corpus, read and measured, their shared causes, and which item answers which; items in §"Archive Reader at corpus size, and the owner's notes of 2026-11-10".
+- `tag-rename-suite.md` — **DESIGNED 2026-11-26 (W40.tag-rename-suite, all three apps)**: a rename or merge carries across
+  the apps through `<archive root>/.archivesuite/tag-changes.json`, applied by each app on its own items after the user
+  confirms; Notes' Rename Tag… and Merge; the Processor's vocabularies follow; the shared Tags window's design
+  (`W40.tag-window-*`). Delete once those items ship.
 - `containers/` — **APPROVED 2026-10-21 (W47, all three apps)**: repository, collection, accession, series, box and
   folder for every item, from label photos or a labelled folder tree, edited in the Reader. `00-plan.md`; items in
   §"Archival containers — W47".
