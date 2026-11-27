@@ -63,6 +63,7 @@ if ! (xcrun clang -c "$SRC/Models/KeychainQuery.m" -o "$WORK/KeychainQuery.o" \
       -I "$CORE" -L "$CORE" -lArchiveCore \
       "$SRC/Tagging/MacOSTagger.swift" \
       "$SRC/Tagging/SystemTagsProvider.swift" \
+      "$SRC/Tagging/ProcessorTagChanges.swift" \
       "$SRC/Tagging/ItemTypeColourSetting.swift" \
       "$SRC/Models/DefaultsKeys.swift" \
       "$SRC/Models/KeychainHelper.swift" \
