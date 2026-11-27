@@ -312,7 +312,7 @@ in run history and Live Capture's spend estimate (W49.proc-fix-s044).
 find either way (Process Files always files through a catalogue run; Live Capture's entity and item-field calls never
 read the setting). What only the sidecar held:
 - **The low-confidence name mentions of an OCR-only or copy-source run** (`recordLocalNameMentions`) are written to the
-  sidecar alone, so with the default they are not kept. (queued: W49.proc-local-names-catalogue)
+  sidecar alone, so with the default they are not kept. The catalogue record has no field for role-less names (SPEC/catalogue-fields.md, "mentions alone"). (asked: W49.proc-local-names-catalogue-owner-ok)
 - **Notes' Copy / Add to Zotero read a source's names from its sidecar** (`ZoteroSource.gather`). Fixed 2026-11-27:
   they, the year suggestion and the Reader's export in catalogue mode now read the PDF's catalogue record
   (`CatalogueSourceFacts`, SPEC/containers.md §Zotero "Catalogue sources"). (accepted: fixed history,
