@@ -243,6 +243,14 @@ footer p { font-size: 13px; }
   </section>
   <section class="panel" id="fs-news">
     <div class="head"><h2>Newspapers: NewsBench's 15 scored broadsheet pages</h2><span class="meta">NewsBench score.py · overall = 1 − CER</span></div>
+    <p class="note" id="fs-news-note"></p>
+    <div class="legend" aria-label="Newspapers chart legend">
+      <span><i class="square" style="background:var(--accent)"></i>Our FarmShare runs (overall 1 − CER)</span>
+      <span><i class="square" style="background:var(--other)"></i>NewsBench published references (overall)</span>
+      <span><i class="diamond" style="background:var(--s2)"></i>Broadsheet subset</span>
+      <span><i class="sw" style="background:var(--s3)"></i>Page subset</span>
+    </div>
+    <div class="plot" style="height:400px"><canvas id="fs-news-chart" role="img" aria-label="Newspapers (NewsBench): overall, broadsheet, and page 1 minus CER scores for FarmShare runs and published references"></canvas></div>
     <div class="tbl"><table><thead><tr><th>Reader</th><th>How the page is read</th><th>Overall</th><th>Broadsheet</th><th>Page</th><th>Pages answered</th><th>Per 1,000 pages</th><th>Pages an hour per GPU</th></tr></thead><tbody id="fs-news-rows"></tbody></table></div>
     <p class="note">Full Library of Congress newspaper pages, scored by NewsBench's own scorer, not NES, so these do not compare with the tables above. "Regions" means newspaper-ocr's layout detector cut the page first and each region was read alone. Reference rows are NewsBench's published results, made elsewhere. Prices are OpenRouter's rates for the run's tokens; GLM-OCR fits on the Mac and is free, and the region runs recorded no tokens, so they have no price. Source: <code>ArchiveProcessor/segbench-results/farmshare/news/</code>.</p>
   </section>
@@ -78943,6 +78951,71 @@ document.getElementById('fs-news-rows').innerHTML = FS.news.map(r => '<tr><td>' 
   FS.news_reference.map(r => '<tr><td>' + r.label + '</td><td>reference</td><td>' + r.overall.toFixed(3) + '</td><td>' + r.broadsheet.toFixed(3) +
   '</td><td>' + r.page.toFixed(3) + '</td><td>—</td><td>—</td><td>—</td></tr>').join('');
 
+// W49.bench-news-chart: fifth bench chart for newspapers from the existing NewsBench scores ($0).
+const newsItems = [
+  ...FS.news.map(r => ({
+    title: r.name + ' · ' + r.how.replace(/\s*\(fs_news_layout\.py\)/, '').replace(/, the kit's glm-ocr route/, ' (kit)'),
+    overall: r.overall, broadsheet: r.broadsheet, page: r.page,
+    answered: r.answered, per_hour: r.per_hour, usd_1000: r.usd_1000, fits_mac: r.fits_mac, ref: false
+  })),
+  ...(FS.news_reference || []).map(r => ({
+    title: r.label + ' (ref)', overall: r.overall, broadsheet: r.broadsheet, page: r.page, ref: true
+  }))
+].sort((a, b) => b.overall - a.overall);
+if (FS.news.length) {
+  const topNews = FS.news[0];
+  document.getElementById('fs-news-note').textContent = 'Highest FarmShare run: ' + topNews.name + ' (' + topNews.how + ') at ' +
+    topNews.overall.toFixed(3) + ' overall (' + topNews.broadsheet.toFixed(3) + ' broadsheet, ' + topNews.page.toFixed(3) +
+    ' page; ' + n0(topNews.per_hour) + ' pages/hour per GPU), matching the top published NewsBench reference rows. ' +
+    'Bars show overall 1 − CER; markers separate the broadsheet and page subsets across all ' + newsItems.length + ' measured and reference entries.';
+}
+let newsChart = null;
+function renderNews() {
+  const cv = document.getElementById('fs-news-chart');
+  if (!cv || !newsItems.length) return;
+  if (newsChart) newsChart.destroy();
+  const acc = css('--accent'), oth = css('--other'), s2 = css('--s2'), s3 = css('--s3'), grid = css('--grid'), mut = css('--muted'), sec = css('--fg-2'), surf = css('--panel');
+  const minVal = Math.min(...newsItems.flatMap(r => [r.overall, r.broadsheet, r.page]));
+  const xMin = Math.max(0, Math.floor((minVal - 0.05) * 10) / 10);
+  newsChart = new Chart(cv, {
+    type: 'bar',
+    data: {
+      labels: newsItems.map(r => r.title),
+      datasets: [
+        { type: 'bar', label: 'Overall (1 − CER)', data: newsItems.map(r => r.overall),
+          backgroundColor: newsItems.map(r => r.ref ? oth : acc), borderRadius: 3, barThickness: 12, order: 3 },
+        { type: 'line', label: 'Broadsheet', data: newsItems.map(r => r.broadsheet), showLine: false,
+          pointStyle: 'rectRot', pointRadius: 5.5, pointHoverRadius: 7.5, backgroundColor: s2, borderColor: surf, borderWidth: 1.2, order: 1 },
+        { type: 'line', label: 'Page', data: newsItems.map(r => r.page), showLine: false,
+          pointStyle: 'circle', pointRadius: 4.5, pointHoverRadius: 6.5, backgroundColor: s3, borderColor: surf, borderWidth: 1.2, order: 2 }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+      layout: { padding: { right: 16, top: 4 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index', intersect: false,
+          callbacks: {
+            afterBody: items => {
+              const r = newsItems[items[0].dataIndex];
+              if (r.ref) return ['NewsBench published reference (no FarmShare timing or price)'];
+              const p = r.fits_mac ? 'free, fits on the Mac' : r.usd_1000 ? money(r.usd_1000) + ' / 1,000 pages' : 'no tokens recorded';
+              return ['Answered: ' + r.answered + ' · ' + n0(r.per_hour) + ' pages/hr per GPU · ' + p];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { min: xMin, max: 1.0, title: { display: true, text: 'NewsBench score (1 − CER, higher is better)', color: sec },
+          grid: { color: grid }, border: { color: grid }, ticks: { color: mut, callback: v => Number(v).toFixed(2) } },
+        y: { grid: { display: false }, border: { color: grid }, ticks: { color: sec, font: { size: 12 } } }
+      }
+    }
+  });
+}
+
 
 // Part 5: difficulty and cascades.
 const DF = DATA.difficulty;
@@ -79682,7 +79755,7 @@ if (PB) {
 }
 
 Chart.defaults.font.family = css('--body');
-const renderAll = () => { render(); renderDifficulty(); };
+const renderAll = () => { render(); renderNews(); renderDifficulty(); };
 renderAll();
 try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll); } catch (e) {}
 new MutationObserver(renderAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });

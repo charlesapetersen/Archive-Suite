@@ -51,6 +51,18 @@ class BenchChartsTests(unittest.TestCase):
         self.assertIn('"tables"', html)
         self.assertIn('"table_form"', html)
 
+    def test_newsbench_chart_renders_all_measured_and_reference_rows(self):
+        d = json.loads((ROOT / "data" / "panel-data.json").read_text())
+        self.assertEqual(len(d["farmshare"]["news"]), 7)
+        self.assertEqual(len(d["farmshare"]["news_reference"]), 5)
+        for row in d["farmshare"]["news"] + d["farmshare"]["news_reference"]:
+            for metric in ("overall", "broadsheet", "page"):
+                self.assertGreater(row[metric], 0)
+                self.assertLessEqual(row[metric], 1.0)
+        html = (ROOT / "site" / "index.html").read_text()
+        self.assertIn('id="fs-news-chart"', html)
+        self.assertIn("renderNews()", html)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -186,8 +186,9 @@ record:
   fp8-KV run (`qwen3.6-27b-1849739`); the bf16-KV and fp8-at-load (`dyn`) runs are in the tables only. Scores
   per kind are averaged from `pages.csv` over the 96 accuracy pages (the agreement-only letters are read from
   `ocr_panel.py`), and `build.py` stops if that average stops matching `summary.json`. GPU-hours per 100,000
-  photos come from its photos an hour. The newspaper results in `farmshare/news/` wait for a newspaper chart
-  (`POTENTIAL_FEATURES.md`).
+  photos come from its photos an hour. The newspaper results in `farmshare/news/` are charted and tabulated
+  in part 4 (`#fs-news`, `W49.bench-news-chart`), plotting overall, broadsheet and page `1 − CER` across all
+  FarmShare runs and published NewsBench references.
 - `ocr-pages.csv` and `ocr-pages-agree.csv`: every whole-page route's score on every one of the 96 pages (kind, the
   kind the route said, Vision OCR's page kind, answered, why a failed page failed, NES, measured cost, word counts;
   the panels, the Mac, Gemini 3.7 through the gateway and every FarmShare and Sherlock run), and the NES between two cheap
