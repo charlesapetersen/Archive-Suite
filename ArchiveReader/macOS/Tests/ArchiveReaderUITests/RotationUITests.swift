@@ -7,6 +7,9 @@ import AppKit
 /// page is turned, and its JPEG original is solid tan and portrait, so a quarter turn trades its width and height. A fixture launch keeps the turns in memory only.
 final class RotationUITests: FixtureUITestCase {
 
+    /// The thumbnail sidebar is remembered across launches; another class may leave it on, and its page copies are ink.
+    override var extraLaunchArguments: [String] { ["-ar.doc.thumbnailsVisible", "NO"] }
+
     func testRotateTurnsBothImagesAndIsRemembered() throws {
         waitForRows(minimum: 3, timeout: 10)
         let filterField = app.textFields["ar.filter.name"]
@@ -203,8 +206,18 @@ final class RotationUITests: FixtureUITestCase {
         return item
     }
 
-    /// The bounding box, in screen points, of the dark pixels in the document window's image pane (the left ⅔ of
-    /// the split, below the toolbar and above the status bar), read from a screenshot.
+    /// The document window's image pane in screen points: its own frame, so the thumbnail sidebar, the status bar and
+    /// the preservation row below it never count (W49.ui-fails-under-coverage). The window's left ⅔ only if the pane
+    /// cannot be found.
+    private func paneFrame(in window: XCUIElement) -> CGRect {
+        let pane = window.descendants(matching: .any)["ar.doc.imagePane"].firstMatch
+        if pane.exists, pane.frame.width > 40, pane.frame.height > 40 { return pane.frame.insetBy(dx: 2, dy: 2) }
+        let f = window.frame
+        return CGRect(x: f.minX + 4, y: f.minY + 60, width: f.width * 0.65 - 4, height: f.height - 120)
+    }
+
+    /// The bounding box, in screen points, of the dark pixels in the document window's image pane, read from a
+    /// screenshot.
     private func inkBounds(in window: XCUIElement) -> CGSize {
         let shot = XCUIScreen.main.screenshot().image
         var rect = CGRect(origin: .zero, size: shot.size)
@@ -212,10 +225,10 @@ final class RotationUITests: FixtureUITestCase {
               let data = cg.dataProvider?.data, let bytes = CFDataGetBytePtr(data),
               cg.bitsPerPixel == 32, shot.size.width > 0 else { return .zero }
         let scale = CGFloat(cg.width) / shot.size.width
-        let f = window.frame
+        let f = paneFrame(in: window)
         var x0 = Int.max, x1 = Int.min, y0 = Int.max, y1 = Int.min
-        for y in stride(from: max(0, Int((f.minY + 60) * scale)), to: min(cg.height, Int((f.maxY - 30) * scale)), by: 1) {
-            for x in stride(from: max(0, Int((f.minX + 4) * scale)), to: min(cg.width, Int((f.minX + f.width * 0.65) * scale)), by: 1) {
+        for y in stride(from: max(0, Int(f.minY * scale)), to: min(cg.height, Int(f.maxY * scale)), by: 1) {
+            for x in stride(from: max(0, Int(f.minX * scale)), to: min(cg.width, Int(f.maxX * scale)), by: 1) {
                 let o = y * cg.bytesPerRow + x * 4
                 guard bytes[o] < 90, bytes[o + 1] < 90, bytes[o + 2] < 90 else { continue }
                 x0 = min(x0, x); x1 = max(x1, x); y0 = min(y0, y); y1 = max(y1, y)
@@ -226,8 +239,7 @@ final class RotationUITests: FixtureUITestCase {
     }
 
     /// The width and height, in screen points, of the run of pixels passing `match` through the middle of the
-    /// document window's image pane (the left ⅔ of the split, below the toolbar), read from a screenshot.
-    /// As `ViewerUITests.pageExtent`.
+    /// document window's image pane, read from a screenshot. As `ViewerUITests.pageExtent`.
     private func pageExtent(in window: XCUIElement, _ match: (Int, Int, Int) -> Bool) -> CGSize {
         let shot = XCUIScreen.main.screenshot().image
         var rect = CGRect(origin: .zero, size: shot.size)
@@ -235,7 +247,7 @@ final class RotationUITests: FixtureUITestCase {
               let data = cg.dataProvider?.data, let bytes = CFDataGetBytePtr(data),
               cg.bitsPerPixel == 32, shot.size.width > 0 else { return .zero }
         let scale = CGFloat(cg.width) / shot.size.width
-        let f = window.frame
+        let f = paneFrame(in: window)
         let bgra = cg.bitmapInfo.contains(.byteOrder32Little)
         func hit(_ x: Int, _ y: Int) -> Bool {
             guard x >= 0, y >= 0, x < cg.width, y < cg.height else { return false }
@@ -243,8 +255,8 @@ final class RotationUITests: FixtureUITestCase {
             let (r, g, b) = bgra ? (bytes[o + 2], bytes[o + 1], bytes[o]) : (bytes[o], bytes[o + 1], bytes[o + 2])
             return match(Int(r), Int(g), Int(b))
         }
-        let left = Int((f.minX + 4) * scale), right = Int((f.minX + f.width * 0.65) * scale)
-        let top = Int((f.minY + 60) * scale), bottom = Int((f.maxY - 30) * scale)
+        let left = Int(f.minX * scale), right = Int(f.maxX * scale)
+        let top = Int(f.minY * scale), bottom = Int(f.maxY * scale)
         let midX = (left + right) / 2, midY = (top + bottom) / 2
         let row = (left...right).filter { hit($0, midY) }, column = (top...bottom).filter { hit(midX, $0) }
         guard let x0 = row.first, let x1 = row.last, let y0 = column.first, let y1 = column.last else { return .zero }

@@ -51,7 +51,7 @@ struct DocumentPreservationRow: View {
         let current = request
         HStack(spacing: 8) {
             Text("Preservation copy").fontWeight(.medium)
-            Text(statusText).foregroundStyle(.secondary)
+            Text(statusText)   // not `.secondary`: 3.95:1 at caption size in light mode
                 .accessibilityIdentifier("ar.doc.preservation.status")
             Spacer()
             if opening != nil { ProgressView().controlSize(.small) }

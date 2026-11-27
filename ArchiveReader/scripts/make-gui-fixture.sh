@@ -271,7 +271,7 @@ cat > "$SUBDIR/.archivesuite/collection-settings.json" <<'JSON'
 {"collection":{"entries":{"hours":{"source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}}},"id":"6F1C2E9A-0000-4000-8000-000000000001","kind":"collection","name":"Box 2"},"createdAt":"2026-11-04T09:59:00Z","projectName":"Fixture Project","schemaVersion":1}
 JSON
 cat > "$SUBDIR/.archivesuite/runs/20261105-100000-6F1C2E9A-0000-4000-8000-000000000003.json" <<'JSON'
-{"fileCount":1,"id":"6F1C2E9A-0000-4000-8000-000000000003","kind":"processFiles","schemaVersion":1,"settings":{"macMemoryGB":16,"processing":{"selectedModelId_Gemini":{"type":"string","value":"gemini-3.7-flash"},"selectedProvider":{"type":"string","value":"Gemini"}},"projectName":"Fixture Project","resolvedAt":"2026-11-05T10:00:00Z","runID":"6F1C2E9A-0000-4000-8000-000000000003","schemaVersion":1,"values":{"hours":{"layer":"collection","source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}},"moneyHabit":{"value":{"type":"string","value":"none"}}}},"startedAt":"2026-11-05T10:00:00Z"}
+{"fileCount":1,"id":"6F1C2E9A-0000-4000-8000-000000000003","kind":"processFiles","schemaVersion":1,"settings":{"macMemoryGB":16,"run":{"provider":"Gemini","model":{"id":"gemini-3.7-flash","displayName":"Gemini 3.7 Flash"}},"projectName":"Fixture Project","resolvedAt":"2026-11-05T10:00:00Z","runID":"6F1C2E9A-0000-4000-8000-000000000003","schemaVersion":1,"values":{"hours":{"layer":"collection","source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}},"moneyHabit":{"value":{"type":"string","value":"none"}}}},"startedAt":"2026-11-05T10:00:00Z"}
 JSON
 
 # --- another app's quarantine stamp on half the files (W40.fix-reader-tag-quarantine) ---

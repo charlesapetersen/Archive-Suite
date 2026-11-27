@@ -82,6 +82,22 @@ final class ContainerUITests: XCTestCase {
         button.click()
     }
 
+    /// The container's Edit menu sits below the item-field rows, at or past the Inspector's bottom edge, where XCUITest
+    /// calls it hittable but its click lands outside the window; scroll until it is wholly inside the Inspector.
+    private func containerEditMenu(in app: XCUIApplication) -> XCUIElement {
+        let edit = app.descendants(matching: .any)["ar.container.container.edit"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 15), "each value has an Edit menu")
+        let inspector = app.scrollViews.containing(.any, identifier: "ar.container.container.edit").firstMatch
+        let inView = { inspector.frame.insetBy(dx: 0, dy: 8).contains(edit.frame) }
+        var tries = 0
+        while !inView() && inspector.exists && tries < 30 {
+            inspector.scroll(byDeltaX: 0, deltaY: -120)
+            tries += 1
+        }
+        XCTAssertTrue(inView(), "the container's Edit menu is scrolled into view: \(edit.frame) in \(inspector.frame)")
+        return edit
+    }
+
     func testTheFolderLevelsAreOfferedThenTheColumnFacetsAndInspectorShowTheContainer() throws {
         let app = launch(["-ARUITestOfferContainerLevels"])
         waitForRows(app, 5)
@@ -266,8 +282,7 @@ final class ContainerUITests: XCTestCase {
         }
         rows("Box 17").element(boundBy: 0).click()
         if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
-        let edit = app.descendants(matching: .any)["ar.container.container.edit"].firstMatch
-        XCTAssertTrue(edit.waitForExistence(timeout: 15), "each value has an Edit menu")
+        let edit = containerEditMenu(in: app)
         edit.click()
         let change = app.menuItems["Change…"].firstMatch
         XCTAssertTrue(change.waitForExistence(timeout: 5))
@@ -334,8 +349,7 @@ final class ContainerUITests: XCTestCase {
         table.tableRows.containing(NSPredicate(format: "label == %@ OR value == %@", "Box 17", "Box 17"))
             .element(boundBy: 0).click()
         if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
-        let edit = app.descendants(matching: .any)["ar.container.container.edit"].firstMatch
-        XCTAssertTrue(edit.waitForExistence(timeout: 15))
+        let edit = containerEditMenu(in: app)
         edit.click()
         app.menuItems["Change…"].firstMatch.click()
         let field = app.textFields["ar.container.container.field"].firstMatch

@@ -1183,13 +1183,15 @@ final class ProcessorUITests: XCTestCase {
         let button = app.buttons[label].firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 5))
         app.typeKey("g", modifierFlags: [.command, .shift])
-        app.typeText(url.deletingLastPathComponent().path)
-        app.typeKey(.return, modifierFlags: [])
         let panel = app.dialogs["open-panel"]
         let goToFolder = panel.sheets["GoToWindow"]
-        if !goToFolder.waitForNonExistence(timeout: 2) {
-            goToFolder.buttons["CloseButton"].click()
-        }
+        // Typed before the sheet's field is up, the path is lost and the panel stays where it was.
+        XCTAssertTrue(goToFolder.textFields["PathTextField"].waitForExistence(timeout: 5), "Go to Folder opens")
+        app.typeText(url.deletingLastPathComponent().path)
+        app.typeKey(.return, modifierFlags: [])
+        // On macOS 27 a Return can only pick the sheet's suggestion row, leaving the sheet over the file list.
+        if !goToFolder.waitForNonExistence(timeout: 3) { app.typeKey(.return, modifierFlags: []) }
+        XCTAssertTrue(goToFolder.waitForNonExistence(timeout: 5), "the Go to Folder sheet closes")
         let item = panel.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR value == %@",
             url.lastPathComponent, url.lastPathComponent)).firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 5), app.debugDescription)
