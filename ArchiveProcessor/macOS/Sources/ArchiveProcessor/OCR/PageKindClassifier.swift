@@ -121,9 +121,11 @@ enum PageKindClassifier {
                                  model: PageKindModel?) async -> PageKind? {
         guard let model else { return nil }
         let measured: PageKindSignals? = if let page {
-            await PageVisionCache.shared.value(PageVisionCache.key(page, profile: "page-kind-signals")) {
-                await measure(image)
-            }
+            // Kept only when every request ran: a failed pass is measured again by the next stage, as before.
+            await PageVisionCache.shared.value(PageVisionCache.key(page, profile: "page-kind-signals"),
+                                               keeps: { $0.complete }) {
+                await measured(image)
+            }.signals
         } else {
             await measure(image)
         }
@@ -136,7 +138,8 @@ enum PageKindClassifier {
         var newspaper = false
         if PageKind.readsForNewspaper(call) {
             let read: Bool? = if let page {
-                await PageVisionCache.shared.value(PageVisionCache.key(page, profile: "page-kind-newspaper")) {
+                await PageVisionCache.shared.value(PageVisionCache.key(page, profile: "page-kind-newspaper"),
+                                                   keeps: { $0 != nil }) {
                     EnginePageKind.readNewspaper(image)?.isNewspaper
                 }
             } else {
@@ -193,20 +196,23 @@ enum PageKindClassifier {
 
     /// kind-signals.swift's measurements, minus its timings and the table counts the regressions do not read.
     static func measure(_ image: CGImage) async -> PageKindSignals? {
-        guard #available(macOS 26, *), var s = measureHand(image) else { return nil }
-        if let obs = try? await RecognizeDocumentsRequest().perform(on: image) {
-            var share = 0.0
-            for o in obs {
-                for t in o.document.tables {
-                    s.tableCells += t.rows.reduce(0) { $0 + $1.count }
-                    let b = t.boundingRegion.boundingBox
-                    share += Double(b.width * b.height)
-                }
-            }
-            s.tableShare = min(share, 1)
-        }
+        await measured(image).signals
+    }
 
-        return s
+    /// `measure`'s signals, and whether every request in it ran (a nil, or a table pass that threw, is not complete).
+    private static func measured(_ image: CGImage) async -> (signals: PageKindSignals?, complete: Bool) {
+        guard #available(macOS 26, *), var s = measureHand(image) else { return (nil, false) }
+        guard let obs = try? await RecognizeDocumentsRequest().perform(on: image) else { return (s, false) }
+        var share = 0.0
+        for o in obs {
+            for t in o.document.tables {
+                s.tableCells += t.rows.reduce(0) { $0 + $1.count }
+                let b = t.boundingRegion.boundingBox
+                share += Double(b.width * b.height)
+            }
+        }
+        s.tableShare = min(share, 1)
+        return (s, true)
     }
 
     private static func measureHand(_ image: CGImage) -> PageKindSignals? {

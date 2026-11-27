@@ -460,6 +460,7 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 │   ├── PDFGenerator.swift             # Output PDF creation
 │   ├── PDFTextExtractor / PDFToImageConverter
 │   ├── RotationDetector / LLMRotationDetector   # local Vision + LLM rotation
+│   ├── PageVisionCache.swift          # One Vision pass per page, turn and request profile, shared across stages
 │   └── NetworkSession.swift           # URLSession with retry logic
 ├── Tagging/
 │   ├── DocumentSegmenter.swift        # Document boundary detection

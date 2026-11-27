@@ -20,25 +20,34 @@ enum RotationDetector {
 
     static func detectCorrection(imageURL: URL) async -> Int? {
         // W49.proc-vision-page-cache: the agreement rule and the comparative route's fallback both ask; one pass answers.
-        await PageVisionCache.shared.value(PageVisionCache.key(imageURL, profile: profile)) {
-            guard let image = downscaledCGImage(from: imageURL) else { return nil }
+        // A page that did not load or a request that threw is not kept: the next stage tries again, as before.
+        let pass: Pass = await PageVisionCache.shared.value(PageVisionCache.key(imageURL, profile: profile),
+                                                            keeps: { $0 != .failed }) {
+            guard let image = downscaledCGImage(from: imageURL) else { return .failed }
             return await visionQueue.run { correction(cgImage: image) }
         }
+        if case .read(let correction) = pass { return correction }
+        return nil
+    }
+
+    private enum Pass: Sendable, Equatable {
+        case read(Int?)
+        case failed
     }
 
     /// The pass's request settings, for the shared cache.
     static let profile = "rotation|\(maxPixelSize)|accurate|corrected|0.015"
 
-    private static func correction(cgImage: CGImage) -> Int? {
+    private static func correction(cgImage: CGImage) -> Pass {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         request.minimumTextHeight = 0.015
         do {
             try VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:]).perform([request])
-        } catch { return nil }
-        return correction(PageVisionSnapshot(observations: request.results ?? [], width: cgImage.width,
-                                             height: cgImage.height, characterBoxes: true))
+        } catch { return .failed }
+        return .read(correction(PageVisionSnapshot(observations: request.results ?? [], width: cgImage.width,
+                                             height: cgImage.height, characterBoxes: true)))
     }
 
     /// The correction a pass's lines vote for, or nil without a clear reading direction.

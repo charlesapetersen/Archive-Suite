@@ -179,6 +179,16 @@ enum OCRPageKindTestDriver {
             finish(results + ["FAIL: fixture JPEG could not be created"])
             return
         }
+        // W49.proc-vision-page-cache: the pre-run classification and the newspaper reader's classify the same unchanged
+        // file; the second is answered by the first's Vision passes, with the same call.
+        let firstCall = await PageKindClassifier.classify(url: image)
+        let afterFirst = PageVisionCache.shared.statistics
+        let secondCall = await PageKindClassifier.classify(url: image)
+        let afterSecond = PageVisionCache.shared.statistics
+        check("6 classifying the same file again gives the same call", firstCall == secondCall,
+              "\(String(describing: firstCall)) vs \(String(describing: secondCall))")
+        check("6 and runs no Vision pass of its own", afterSecond.computed == afterFirst.computed
+              && afterSecond.reused > afterFirst.reused, "\(afterFirst) then \(afterSecond)")
         let script = Script()
         check("6 the HTTP seam is dormant before the contract installs it", !NetworkSession.testTransportIsActive)
         NetworkSession.testTransport = { request in

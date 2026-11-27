@@ -36,21 +36,22 @@ struct PageVisionSnapshot: Sendable, Equatable {
     let height: Int
     let lines: [Line]
 
-    /// The top candidate of every observation, in Vision's order. `characterBoxes` also records each line's first and
+    /// Every observation with its top candidate, in Vision's order. `characterBoxes` also records each line's first and
     /// last character boxes (one extra lookup per line; only rotation reads them).
     init(observations: [VNRecognizedTextObservation], width: Int, height: Int, characterBoxes: Bool = false) {
         self.width = width
         self.height = height
-        lines = observations.compactMap { o in
-            guard let c = o.topCandidates(1).first else { return nil }
+        lines = observations.map { o in
+            // An observation without a candidate keeps its geometry (the slope counts it) with no text.
+            let c = o.topCandidates(1).first
             var first: CGRect?, last: CGRect?
-            let text = c.string
-            if characterBoxes, let a = text.firstIndex(where: { !$0.isWhitespace }),
+            let text = c?.string ?? ""
+            if characterBoxes, let c, let a = text.firstIndex(where: { !$0.isWhitespace }),
                let b = text.lastIndex(where: { !$0.isWhitespace }), a < b {
                 first = (try? c.boundingBox(for: a..<text.index(after: a)))?.boundingBox
                 last = (try? c.boundingBox(for: b..<text.index(after: b)))?.boundingBox
             }
-            return Line(text: text, confidence: c.confidence, boundingBox: o.boundingBox, bottomLeft: o.bottomLeft,
+            return Line(text: text, confidence: c?.confidence ?? 0, boundingBox: o.boundingBox, bottomLeft: o.bottomLeft,
                         bottomRight: o.bottomRight, firstCharacter: first, lastCharacter: last)
         }
     }
@@ -153,6 +154,15 @@ final class PageVisionCache: @unchecked Sendable {
         // The only writer for a key is `compute`, which returns T, so this cast holds; recompute rather than trap.
         if let typed = result as? T { return typed }
         return await compute()
+    }
+
+    /// A finished result for `key`, without starting or waiting for a pass. Counted as a reuse when there is one.
+    func finished<T: Sendable>(_ key: Key, as: T.Type) -> T? {
+        lock.withLock {
+            guard let stored = done[key], let hit = stored as? T else { return nil }
+            counts.reused += 1
+            return hit
+        }
     }
 
     /// How many passes ran and how many were answered from an earlier one (the regression's evidence).

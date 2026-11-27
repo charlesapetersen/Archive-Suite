@@ -431,6 +431,8 @@ OCR/                           OCR pipeline + provider clients:
   LocalAgentClient.swift       OCR/text via a subscription-authed CLI (claude/gemini/codex) subprocess; dedicated concurrency cap + usage-window pacing.
   LocalAgentValidator.swift    Detect + verify a CLI is installed & signed in → plain-English Status (CLI analog of KeyValidator).
   RotationDetector.swift       Local (Vision) upright-rotation detection.
+  PageVisionCache.swift        One Vision pass per page file, turn and request profile, shared by the stages that
+                               repeat it (W49.proc-vision-page-cache; `scripts/test-vision-page-cache.sh`).
   LLMRotationDetector.swift    Vision-LLM upright-rotation detection (compares the 4 candidates).
   PDFGenerator.swift           Build the 2-page output PDF (image + dynamic-height OCR-text page).
   PDFTextExtractor.swift       Read OCR text + classification back out of existing PDFs.

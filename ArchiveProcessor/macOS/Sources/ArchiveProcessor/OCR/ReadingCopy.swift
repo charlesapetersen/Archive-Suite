@@ -28,8 +28,14 @@ enum ReadingCopy {
         request.usesLanguageCorrection = false
         let handler = VNImageRequestHandler(cgImage: small, options: [:])
         guard (try? handler.perform([request])) != nil else { return nil }
-        let (w, h) = (Double(small.width), Double(small.height))
-        let slopes: [Double] = (request.results ?? []).compactMap { o in
+        return lineAngle(of: PageVisionSnapshot(observations: request.results ?? [], width: small.width,
+                                                height: small.height))
+    }
+
+    /// The same median slope from lines a pass already read (W49.proc-vision-page-cache's measurement).
+    static func lineAngle(of snapshot: PageVisionSnapshot) -> Double? {
+        let (w, h) = (Double(snapshot.width), Double(snapshot.height))
+        let slopes: [Double] = snapshot.lines.compactMap { o in
             // Vision's points are normalised with a bottom-left origin; the bench's y runs down.
             let (l, r) = (o.bottomLeft, o.bottomRight)
             let dx = Double(r.x - l.x), dy = -Double(r.y - l.y)

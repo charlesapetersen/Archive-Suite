@@ -105,6 +105,16 @@ struct VisionClient: Sendable {
         case requestFailed(String)
     }
 
+    /// The finished default-settings pass over `imageURL` at `rotationDegrees`, if a stage has already run it; never
+    /// starts one. `scripts/segbench/vision_cache_slope.sh` reads the straightening slope from it. The reading copy
+    /// keeps its own pass: read from this one, the straighten decision moved on 7 of 297 page images
+    /// (`segbench-results/vision-page-cache-slope.md`).
+    static func finishedDefaultSnapshot(imageURL: URL, rotationDegrees: Int) -> PageVisionSnapshot? {
+        guard let key = PageVisionCache.key(imageURL, rotation: rotationDegrees, profile: profile(.default)),
+              case .snapshot(let snapshot)? = PageVisionCache.shared.finished(key, as: Read.self) else { return nil }
+        return snapshot
+    }
+
     /// Every setting that changes what the request returns. The confidence floor filters afterwards, so it is not one.
     static func profile(_ settings: VisionOCRSettings) -> String {
         "transcription|\(settings.usesFastRecognition ? "fast" : "accurate")|\(settings.languages.joined(separator: ","))"
@@ -145,7 +155,10 @@ struct VisionClient: Sendable {
 
         let handler = VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:])
         try handler.perform([request])
-        return PageVisionSnapshot(observations: request.results ?? [], width: image.width, height: image.height)
+        // Vision's boxes are in the frame of the image as `orientation` turns it upright; record that frame's size.
+        let sideways = [.left, .leftMirrored, .right, .rightMirrored].contains(orientation)
+        return PageVisionSnapshot(observations: request.results ?? [], width: sideways ? image.height : image.width,
+                                  height: sideways ? image.width : image.height)
     }
 
     private static func result(_ snapshot: PageVisionSnapshot, settings: VisionOCRSettings) -> OCRResult {
