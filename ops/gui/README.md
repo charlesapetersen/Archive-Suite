@@ -194,6 +194,18 @@ ever starts booting into apps again, that pair of defaults is the first thing to
 tests are only *partly* protected by `tart_kill_app`, which knows the apps in the per-app table and
 nothing else.
 
+**2026-11-26 (W49.reader-toolbar-undo): the defaults were still off, and the guest booted into apps anyway.**
+A guest kernel panic at 09:01 left `/private/var/db/PanicReporter/current.panic`, so every boot showed
+Diagnostics Reporter's "Your computer was restarted because of a problem" in the middle of the screen, and
+macOS relaunched what had been open (Photos, Zotero, System Settings, Terminal; `application.*` jobs in
+`launchctl list`). Every Reader UI test that clicked the Inspector failed `Not hittable` behind them, on
+main as well. The fix, inside the guest: `killall` the strays, then shut down from inside the guest
+(`sudo /sbin/shutdown -h now`) rather than `tart stop`, so nothing is relaunched. Move the panic out of the
+way: `.contents.panic`, the `panic-full-*.panic` files and the `current.panic` link go into
+`/Library/Logs/DiagnosticReports/Retired/`. They were kept there, in
+`Retired/panic-acknowledged-20261126/`. Check `launchctl list | grep application.` and that link first
+when a test fails `Not hittable` in the middle of the screen.
+
 **Why VNC for the sighted lane** (not in-VM `screencapture`/`cliclick`): a headless VM has **no capturable
 display** until a viewer attaches (in-VM `screencapture` → "could not create image from display"), and in-VM
 `cliclick` needs Accessibility TCC that's awkward to grant. So the sighted lane boots with

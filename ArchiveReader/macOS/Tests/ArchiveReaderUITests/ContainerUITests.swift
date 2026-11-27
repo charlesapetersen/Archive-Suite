@@ -378,6 +378,17 @@ final class ContainerUITests: XCTestCase {
         app.typeKey("z", modifierFlags: [.command, .shift])
         waitFor("Box 99", 3, "⇧⌘Z redoes it")
         XCTAssertTrue(try String(contentsOf: written, encoding: .utf8).contains("Box 99"))
+
+        // W49.reader-toolbar-undo: the toolbar's Undo takes the same change. It read the tag ledger alone, so it was
+        // off after a container edit with no tag change to undo.
+        let toolbarUndo = app.windows["Archive Reader"].buttons.matching(identifier: "ar.toolbar.undo")
+            .allElementsBoundByIndex.first { $0.isHittable } ?? app.buttons["ar.toolbar.undo"].firstMatch
+        XCTAssertTrue(toolbarUndo.waitForExistence(timeout: 5))
+        XCTAssertTrue(toolbarUndo.isEnabled, "the toolbar's Undo is on after a container edit")
+        toolbarUndo.click()
+        waitFor("Box 17", 3, "the toolbar's Undo undoes the container change")
+        XCTAssertFalse(try String(contentsOf: written, encoding: .utf8).contains("Box 99"))
+        _ = captureScreenshot("containers-toolbar-undone")
         XCTAssertEqual(count("Box 18"), 2, "the other folder is untouched throughout")
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: corpus.appendingPathComponent(
