@@ -654,7 +654,12 @@ Views/
   (ArchiveCoreUI) TagEntry    The tag fields' shared completion lookup (list cell, filter, ⌥⌘I Inspector, Notes'
                               tag field): only leading space is trimmed, so a typed space ends a completion.
                               In `packages/ArchiveCore/Sources/ArchiveCoreUI/TagEntry/` (the UI target; ArchiveCore stays UI-free).
+  NavigationModel+TagChanges.swift  The suite's tag change log, the Reader's side: a rename recorded with its ledger
+                              group as id (one serial queue), Undo/Redo withdraw and restore it, Notes' entries
+                              offered after a settled scan (W40.tag-rename-suite).
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
+  TagChangesSheet.swift       Tags ▸ Tag Changes from Other Apps…: Notes' renames from the archive's change log,
+                              Apply (the ordinary renameTag) or Skip; withdrawals shown once (W40.tag-rename-suite).
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware Inspector editor (⌥⌘I); immutable `targetPaths` protect drafts across selection changes.

@@ -139,9 +139,10 @@ Notes with several Reader roots records the change in each root it can reach, an
 At launch and when the output folder changes, the Processor reads the record at its archive root and, for each
 entry not yet handled (withdrawn ones included, see below), re-spells its vocabularies: the autocomplete vocabulary
 drops `from` and holds `to` (a new `TagVocabulary.rename(from:to:)`), and the controlled subject list replaces a line
-matching `from` by `to` (dropping a duplicate). A withdrawn entry it already applied is reversed the same way when
-`from` is no longer on any item it knows of: the vocabulary is a list of spellings, not a record of items, so there
-is nothing to lose. Its handled list is kept in its own settings.
+matching `from` by `to` (dropping a duplicate). A withdrawn entry it already applied puts `from` back in both (`to`
+stays, as it may be in use by then) and leaves both lists, so a later Redo applies again. Its handled list is kept in
+its own settings. The archive is found from the output folder and the harvested roots, each taken up to the folder
+holding its Reader root marker. Self-test drivers skip it (the controlled list is a real settings key).
 
 ## The Tags window (`W40.tag-window-core` and the per-app items; owner, 2026-11-14)
 

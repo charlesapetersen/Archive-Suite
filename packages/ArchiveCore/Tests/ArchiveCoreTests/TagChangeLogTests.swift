@@ -191,6 +191,66 @@ final class TagChangeLogTests: XCTestCase {
                                           carried: [tagKey("Lincoln")]).offers, [respell])
     }
 
+    // MARK: Following without asking (the Processor)
+
+    func testRenamedListReplacesInPlaceAndMergesIntoAnExistingEntry() {
+        XCTAssertEqual(TagChangeLog.renamed(["Labor", "civil rights", "Oil"], from: "Civil Rights", to: "Civil Rights Movement"),
+                       ["Labor", "Civil Rights Movement", "Oil"])
+        XCTAssertEqual(TagChangeLog.renamed(["Draft", "Final"], from: "Draft", to: "final"), ["Final"],
+                       "into an existing entry: its spelling stays")
+        XCTAssertEqual(TagChangeLog.renamed(["lincoln"], from: "Lincoln", to: "Lincoln"), ["Lincoln"], "a re-spelling")
+        XCTAssertEqual(TagChangeLog.renamed(["Oil"], from: "Draft", to: "Final"), ["Oil"])
+    }
+
+    func testVocabularyRenameDropsTheOldAndOffersTheNew() throws {
+        let vocab = TagVocabulary(fileURL: root.appendingPathComponent("vocab.json"))
+        vocab.add(rawTags: ["Civil Rights", "Labor", "Final"])
+        XCTAssertTrue(vocab.rename(from: "civil rights", to: "Civil Rights Movement"))
+        XCTAssertEqual(vocab.spelling(of: "civil rights movement"), "Civil Rights Movement")
+        XCTAssertFalse(vocab.snapshot().contains("Civil Rights"))
+        XCTAssertTrue(vocab.rename(from: "Labor", to: "final"))
+        XCTAssertEqual(vocab.snapshot(), ["Civil Rights Movement", "Final"], "merged into the spelling it knew")
+        XCTAssertTrue(vocab.rename(from: "final", to: "FINAL"))
+        XCTAssertEqual(vocab.spelling(of: "final"), "FINAL", "a case-only change re-spells")
+        XCTAssertFalse(vocab.rename(from: "Nobody", to: "Somebody"))
+    }
+
+    func testFollowAppliesOtherAppsChangesOnceAndPutsBackAWithdrawal() throws {
+        let vocab = TagVocabulary(fileURL: root.appendingPathComponent("vocab.json"))
+        vocab.add(rawTags: ["Draft", "Labor"])
+        let a = change("Draft", "Final"), mine = change("Labor", "Work", app: TagChangeLog.processor)
+        let first = TagChangeLog.follow(TagChangeDocument(changes: [a, mine]), app: TagChangeLog.processor, handled: [],
+                                        applied: [], vocabulary: vocab, controlled: ["Draft", "Oil"])
+        XCTAssertEqual(first.controlled, ["Final", "Oil"])
+        XCTAssertEqual(first.handled, [a.id])
+        XCTAssertEqual(first.applied, [a.id])
+        XCTAssertEqual(vocab.snapshot(), ["Final", "Labor"], "its own entry is not applied")
+
+        let again = TagChangeLog.follow(TagChangeDocument(changes: [a]), app: TagChangeLog.processor, handled: [a.id],
+                                        applied: [a.id], vocabulary: vocab, controlled: first.controlled)
+        XCTAssertEqual(again, TagChangeFollow(controlled: ["Final", "Oil"]), "handled: nothing again")
+
+        var undone = a; undone.withdrawn = true
+        let back = TagChangeLog.follow(TagChangeDocument(changes: [undone]), app: TagChangeLog.processor,
+                                       handled: [a.id], applied: [a.id], vocabulary: vocab, controlled: ["Final", "Oil"])
+        XCTAssertEqual(back.controlled, ["Final", "Oil", "Draft"], "from comes back; to stays")
+        XCTAssertEqual(back.unapplied, [a.id])
+        XCTAssertTrue(vocab.snapshot().contains("Draft"))
+        // An empty controlled list means no list: nothing is added to it.
+        XCTAssertEqual(TagChangeLog.follow(TagChangeDocument(changes: [undone]), app: TagChangeLog.processor,
+                                           handled: [a.id], applied: [a.id], vocabulary: vocab, controlled: []).controlled, [])
+    }
+
+    func testTheArchiveIsTheNearestReaderMarkerAbove() throws {
+        let deep = root.appendingPathComponent("Collection/Box 1", isDirectory: true)
+        try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+        XCTAssertNil(TagChangeLog.archiveRoot(containing: deep))
+        let marker = try RootMarker.ensure(at: root, kind: .reader, name: "Scratch")
+        let found = try XCTUnwrap(TagChangeLog.archiveRoot(containing: deep))
+        XCTAssertEqual(found.guid, marker.guid)
+        XCTAssertEqual(found.url.resolvingSymlinksInPath().path, root.resolvingSymlinksInPath().path)
+    }
+
     // MARK: The handled list
 
     func testHandledListPersistsPerRootAndIsBounded() {

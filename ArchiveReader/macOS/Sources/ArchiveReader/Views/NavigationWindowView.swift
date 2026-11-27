@@ -104,6 +104,7 @@ struct NavigationWindowView: View {
         .sheet(isPresented: $model.showingSimilarTags) {
             SimilarTagsSheet(model: model, size: SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: contentSize))
         }
+        .sheet(isPresented: $model.showingTagChanges) { TagChangesSheet(model: model) }
         .sheet(isPresented: $model.showingSaveDialog) { SaveSearchSheet(model: model) }
         .sheet(isPresented: Binding(get: { model.containerLevelsDraft != nil },
                                     set: { if !$0, model.containerLevelsDraft != nil { model.dismissContainerLevels() } })) {

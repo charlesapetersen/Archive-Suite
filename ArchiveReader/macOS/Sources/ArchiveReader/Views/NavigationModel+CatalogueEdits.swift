@@ -100,8 +100,9 @@ extension NavigationModel {
 
     /// Use the same owner resolution and duplicate handling for inline and Inspector subject edits.
     @discardableResult
-    func editCatalogueSubjects(paths: [String], _ update: ([String]) -> [String]) -> Bool {
-        editCatalogue(title: "Subjects Change", paths: paths) { facts in
+    func editCatalogueSubjects(paths: [String], completed: ((Set<String>) -> Void)? = nil,
+                               _ update: ([String]) -> [String]) -> Bool {
+        editCatalogue(title: "Subjects Change", paths: paths, completed: completed) { facts in
             facts.catalogueDocumentEdit { id, fields in
                 CatalogueEdit(.document(id, .subjects), .set(.names(update(Self.value(fields.subjects) ?? []))))
             }

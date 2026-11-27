@@ -14,6 +14,16 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
   so the guest changed, not the app; ledger row R-35 waits on it (`verification/evidence/reader/W40.h2-recheck.md`).
   (queued: W40.fix-reader-docpanekeys-vm-harness)
 
+## Tag changes across the apps — the limits (W40.tag-rename-suite, 2026-11-26)
+
+- In catalogue mode a rename is recorded for Notes once the catalogue save reports, but its Undo runs through the
+  catalogue's own journal, which does not mark the recorded entry withdrawn, so Notes still offers a rename the Reader
+  has undone (queued: W40.tag-window-reader).
+- A rename is recorded only when the granted folder has a durable root marker (`RootFolderStore.rootMarker`); a root
+  whose marker could not be written renames its files and tells Notes nothing (accepted: the marker is the archive's
+  identity, and without it Notes cannot tell which archive a record belongs to; `RootMarkerState` already reports the
+  degraded identity).
+
 ## Moving the archive folder (W49.reader-root-movable, 2026-11-23)
 
 On the same mounted volume, Reader can reopen the same adopted directory at a new path and read flags and

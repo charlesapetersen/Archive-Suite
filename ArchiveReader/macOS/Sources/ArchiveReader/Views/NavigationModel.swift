@@ -525,6 +525,10 @@ final class NavigationModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] phase in MainActor.assumeIsolated {
                 if phase.isSettled { self?.refreshContainers() }   // offers the map once the build is current
+                // W40.tag-rename-suite: other apps' tag changes, offered once each per session.
+                if phase.isSettled, !ArchiveTestHost.isUnitTestHost {
+                    Task { [weak self] in await self?.offerNewTagChanges() }
+                }
             } }
             .store(in: &cancellables)
         if let root = rootStore.root {
@@ -2890,6 +2894,11 @@ final class NavigationModel: ObservableObject {
             // back, as their own undo step (W40.fix-reader-undo-partial), with any a cancel never reached.
             // Re-recorded oldest first, as they were written, so the history reads them back newest first again.
             let keptOK = AuditLedger.shared.keepForRetry(kept.reversed(), of: group, redo: redo)
+            // W40.tag-rename-suite: a recorded rename's entry follows an Undo or Redo that changed something. A retry
+            // step reverses the group its lines were first part of.
+            if !verified.isEmpty {
+                tagChangeReversed(group: batch.first?.retryOf ?? group, by: reversal, redo: redo)
+            }
             let keptRetries = keptOK ? retried : 0
             library.applyVerifiedWrites(verified.filter { !stale.contains($0.url) })
             // A retry step (a failure's, or what a cancel left) reverses the group its lines were first part of.
@@ -3061,6 +3070,14 @@ final class NavigationModel: ObservableObject {
 
     @Published var renamingTag: String?     // non-nil while the rename-tag sheet is open (the old tag)
     @Published var showingSimilarTags = false   // near-duplicate subject-tag finder sheet
+    /// Other apps' renames waiting for Apply or Skip, and withdrawals of ones applied here (W40.tag-rename-suite).
+    @Published var tagChangeOffers: [ReaderTagChangeOffer] = []
+    @Published var showingTagChanges = false
+    /// The offers already shown this session, so a later rescan does not show the sheet again for them.
+    var tagChangesPresented: Set<UUID> = []
+    var tagChangeRefreshing = false
+    /// Where the handled lists and the rename groups are kept: nil is the app's own settings; tests pass a suite.
+    var tagChangeDefaultsSuite: String?
 
     /// Number of files carrying `tag` (for the rename sheet's "affects N files").
     func affectedFileCount(forTag tag: String) -> Int {
@@ -3079,23 +3096,32 @@ final class NavigationModel: ObservableObject {
         if renamingTag == nil { statusMessage = "No tags to rename in the current view."; announce(statusMessage) }
     }
 
-    func renameTag(from oldTag: String, to newTag: String) {
+    /// `recording` false when applying another app's change, which is already in the archive's log (W40.tag-rename-suite);
+    /// `completed` gets the number of files changed and that could not be once the batch has reported.
+    func renameTag(from oldTag: String, to newTag: String, recording: Bool = true,
+                   completed: (@MainActor (_ changed: Int, _ failed: Int) -> Void)? = nil) {
         if refuseWhileTagBatchRuns() { return }
         let old = oldTag                                    // tag identity — must match the sheet's
         let typed = newTag.trimmingCharacters(in: .whitespaces)  // affectedFileCount(forTag: oldTag)
         // Renaming into another existing tag merges into it in its spelling; a case-only rename of the
         // same tag is how its spelling is changed, so that keeps the case as typed.
         let new = isSameTag(typed, old) ? typed : spellingForNewTag(typed)
-        guard !old.isEmpty, !new.isEmpty, new != old || hasOtherSpellings(of: old) else { return }
+        guard !old.isEmpty, !new.isEmpty, new != old || hasOtherSpellings(of: old) else { completed?(0, 0); return }
         if library.usesCatalogue {
             let paths = library.files.filter { $0.hasSubject(old) }.map(\.path)
-            editCatalogueSubjects(paths: paths) { subjects in
+            // Recorded, and reported to `completed`, once the save has reported what it wrote.
+            let started = editCatalogueSubjects(paths: paths, completed: { [weak self] verified in
+                if recording, !verified.isEmpty { self?.recordTagChange(id: UUID(), from: old, to: new) }
+                completed?(verified.count, paths.count - verified.count)
+            }) { subjects in
                 if isSameTag(old, new) {
                     return subjects.map { isSameTag($0, old) ? new : $0 }
                 }
                 let retained = subjects.filter { !isSameTag($0, old) }
                 return retained.contains { isSameTag($0, new) } ? retained : retained + [new]
             }
+            // The catalogue's own journal holds its Undo, which does not withdraw the entry (KNOWN_ISSUES).
+            if !started { completed?(0, max(paths.count, 1)) }
             return
         }
         let reverified = reverifyCacheRows(library.files.filter { $0.hasSubject(old) })
@@ -3106,6 +3132,7 @@ final class NavigationModel: ObservableObject {
                     + (reverified.rejected == 1 ? "." : "s.")
                 : "No files carry the tag “\(old)”."
             announce(statusMessage)
+            completed?(0, reverified.rejected)
             return
         }
         let rejected = reverified.rejected
@@ -3140,6 +3167,9 @@ final class NavigationModel: ObservableObject {
                 ? "Renamed “\(old)” → “\(new)” on \(changed) file\(changed == 1 ? "" : "s")."
                 : "Renamed \(changed); \(failures) could not update.") + Self.cancelledNote(stopped)
             announce(statusMessage)
+            // Its id is the ledger group, so this rename's Undo and Redo withdraw and restore it.
+            if recording, changed > 0 { recordTagChange(id: group, from: old, to: new) }
+            completed?(changed, failures + stopped)
         }
     }
 

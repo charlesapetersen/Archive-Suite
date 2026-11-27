@@ -296,6 +296,11 @@ struct ArchiveReaderCommands: Commands {
                 tagSheetNav?.showingSimilarTags = true
             }
             .disabled(tagSheetNav == nil)
+            Button(ReaderCommand.tagChanges.title) {
+                if nav == nil { openWindow(id: WindowID.navigation) }
+                tagSheetNav?.showingTagChanges = true
+            }
+            .disabled(tagSheetNav == nil)
             Button(ReaderCommand.toggleFlag.title) { if let nav { nav.toggleFlagSelection() } else { docTags?.toggleFlag() } }
                 .keyboardShortcut(.toggleFlag).disabled(noTagTarget)
             Divider()

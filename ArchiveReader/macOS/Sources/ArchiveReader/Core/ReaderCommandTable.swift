@@ -72,7 +72,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     case open, preview, revealInFinder, openInDefaultApp, copyLinks, copyArchiveLinks, exportToZotero, addToZotero, selectRun, nextUnread,
          previousUnread
     // Tags
-    case markRead, markUnread, markReadAndNext, renameTag, findSimilarTags, toggleFlag, undoTagChange, redoTagChange,
+    case markRead, markUnread, markReadAndNext, renameTag, findSimilarTags, tagChanges, toggleFlag, undoTagChange, redoTagChange,
          togglePoorOCR, improveOCR
     // Sort & Filter
     case clearAll, focusTagFilter, searchOCRText, advancedSearch, showPoorOCROnly
@@ -146,6 +146,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .markReadAndNext: return "Mark Read & Next Unread"
         case .renameTag: return "Rename Tag…"
         case .findSimilarTags: return "Find Similar Tags…"
+        case .tagChanges: return "Tag Changes from Other Apps…"
         case .toggleFlag: return "Toggle Flag"
         case .undoTagChange: return "Undo Tag Change"
         case .redoTagChange: return "Redo Tag Change"
@@ -235,7 +236,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .markRead: return CommandKey("r")
         case .markUnread: return CommandKey("u")
         case .markReadAndNext: return CommandKey("m", [.command, .shift])
-        case .renameTag, .findSimilarTags: return nil
+        case .renameTag, .findSimilarTags, .tagChanges: return nil
         case .toggleFlag: return CommandKey("f", [.command, .shift])
         // P for Poor; ⌘P stays the Mac's Print.
         case .togglePoorOCR: return CommandKey("p", [.command, .control])

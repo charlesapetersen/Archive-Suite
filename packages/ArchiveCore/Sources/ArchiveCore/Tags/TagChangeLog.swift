@@ -139,6 +139,69 @@ public enum TagChangeLog {
         return box
     }
 
+    // MARK: Following without asking (the Processor, which has vocabularies and no items)
+
+    /// The archive a folder belongs to: the nearest folder at or above `directory` holding a Reader root marker,
+    /// where the log lives. Nil when there is none below the volume's top.
+    public static func archiveRoot(containing directory: URL) -> (guid: UUID, url: URL)? {
+        var folder = directory.resolvingSymlinksInPath().standardizedFileURL
+        for _ in 0..<64 {
+            if let marker = try? RootMarker.read(at: folder), marker.kind == .reader { return (marker.guid, folder) }
+            let parent = folder.deletingLastPathComponent()
+            if parent.path == folder.path || parent.pathComponents.count < 2 { return nil }
+            folder = parent
+        }
+        return nil
+    }
+
+    /// `list` (a subject list such as the Processor's controlled vocabulary) with every entry keyed as `from`
+    /// replaced by `to` where the first one stood, or `to`'s existing entry kept when the list already holds it.
+    public static func renamed(_ list: [String], from: String, to: String) -> [String] {
+        func key(_ s: String) -> String { tagKey(s.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        let (fromKey, toKey) = (key(from), key(to))
+        guard list.contains(where: { key($0) == fromKey }) else { return list }
+        let hasTarget = fromKey != toKey && list.contains { key($0) == toKey }
+        var out: [String] = []
+        var placed = false
+        for entry in list {
+            if key(entry) == fromKey {
+                if !placed, !hasTarget { out.append(to) }
+                placed = true
+            } else {
+                out.append(entry)
+            }
+        }
+        return out
+    }
+
+    /// Applies every unhandled entry of other apps in `doc` to `vocabulary` and `controlled`, oldest first, with no
+    /// question: a vocabulary is a list of spellings, not of anyone's items. A withdrawal of an entry applied before
+    /// puts `from` back in both (`to` stays: it may be in use by then). Returns the new controlled list, the ids to add
+    /// to the handled and applied lists, and the withdrawals put back, which the caller removes from both lists so a
+    /// later Redo applies again.
+    public static func follow(_ doc: TagChangeDocument, app: String, handled: Set<UUID>, applied: Set<UUID>,
+                              vocabulary: TagVocabulary, controlled: [String]) -> TagChangeFollow {
+        var result = TagChangeFollow(controlled: controlled)
+        for change in doc.changes where change.app != app && isRecordable(from: change.from, to: change.to) {
+            if change.withdrawn {
+                guard applied.contains(change.id) else { continue }   // never applied: nothing to put back
+                vocabulary.add(rawTags: [change.from])
+                let fromKey = tagKey(change.from)
+                if !result.controlled.isEmpty, !result.controlled.contains(where: { tagKey($0) == fromKey }) {
+                    result.controlled.append(change.from)
+                }
+                result.unapplied.append(change.id)
+                continue
+            }
+            guard !handled.contains(change.id) else { continue }
+            vocabulary.rename(from: change.from, to: change.to)
+            result.controlled = renamed(result.controlled, from: change.from, to: change.to)
+            result.handled.append(change.id)
+            result.applied.append(change.id)
+        }
+        return result
+    }
+
     /// Read, change and write back under the lock, again from a fresh read when another writer got in between.
     /// `edit` returns whether it changed anything; nothing is written when it did not. `creating: false` leaves a
     /// missing log missing.
@@ -172,6 +235,17 @@ public enum TagChangeLog {
             }
         }
     }
+}
+
+/// `TagChangeLog.follow`'s answer.
+public struct TagChangeFollow: Equatable, Sendable {
+    public var controlled: [String]
+    public var handled: [UUID] = []
+    public var applied: [UUID] = []
+    /// Withdrawals put back: no longer applied.
+    public var unapplied: [UUID] = []
+
+    public init(controlled: [String]) { self.controlled = controlled }
 }
 
 /// `TagChangeLog.inbox`'s answer.

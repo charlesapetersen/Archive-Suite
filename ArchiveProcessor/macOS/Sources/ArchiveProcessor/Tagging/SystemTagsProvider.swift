@@ -138,6 +138,24 @@ final class SystemTagsProvider: ObservableObject {
     func warmUp() {
         publishSnapshot()
         startDueHarvestIfIdle()
+        followTagChanges()
+    }
+
+    /// The other apps' renames and merges, read from each known archive's change log and applied to both
+    /// vocabularies without asking (`ProcessorTagChanges`, W40.tag-rename-suite). Off the main thread; one at a time.
+    private var followingTagChanges = false
+
+    private func followTagChanges() {
+        // A self-test driver's vocabulary is a scratch file, but the controlled list is the real settings key.
+        guard !followingTagChanges, !KeychainHelper.isHeadlessTestMode else { return }
+        followingTagChanges = true
+        Task.detached(priority: .utility) {
+            let changed = ProcessorTagChanges.follow()
+            await MainActor.run {
+                SystemTagsProvider.shared.followingTagChanges = false
+                if changed { SystemTagsProvider.shared.publishSnapshot() }
+            }
+        }
     }
 
     /// Prefix-first, then substring suggestions (case-insensitive), excluding already-chosen tags.

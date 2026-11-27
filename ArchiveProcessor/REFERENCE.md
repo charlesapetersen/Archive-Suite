@@ -461,6 +461,8 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification;
                                `enclosureOf` (W37) from the OCR `[enclosure]` marker, never adjacency.
   CollectionSegmenter.swift    Group files into box/folder collections.
+  ProcessorTagChanges.swift    Both vocabularies follow the Reader's and Notes' renames, read from each known
+                               archive's .archivesuite/tag-changes.json without asking (W40.tag-rename-suite).
   SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.

@@ -159,6 +159,30 @@ public final class TagVocabulary: @unchecked Sendable {
         return grew
     }
 
+    /// Follows a rename or merge recorded by another app (W40.tag-rename-suite): `from` is no longer offered and `to`
+    /// is, in `to`'s spelling unless the vocabulary already holds `to` in another case (into an existing tag it
+    /// merges, as the Reader's rename does); a case-only change re-spells it. A later harvest of files that still
+    /// carry `from` brings it back, as it should: the vocabulary lists what is in use.
+    /// - Returns: true when anything changed.
+    @discardableResult
+    public func rename(from: String, to: String) -> Bool {
+        let from = from.trimmingCharacters(in: .whitespacesAndNewlines)
+        let to = to.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !from.isEmpty, !to.isEmpty else { return false }
+        let (fromKey, toKey) = (tagKey(from), tagKey(to))
+        lock.lock()
+        let before = names
+        if fromKey == toKey {
+            if names[fromKey] != nil { names[fromKey] = to }
+        } else if names.removeValue(forKey: fromKey) != nil, names[toKey] == nil {
+            names[toKey] = to
+        }
+        let changed = names != before
+        lock.unlock()
+        if changed { scheduleSave() }
+        return changed
+    }
+
     // MARK: - Roots
 
     /// Would harvesting this root be a legitimate archive walk, or the invasive `$HOME` sweep the owner's
