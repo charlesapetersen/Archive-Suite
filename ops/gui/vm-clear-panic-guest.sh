@@ -4,8 +4,10 @@
 # for the reason vm-seed-accessibility-guest.sh gives: the JSON the panic line is read from needs a third level
 # of escaping there.
 #
-# A pending panic is any of: the PanicReporter link Diagnostics Reporter reads at login, the `.contents.panic`
-# it points at, or a `panic-full-*.panic` report not yet retired. Each report is copied to OUT_DIR, then all of
+# A pending panic is any of: a link in /var/db/PanicReporter (`current.panic`, or `display.panic` while the
+# alert is up), the `.contents.panic` it points at, or a `panic-full-*.panic` report not yet retired.
+# Diagnostics Reporter is a launchd QueueDirectories job on that folder: launchd starts it whenever the folder
+# is not empty, which is why the alert comes back at every boot, and why an empty folder keeps it away. Each report is copied to OUT_DIR, then all of
 # them are moved to DiagnosticReports/Retired/panic-acknowledged-<stamp>/ (where the 2026-11-26 hand fix put
 # the earlier two), and the alert is closed. Nothing is deleted.
 #
@@ -15,13 +17,14 @@
 #   FAILED <why>    it was pending and is not cleared
 set -u
 out="${1:-}"
-link=/private/var/db/PanicReporter/current.panic
+pr=/private/var/db/PanicReporter
 dr=/Library/Logs/DiagnosticReports
 shopt -s nullglob
 files=("$dr"/panic-full-*.panic)
 contents="$dr/.contents.panic"
 
-pending() { [ -L "$link" ] || [ -e "$link" ]; }
+# Anything in the folder starts the reporter, so every entry counts, not only the two links named above.
+pending() { [ -n "$(ls -A "$pr" 2>/dev/null)" ]; }
 if ! pending && [ ! -e "$contents" ] && [ "${#files[@]}" -eq 0 ]; then
   echo NONE; exit 0
 fi
@@ -38,7 +41,11 @@ sudo -n mkdir -p "$dest" || { echo "FAILED sudo -n mkdir $dest"; exit 0; }
 for f in "${files[@]}" "$contents"; do
   [ -e "$f" ] && sudo -n mv "$f" "$dest/"
 done
-pending && sudo -n mv "$link" "$dest/"
-# The alert is Diagnostics Reporter's window. With the link gone it does not come back at the next boot.
+for l in "$pr"/* "$pr"/.[!.]*; do
+  [ -L "$l" ] || [ -e "$l" ] && sudo -n mv "$l" "$dest/"
+done
+# The alert is Diagnostics Reporter's window. With the folder empty launchd does not start it again.
 pkill -x 'Diagnostics Reporter' 2>/dev/null
-if pending; then echo "FAILED $link is still there"; else echo "CLEARED $dest"; fi
+# The guest may next be powered off hard (tart_stop_clean's fallback), which loses unflushed writes.
+sync
+if pending; then echo "FAILED $pr is not empty: $(ls -A "$pr" | tr '\n' ' ')"; else echo "CLEARED $dest"; fi

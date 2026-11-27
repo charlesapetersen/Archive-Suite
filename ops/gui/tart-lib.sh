@@ -319,7 +319,8 @@ tart_clear_panic() {
       TART_PANIC_NOTE="cleared a pending guest kernel panic ($(printf '%s\n' "$raw" | sed -n 's/^PANIC //p' | tr '\n' ' ' | sed 's/ *$//')); report kept in guest-panics/ and ${raw##*CLEARED }"
       return 1 ;;
     *)
-      TART_PANIC_NOTE="a guest kernel panic may still be pending and its alert may cover the app: $(printf '%s' "$raw" | tr '\n' ' ' | cut -c1-300)"
+      # Also the path taken when the mounted checkout predates the guest half: then nothing was checked.
+      TART_PANIC_NOTE="could not check for or clear a pending guest kernel panic (its alert may cover the app): $(printf '%s' "$raw" | tr '\n' ' ' | cut -c1-300)"
       return 2 ;;
   esac
 }

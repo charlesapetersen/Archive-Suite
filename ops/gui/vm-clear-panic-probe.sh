@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 # vm-clear-panic-probe.sh — prove tart_clear_panic (W49.vm-guest-crash-dialog, tart-lib.sh) against the REAL
-# guest: plant a pending kernel panic, force a restart, and check that the alert comes back and is cleared.
+# guest: plant a pending kernel panic, clear it, and check that it stays cleared across a forced restart.
 #
-#   1. a pending panic survives a hard power-off (`tart stop`) and Diagnostics Reporter raises it at boot
-#   2. tart_clear_panic -> 1, names the panic, copies the report out; the link and the alert are gone
+#   1. a planted pending panic (both PanicReporter links, `.contents.panic`, a `panic-full-*.panic`)
+#   2. tart_clear_panic -> 1, names the panic, copies the report out; the folder is empty, no alert process
 #   3. a second call -> 0 (nothing pending)
-#   4. after another restart there is still nothing pending and no alert
+#   4. after a hard power-off (`tart stop`) and boot: still nothing pending and no alert process
+#   5. after a clean restart: the same
 #
-# The planted panic is a copy of a real one the guest already retired (Retired/panic-acknowledged-*), so
-# Diagnostics Reporter reads what a real panic leaves; with none retired it writes a minimal one of the same
-# shape. Each run therefore leaves one more retired copy in the guest (about 64 KB). Takes the VM lock and
-# stops any kept guest first, since that guest may mount a checkout without the guest half; ~4 minutes; $0.
+# What it cannot show is the alert itself coming back from a planted panic. Diagnostics Reporter is a launchd
+# QueueDirectories job on /var/db/PanicReporter, and it rejects a planted copy ("Invalid launch" in its
+# com.apple.osanalytics.DiagnosticsReporter log) and removes the link, at boot as well as at once (measured
+# 2026-11-27, five boots). The real path was proven the same day on a genuine pending panic (the 08:17
+# Halt/Restart Timed Out): the runner cleared it at boot and the four AccessibilityAuditUITests that had failed
+# under the alert passed. So the probe unloads the reporter for the planting boot (bootout, not disable: it
+# loads again at the next boot), and the planted files are copies of a panic the guest already retired, so
+# each run leaves one more retired copy (about 64 KB). Takes the VM lock and stops any kept guest first, since
+# that guest may mount a checkout without the guest half; ~5 minutes; $0.
+# ⚠️ Run it by hand only, never from a gate: step 4 powers the shared guest off hard on purpose, which loses
+# whatever the guest had not flushed (W40.vm-macos27). It syncs first, and nothing else runs in the guest then.
 # USAGE: ops/gui/vm-clear-panic-probe.sh      ENV: VM_NAME, ART_DIR, AGENT_WAIT
 set -uo pipefail
 . "$(dirname "$0")/../autonomous/heavy-enter.sh"
@@ -49,19 +57,20 @@ reporter_up() {
   done
   return 1
 }
-pending(){ tart exec "$VM" bash -lc '[ -L /private/var/db/PanicReporter/current.panic ] || [ -e /private/var/db/PanicReporter/current.panic ]' >/dev/null 2>&1; }
+pending(){ tart exec "$VM" bash -lc '[ -n "$(ls -A /private/var/db/PanicReporter 2>/dev/null)" ]' >/dev/null 2>&1; }
 : > "$ART/clear-panic-probe-tart.log"
 boot
 
-echo "== 1. a pending panic survives a forced restart and raises the alert =="
+echo "== 1. plant a pending panic =="
 # Never delete here: only copies go in, and tart_clear_panic retires them like a real one.
 tart exec "$VM" bash -lc '
+  launchctl bootout "gui/$(id -u)/com.apple.DiagnosticsReporter" 2>/dev/null
   dr=/Library/Logs/DiagnosticReports
   src=$(ls -d "$dr"/Retired/panic-acknowledged-*/ 2>/dev/null | while read -r d; do [ -e "$d.contents.panic" ] && ls "$d"panic-full-*.panic >/dev/null 2>&1 && echo "$d"; done | tail -n 1)
   stamp=$(date +%Y-%m-%d-%H%M%S)
   if [ -n "$src" ]; then
-    sudo -n cp "$src.contents.panic" "$dr/.contents.panic"
-    sudo -n cp "$(ls "$src"panic-full-*.panic | tail -n 1)" "$dr/panic-full-$stamp.0002.panic"
+    sudo -n cp -p "$src.contents.panic" "$dr/.contents.panic"
+    sudo -n cp -p "$(ls "$src"panic-full-*.panic | tail -n 1)" "$dr/panic-full-$stamp.0002.panic"
   else
     body="{\"product\" : \"VirtualMac2,1\", \"panicString\" : \"panic(cpu 0 caller 0x0): planted by vm-clear-panic-probe\\n\"}"
     printf "%s\n" "$body" | sudo -n tee "$dr/.contents.panic" >/dev/null
@@ -69,23 +78,22 @@ tart exec "$VM" bash -lc '
   fi
   sudo -n mkdir -p /private/var/db/PanicReporter
   sudo -n ln -sfn "$dr/.contents.panic" /private/var/db/PanicReporter/current.panic
-  sync
-' >/dev/null 2>&1
-pending && ok "panic planted" || no "could not plant the panic"
-tart stop "$VM" >/dev/null 2>&1   # the forced restart: a hard power-off
-for i in $(seq 1 30); do running || break; sleep 1; done
-boot
-pending && ok "still pending after a hard power-off and boot" || no "the planted panic did not survive the restart"
-reporter_up 90 && ok "Diagnostics Reporter raised the alert at boot (the defect)" \
-               || no "Diagnostics Reporter never started — the repro did not reproduce"
+  sudo -n ln -sfn "$dr/.contents.panic" /private/var/db/PanicReporter/display.panic
+  ls -la /private/var/db/PanicReporter/
+' > "$ART/clear-panic-probe-plant.log" 2>&1
+[ "$(tart exec "$VM" bash -lc 'ls -A /private/var/db/PanicReporter | wc -l' 2>/dev/null | tr -d ' ')" = 2 ] \
+  && ok "panic planted (current.panic and display.panic)" \
+  || no "could not plant the panic: $(tr '\n' ' ' < "$ART/clear-panic-probe-plant.log" | cut -c1-400)"
 
 echo "== 2. tart_clear_panic clears it =="
 since="$(mktemp)"; sleep 1
 crc=0; tart_clear_panic "$VM" || crc=$?
 [ "$crc" = 1 ] && ok "-> 1: $TART_PANIC_NOTE" || no "clear returned $crc: $TART_PANIC_NOTE"
-pending && no "current.panic is still there" || ok "current.panic is gone"
+pending && no "/var/db/PanicReporter is not empty" || ok "/var/db/PanicReporter is empty"
+tart exec "$VM" bash -lc 'ls /Library/Logs/DiagnosticReports/.contents.panic /Library/Logs/DiagnosticReports/panic-full-*.panic' >/dev/null 2>&1 \
+  && no "a panic report is still unretired" || ok "the reports are retired"
 sleep 3
-tart exec "$VM" pgrep -x 'Diagnostics Reporter' >/dev/null 2>&1 && no "the alert's process is still running" || ok "the alert is closed"
+tart exec "$VM" pgrep -x 'Diagnostics Reporter' >/dev/null 2>&1 && no "the alert's process is running" || ok "no alert process"
 [ -n "$(find "$ART/guest-panics" -name 'panic-full-*.panic' -newer "$since" 2>/dev/null)" ] \
   && ok "report copied to $ART/guest-panics" || no "report not copied out"
 rm -f "$since"
@@ -94,13 +102,21 @@ echo "== 3. nothing pending -> 0 =="
 crc=0; tart_clear_panic "$VM" || crc=$?
 [ "$crc" = 0 ] && ok "second call -> 0" || no "second call returned $crc: $TART_PANIC_NOTE"
 
-echo "== 4. it stays gone across a restart =="
+after_boot() {  # $1 = how the guest was restarted
+  pending && no "$1: a panic is pending again" || ok "$1: nothing pending"
+  # A new REAL panic from that shutdown would show here; say so rather than blame the clear.
+  reporter_up 45 && no "$1: Diagnostics Reporter started (a new panic? $(tart exec "$VM" bash -lc 'ls /Library/Logs/DiagnosticReports | grep panic-full' 2>/dev/null))" \
+                 || ok "$1: no alert process at boot"
+}
+echo "== 4. a forced restart (hard power-off) =="
+tart exec "$VM" sync >/dev/null 2>&1
+tart stop "$VM" >/dev/null 2>&1
+for i in $(seq 1 30); do running || break; sleep 1; done
+boot; after_boot "after tart stop"
+
+echo "== 5. a clean restart =="
 tart_stop_clean "$VM"; BOOTED=0
-boot
-pending && no "a panic is pending again after the restart" || ok "nothing pending after the restart"
-# A new real panic from that shutdown would be pending here too; say so rather than blame the clear.
-reporter_up 45 && no "Diagnostics Reporter started again (a new panic from the shutdown? $(tart exec "$VM" bash -lc 'ls /Library/Logs/DiagnosticReports | grep panic-full' 2>/dev/null))" \
-               || ok "no alert at boot"
+boot; after_boot "after a clean stop"
 
 echo
 echo "vm-clear-panic-probe: $PASS passed, $FAIL failed"

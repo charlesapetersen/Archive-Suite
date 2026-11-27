@@ -206,6 +206,21 @@ way: `.contents.panic`, the `panic-full-*.panic` files and the `current.panic` l
 `Retired/panic-acknowledged-20261126/`. Check `launchctl list | grep application.` and that link first
 when a test fails `Not hittable` in the middle of the screen.
 
+**2026-11-27 (W49.vm-guest-crash-dialog): it recurs, and the runner and the gate now clear it at every boot.**
+The panics are the guest's own shutdown: `panic … Halt/Restart Timed Out @IOPlatformExpert.cpp:900` on 23, 26
+and 27 Nov, each under `tart_stop_clean`'s in-guest `shutdown -h`. Almost every shutdown of this guest stalls
+(a `shutdown_stall_*.shutdownStall` report per stop, 56 by 27 Nov), and a few run past the kernel's halt timeout.
+A hard `tart stop` would avoid the stall but loses unflushed writes (W40.vm-macos27), so the stop stays as it
+is. Instead, `tart_clear_panic` (tart-lib.sh; guest half `vm-clear-panic-guest.sh`) runs after the agent
+answers on every boot. It copies any pending `panic-full-*.panic` to `vm-artifacts/guest-panics/`, moves the
+reports and the link to `Retired/panic-acknowledged-<stamp>/`, and closes Diagnostics Reporter, and the run log
+names the panic. Nothing is deleted. Diagnostics Reporter is a launchd `QueueDirectories` job on
+`/var/db/PanicReporter/`, so it starts whenever that folder is not empty: that is why the alert returns at every
+boot, and an empty folder keeps it away. The fix was proven on the genuine 08:17 panic: the runner cleared it at
+boot and the four audit tests that had failed under the alert passed. `vm-clear-panic-probe.sh` checks the
+clearing on the real guest: plant, clear, a hard power-off, then a clean restart. It cannot make the alert
+itself come back, because the reporter rejects a planted copy ("Invalid launch"); its header has the detail.
+
 **Why VNC for the sighted lane** (not in-VM `screencapture`/`cliclick`): a headless VM has **no capturable
 display** until a viewer attaches (in-VM `screencapture` → "could not create image from display"), and in-VM
 `cliclick` needs Accessibility TCC that's awkward to grant. So the sighted lane boots with
