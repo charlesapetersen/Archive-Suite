@@ -1402,3 +1402,115 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open` — verification queued as `W49.notes-s055-verify`.
 - **History:**
   - 2026-11-26 W40.d11 — raised; seen on main and on the item's branch, which changes only tests in Notes.
+
+### S-056 · A held output still held after three write passes is dropped while its page counts as a success
+
+- **Raised:** 2026-11-26 · W49.proc-arch-review-gate-b · code reading (Fable reviewer, confirmed by Claude Opus 5.5).
+- **Suspected behaviour:** `materializeDeferredOutputs` writes held outputs in at most three passes; a Retry that
+  lands during a pass is held again. An output still held after the third pass is cleared from `outputURLMap` and
+  `deferredOutputs` without `recordFileFailure`, so the job stays `.succeeded`, `completeRun` counts it and the run
+  says it finished while that page has no PDF.
+- **Where:** `OCR/OCRProcessor+PostOCRFinalizer.swift` `materializeDeferredOutputs` (the "Backstop" loop).
+- **Would confirm it:** a `DeferredOutputContract` case that re-holds one output in each of three passes (a fake
+  Retry per pass), then reads the job status, the run's failed-file count and the output folder.
+- **Would clear it:** the job is marked failed or re-written by some later step, or a re-hold cannot happen after
+  the first pass.
+- **Status:** `open` — verification queued as `W49.proc-s056-verify`.
+- **History:**
+  - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 5, silent failure).
+
+### S-057 · A single-file Retry after a run decides its Preservation Copy from today's setting, not the run's
+
+- **Raised:** 2026-11-26 · W49.proc-arch-review-gate-b · code reading (Fable reviewer, confirmed by Claude Opus 5.5).
+- **Suspected behaviour:** the standalone branch of `retryOne` calls `beginCatalogueRun(outputRoot:sources:)` with no
+  `keepPreservationCopies:`, so it falls back to `SettingsLayerStore.shared.keepsPreservationCopies`. Every other
+  route passes the run's frozen value (`ResolvedRunConfig.keepPreservationCopies`, W49.proc-settings-config-unify).
+  Changing the setting after a run and then retrying one failed page files that page unlike the rest of its run.
+- **Where:** `OCR/OCRProcessor+Pipeline.swift` `retryOne` (standalone `beginCatalogueRun` call);
+  `OCR/OCRProcessor+Catalogue.swift` `beginCatalogueRun`.
+- **Would confirm it:** a scratch run with copies off, the setting turned on, one page retried: a Preservation Copy
+  appears for that page only.
+- **Would clear it:** `activeRunConfig`'s value reaches `beginCatalogueRun` some other way.
+- **Status:** `open` — verification queued as `W49.proc-s057-verify`.
+- **History:**
+  - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 1, multi-path drift).
+
+### S-058 · A managed page-reader download keeps running after the Processor quits
+
+- **Raised:** 2026-11-26 · W49.proc-arch-review-gate-b · code reading (Fable reviewer, confirmed by Claude Opus 5.5).
+- **Suspected behaviour:** `applicationWillTerminate` stops `ManagedGemma` and `LocalModelSupervisor.stopAll()`, but
+  `ManagedLocalOCR.installations` (the `uv pip install` and the up-to-6 GB `download` children run through
+  `LocalAgentClient.runAsync`) are cancelled only by the user's Cancel. Quitting mid-download leaves the child running,
+  reparented; on relaunch the model shows as partial and a new Download can start a second downloader into the same
+  store beside it.
+- **Where:** `ProcessorAppDelegate.swift` `applicationWillTerminate`; `LocalModels/ManagedLocalOCR.swift`
+  `installations`, `cancel`.
+- **Would confirm it:** a headless scratch download with a stub downloader that sleeps; quit the app; the stub is
+  still alive (`pgrep`).
+- **Would clear it:** the child is in the app's process group or watches its parent and exits.
+- **Status:** `open` — verification queued as `W49.proc-s058-verify`.
+- **History:**
+  - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 2, uncoordinated subprocess).
+
+### S-059 · The handwriting placer can run beside a resident managed page reader (about 14–16 GB)
+
+- **Raised:** 2026-11-26 · W49.proc-arch-review-gate-b · code reading (Fable reviewer, confirmed by Claude Opus 5.5).
+- **Suspected behaviour:** `HandPlacer.run` (VisionOCRKit) launches its own PyTorch process and coordinates only through
+  VisionOCRKit's reader slots, which `LocalModelSupervisor` never takes. In Live Capture with a managed reader
+  (Qwen3.5 9B, about 9 GB, kept for 300 s after each page) and "Place handwritten text on the page image" on, a hand
+  page's placement (4.6–6.8 GB) runs while the reader is resident: swap, then the placer stopped by `ModelGuard` or the
+  reader unloaded and reloaded. Placement is off by default since W49.proc-pipeline-prune-apply.
+- **Where:** `packages/VisionOCRKit/Sources/VisionOCRKit/HandPlacer.swift` `run`; `LocalModels/LocalModelSupervisor.swift`
+  (`scheduleIdle`, `keepAliveLiveCapture`); `PDFGenerator.swift` `HandPlacer.place` calls.
+- **Would confirm it:** a memory trace of one Live Capture hand page with both on (under the heavy lock), or a test
+  that the supervisor's worker is resident when `HandPlacer.place` starts.
+- **Would clear it:** the placer waits for, or evicts, the supervisor's worker by some path not seen.
+- **Status:** `open` — verification queued as `W49.proc-s059-verify`.
+- **History:**
+  - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 2, memory).
+
+### S-060 · A resumed paid batch can take phone quality ratings left from an earlier Live hand-off
+
+- **Raised:** 2026-11-26 · W49.proc-arch-review-gate-b · code reading (Fable reviewer, confirmed by Claude Opus 5.5).
+- **Suspected behaviour:** `resumeBatch` plans with `phoneGroupsApply: false` and resets segments, but never clears
+  `preGroupedQualities`; `applyCaptureQualityTags` and `catalogueQuality` index it by job position. In one app session,
+  a staged Live hand-off followed by Resume of an interrupted batch gives the batch's pages the hand-off's Q ratings,
+  in Finder tags and the catalogue record.
+- **Where:** `OCR/OCRProcessor+Pipeline.swift` `resumeBatch`; `OCR/OCRProcessor+Tagging.swift` `applyCaptureQualityTags`;
+  `OCR/OCRProcessor+Catalogue.swift` `catalogueQuality`.
+- **Would confirm it:** a driver case: set `preGroupedQualities`, resume a scratch batch journal, read the tags.
+- **Would clear it:** the arrays are cleared on the way into `resumeBatch`.
+- **Status:** `open` — verification queued as `W49.proc-s060-verify`.
+- **History:**
+  - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 1, multi-path drift).
+
+### S-061 · Improve OCR rewrites page 2 in one column whatever the collection's text-column setting
+
+- **Raised:** 2026-11-26 · W49.proc-arch-review-gate-b · code reading (Fable reviewer, confirmed by Claude Opus 5.5).
+  Pre-existing at `ccbadd87`; the delta reworked this path (W49.proc-reocr-preservation, W49.proc-item-fields-rerun).
+- **Suspected behaviour:** `ReOCRPairs.replacementPage` calls `PDFGenerator.textPageData` without `textColumns`
+  (default 1); the fresh write passes the run's `textColumns`. A two- to four-column collection gets a one-column
+  page 2 after Improve OCR.
+- **Where:** `ReOCR/ReOCRPairs.swift` `replacementPage`.
+- **Would confirm it:** Improve OCR on a scratch two-column output; read page 2's layout.
+- **Would clear it:** the replacement page is laid out elsewhere with the collection's columns.
+- **Status:** `open` — verification queued as `W49.proc-s061-verify`.
+- **History:**
+  - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 1, multi-path drift).
+
+### S-062 · Subject-list edits in Settings ▸ Output are not recorded for the other apps, and a failed record can go unsaid
+
+- **Raised:** 2026-11-26 · W49.proc-arch-review-gate-b · code reading (Fable reviewers, confirmed by Claude Opus 5.5).
+- **Suspected behaviour:** (a) Settings ▸ Output offers "Edit or import…" (the free-text `TagVocabularySheet`, and CSV
+  import) beside "Tags Window" for the same subject list (`DefaultsKeys.tagVocabulary`). The window records a rename
+  or merge in `tag-changes.json`; the text sheet does not, so a spelling fixed there never reaches the Reader or Notes.
+  (b) `ProcessorTagsController.write` shows a failed record's note only if `generation` is unchanged, and the next
+  change bumps it, so a second change made before the first write ends hides "The other apps were not told…".
+- **Where:** `Views/Settings/SettingsOutputTab.swift` `filingSection`; `Tagging/ProcessorTagsWindow.swift` `perform`,
+  `replay`, `write`.
+- **Would confirm it:** (a) a rename typed in the text sheet leaves no entry in a scratch archive's `tag-changes.json`;
+  (b) a driver with a failing first record and a second change queued behind it.
+- **Would clear it:** (a) the text sheet is meant as a whole-list replacement and says so; (b) the note is kept.
+- **Status:** `open` — verification queued as `W49.proc-s062-verify`.
+- **History:**
+  - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure classes 3 and 5).

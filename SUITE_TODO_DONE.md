@@ -19139,3 +19139,27 @@ the same three lines and landing them separately would silently revert part of t
   fold, scored there by `metadata_unified_score.py`). No measured score committed here, so ArchiveOCRBench is
   unchanged. $0. Item notes folded in and deleted.
   <!-- /W49.proc-metadata-consolidate-sherlock-prep -->
+- [x] **W49.proc-arch-review-gate-b — Gate B: one W49.proc-arch-review pass at HEAD before the Processor guided session [S-M]** · §Archive Processor — pipeline simplification, unification & architecture (lane: processor) (uses: light) (agents: claude, codex) — Filed by W40.g3, 2026-11-26. Every W40.g3 prerequisite is done, but the standing review's Gate B ("right before `W40.g3`") has never run, and about 60 Processor commits have landed since it was armed on 2026-11-24. Run one pass by W49.proc-arch-review's procedure on the lead model, over the commits since `ccbadd87`, against its five failure classes. File each confirmed finding as its own item, and make W40.g3 wait on every one that touches a guided task (setup, fresh Process Files, Live Capture) with `plan-edit.sh … depend W40.g3 <TAG>`. Record the reviewed SHA so the standing review's next pass starts there, and rearm `W49.proc-arch-review-due`. SHIPPED 2026-11-26.
+  Reviewed `ccbadd87..6ddcfa68`: 71 Processor commits, 210 files, +19,355/−10,926. There were four read-only Fable reviewers, one
+  for each failure class (classes 3 and 4 shared one). This session (Claude Opus 5.5) re-read each candidate in the code before filing it. Confirmed and
+  queued as suspects with their own verification items (owner call 30): S-056 a held output dropped after three
+  write passes while its page counts as a success (class 5); S-057 a post-run single-file Retry takes today's
+  Preservation Copy setting (class 1); S-058 a managed page-reader download survives quit (class 2); S-059 the
+  handwriting placer beside a resident managed reader, about 14–16 GB, placement off by default (class 2); S-060 a
+  resumed batch takes leftover phone qualities (class 1); S-061 Improve OCR writes page 2 in one column (class 1,
+  pre-existing); S-062 the Output tab's subject-list sheet records no rename for the other apps, and a failed
+  Tags-window record can go unsaid (classes 3 and 5). One intended-behaviour question went to the owner:
+  W49.proc-quality-no-tagging (Live Capture keeps phone Q ratings in No-tagging mode, Process Files drops them).
+  W40.g3 now waits on S-056, S-057 and S-058 and on the question, because the session's default setup, fresh Process
+  Files or Live Capture reaches them. S-059 to S-062 need a non-default setting, a batch, Improve OCR or the Tags
+  window. Not filed:
+  per-field "Reset" under layered settings (the owner-approved Settings design), "Use No tagging" caption button (sets
+  the same key as the pickers), Resume's missing Rotation review (owner call 30 named the reviews a resume shows),
+  a corrupt resolved-run record falling back to the general layer on resume (no-migration rule), supervisor
+  unload on cancellation and static admission (defensible, or already queued as W49.proc-managed-mac-image-calls,
+  W49.proc-managed-ocr-9b-check and W49.proc-gemma-external-switch). Class 4: the five new inline driver files were
+  added 2026-11-25, before the non-hosted target (6af1c457). After it, about 177 lines of new assertions were added to
+  existing drivers (05357fe8, 8e327cfb). They exercise `@MainActor OCRProcessor` and not pure logic, and the
+  target's rule is lazy migration, so no item was filed. Next pass starts at `6ddcfa68`; `W49.proc-arch-review-due` rearmed. $0;
+  no bench cache used.
+  <!-- /W49.proc-arch-review-gate-b -->
