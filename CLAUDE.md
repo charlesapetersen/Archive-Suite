@@ -236,26 +236,15 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   is much better. No new arm, prompt, route or training row takes it as input. Results already scored stay as they are. A set
   chosen by the ABBYY text (W46.date-image's unprinted-year documents: the year is not in the ABBYY text) says so
   where it is reported. Images already follow the JPEG-originals rule (2026-10-22).
-- ⛔ **Cluster work runs on Sherlock; the engine prepares it, the owner's session submits it (owner, 2026-10-22).**
-  Sherlock suits this project better than FarmShare, even when it is slower. FarmShare only with the owner's
-  explicit approval for that run; other FarmShare mentions are history, not a route.
-  **No engine session contacts Sherlock**: no SSH, scp, rsync or DTN, not even a read-only check (Sherlock's
-  `/etc/agents` rules forbid agent sessions that a supervisor starts or feeds while nobody is there, even over SSH;
-  `cluster-reach.py` never preflights it; `.claude/hooks/no-sherlock.sh` refuses it under `ARCHIVE_UNATTENDED=1`). The engine does the
-  Mac-side work of an open `(cluster: sherlock)` item (pack, scorer, job and submit scripts against
-  `ArchiveProcessor/scripts/segbench/sherlock/` — sh.env, the container wrappers, `stage-job.sh` for copies and
-  downloads; `restart-20261022.sh` is the pattern — dry-run on the Mac), then hands over: submit command, job count and
-  what to collect in `execution-plans/items/<TAG>.md`, the batch manifest in
-  `ArchiveProcessor/scripts/segbench/sherlock/packs/`, `ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md
-  hold TAG 'ready to submit: <command>'`, and a Daemon Report line (no decision). The owner's session submits
-  held items in batches (`execution-plans/sherlock-access.md` §"Batches"; `cluster-reach.py mark TAG submitted`),
-  collects the results into `$GROUP_HOME` or the Mac, runs `mark TAG finished` and `plan-edit.sh … release TAG
-  'results in <path>'`; the engine scores. FarmShare's data is on Sherlock, so a pack may already exist there: the engine never checks, it names the
-  possible pack in the hand-over and the owner's session looks before one is rebuilt. File a new
-  cluster item with `(cluster: sherlock)` alone. Rules for a Sherlock session:
-  [`execution-plans/sherlock-access.md`](execution-plans/sherlock-access.md). Future GPU packs may also run on
-  Google Colab under the owner's Google AI Ultra plan (owner, 2026-11-27):
-  [`execution-plans/colab-access.md`](execution-plans/colab-access.md).
+- ⛔ **Future GPU cluster work defaults to Google Colab (owner, 2026-11-27); Sherlock stays as fallback (owner, 2026-10-22).**
+  File new GPU cluster items with `(cluster: colab)` alone (Google AI Ultra plan: A100/H100 80 GB or L4 24 GB + High-RAM;
+  `ArchiveProcessor/scripts/segbench/colab/colab_pack.py` and `run_pack.ipynb`; [`execution-plans/colab-access.md`](execution-plans/colab-access.md)).
+  Neither Colab nor Sherlock is contacted by unattended engine sessions (`cluster-reach.py` `PREP_ONLY`; `.claude/hooks/no-sherlock.sh`
+  refuses Sherlock under `ARCHIVE_UNATTENDED=1`): the engine does Mac-side preparation (pack, scorer, size-and-necessity review
+  in `execution-plans/items/<TAG>.md`, dry-run), then hands over with `ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md
+  hold TAG 'ready to submit: …'` and a Daemon Report mention (no decision). The owner's session runs on Colab (or submits
+  a Sherlock fallback batch per [`execution-plans/sherlock-access.md`](execution-plans/sherlock-access.md)), fetches results,
+  marks `finished`, and releases the item for engine scoring. FarmShare only with explicit per-run owner approval.
 - ⛔ **Every Sherlock job is reviewed for size and necessity before it is submitted (owner, 2026-10-22).** The
   preparing session writes, in `execution-plans/items/<TAG>.md` before its hand-over: (1) the question and the route,
   default or recommendation the answer could change; (2) why results in hand do not settle it; (3) the job count and

@@ -61,16 +61,17 @@ BATCH_WAIT_DAYS = 5
 # waiting on the cluster, not on the owner (ops/agent/hooks.py cluster_submitted), so this ask is what brings it back.
 BATCH_COLLECT_DAYS = 1
 
-# name -> (display name, control socket, login). Sherlock's entry names it for messages only: it is PREP_ONLY.
+# name -> (display name, control socket, login). Sherlock and Colab entries name them for messages only: both are PREP_ONLY.
 CLUSTERS = {
     "farmshare": ("FarmShare", "~/.ssh/cm-farmshare", "cp1@login.farmshare.stanford.edu"),
     "sherlock": ("Sherlock", "~/.ssh/cm-sherlock", "cp1@login.sherlock.stanford.edu"),
+    "colab": ("Google Colab", "", ""),
 }
-# Clusters no engine session may contact at all (owner, 2026-10-22; execution-plans/sherlock-access.md): Sherlock's
-# /etc/agents rules forbid agent sessions a supervisor starts or feeds while nobody is there, even over SSH. Their
-# items are offered for the Mac-side preparation only, with no preflight; the session stops at a ready-to-submit
-# hold (plan-edit.sh hold) and an owner-started session submits. preflight() refuses them, so nothing here can SSH.
-PREP_ONLY = {"sherlock"}
+# Clusters no engine session may contact at all (Sherlock: owner 2026-10-22, execution-plans/sherlock-access.md;
+# Google Colab: owner 2026-11-27, execution-plans/colab-access.md, default for future GPU work under Google AI Ultra).
+# Their items are offered for Mac-side preparation only, with no preflight; the session stops at a ready-to-submit
+# hold (plan-edit.sh hold) and an owner-started session runs/submits. preflight() refuses them, so nothing here can SSH.
+PREP_ONLY = {"sherlock", "colab"}
 MARKER = re.compile(r"\(cluster:\s*([A-Za-z]+)\s*\)")
 LEDGER_STATES = ("submitted", "finished", "in-box")
 UNREACHABLE = re.compile(r"^cluster ([a-z]+) not reachable")
