@@ -521,8 +521,8 @@ enum SettingsSolverTestDriver {
            "infinity-parser2-pro-sherlock")
         eq("E newspapers: Qwen3.5 27B, the L9 leader", pick(e, "reading", "L9"), "qwen3.5-27b-farmshare")
         eq("E forms: Qwen3.5 27B, the L4 leader", pick(e, "reading", "L4"), "qwen3.5-27b-farmshare")
-        eq("E N6: Xiaomi-OCR-0", pick(e, "reading", "N6"), "xiaomi-ocr-0-sherlock")
-        for s in ["L5", "L6", "L7", "L8", "N1", "N3", "N4"] {
+        // CHURRO-3B read N6 and led Xiaomi-OCR-0 by 13.3 points (W46.ocr-family-coverage, 2026-11-26).
+        for s in ["L5", "L6", "L7", "L8", "N1", "N3", "N4", "N6"] {
             eq("E \(s): CHURRO 3B", pick(e, "reading", s), "churro-3b-farmshare")
         }
         // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 3): the app brings a cluster's reading in (the institutional

@@ -10952,7 +10952,7 @@
      "kind_rules": [],
      "fallback": "step 4",
      "conditions": [
-      "Advanced switch only (W47.wh-date-8b-image); no measured gain as step 2 on the traces or on the laptop route (a) itself, 0/1 strict and 1/2 quote source gained/lost on 55 documents (date-8b-local.md)"
+      "not offered automatically; switch on the local image pass in Advanced settings (W47.wh-date-8b-image); no measured gain as step 2 on the traces or on the laptop route (a) itself, 0/1 strict and 1/2 quote source gained/lost on 55 documents (date-8b-local.md)"
      ],
      "step": [
       2

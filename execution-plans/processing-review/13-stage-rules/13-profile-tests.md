@@ -44,9 +44,8 @@ Segmentation figures below were rescored by W46.seg-common-support on the same 3
   peak), zero-shot card and the manuscript warning; review by its own level (no partner).
 - Dating (note 08 §9): steps 1 and 4 `vision-rules-t3` (48.1 not in text, 85.7 in text), the route the app runs: the
   Vision 2B chooser `vision-2b-chooser-t3` (47.3, 89.9) is a bench row the app does not run (owner 2026-11-24, call 3).
-  Every propagated year Date Uncertain with its source document; no step 2 (the solver picks the 8B image pass here
-  today, a defect queued as `W49.proc-fix-solver-b1-image-pass`) (`qwen3-vl-8b-image-mac` is not offered: its quotes add no year on the
-  traces, W46.date-route-pipeline-8b, nor on this route, W46.date-8b-local-baseline).
+  Every propagated year Date Uncertain with its source document; no step 2 (`qwen3-vl-8b-image-mac` is not offered automatically,
+  only by its Advanced switch, W47.wh-date-8b-image: its quotes add no year on the traces, W46.date-route-pipeline-8b, nor on this route, W46.date-8b-local-baseline).
 - Entities (note 09 §9, owner call 11): nothing unless names are ranked; when ranked, `qwen3-vl-8b-mac` on typed and
   printed correspondence over Vision text, sender hidden; `none` on handwriting and non-correspondence.
 - Placement (note 05): Vision's own lines on print; on handwriting the text page, since the hand layer is an Advanced
@@ -127,7 +126,7 @@ image g2 route (+1.5 [−4.0, +7.7]).
   `qwen3.5-27b-farmshare` (L9 95.84, the leader of public895/L9; descriptive, 15 pages, P13-7) read on
   `pp-doclayoutv3` regions for small readers (kind rule), whole page for 27B-class readers. Forms
   `qwen3.5-27b-farmshare` (L4 69.98, the leader of public895/L4; its rivals' intervals hold 0, which makes no tie).
-  N6 `xiaomi-ocr-0-sherlock`; L5-L8, N1, N3, N4 `churro-3b-farmshare` (note 04 §9 profile 4).
+  L5-L8, N1, N3, N4 and N6 `churro-3b-farmshare` (note 04 §9 profile 4).
 - Segmentation: `manual`. The app brings a cluster's reading in (the institutional computing import) but runs no
   segmentation or dating there, so the cluster rows (`seg-qwen3.5-2b-bf16-cluster` 79.4%, the 4B 82.8%, the teacher
   81.2%) are bench rows (owner 2026-11-24, call 3), and with nothing downloaded to the Mac the 2B is out too.
