@@ -2441,32 +2441,56 @@ final class NavigationModel: ObservableObject {
         // that looked exactly as it had before the panel opened. Say why, and leave the previous
         // root's view state alone rather than tearing it down for a root we did not get.
         // (`W26.symroot-fu1`.)
+        let outgoing = rootStore.root
         if let refusal = rootStore.setRoot(url) {
             statusMessage = refusal.message
             announce(statusMessage)
             return
         }
-        resetForAdoptedRoot()
+        resetForAdoptedRoot(leaving: outgoing)
     }
 
     /// File ▸ Open Recent (W49.reader-ux-gaps-small): reopen a folder opened before, through its bookmark. A folder
     /// that no longer opens says why and leaves the current one showing, as a refused pick does.
     func openRecentRoot(_ entry: RecentArchiveFolder) {
         guard !choosingRoot else { return }
-        if let refusal = rootStore.setRoot(bookmark: entry.bookmark, name: entry.name) {
-            statusMessage = refusal.message
-            announce(statusMessage)
-            return
+        choosingRoot = true
+        Task {
+            defer { choosingRoot = false }
+            // The folder may have moved into a cloud drive since it was chosen, so it is checked again as a pick is.
+            var stale = false
+            if let url = try? URL(resolvingBookmarkData: entry.bookmark, options: .withSecurityScope, relativeTo: nil,
+                                  bookmarkDataIsStale: &stale) {
+                let accessing = url.startAccessingSecurityScopedResource()
+                let confirmed = await CloudDriveWarning.confirmUse(of: [url])
+                if accessing { url.stopAccessingSecurityScopedResource() }
+                guard confirmed else { return }
+            }
+            let outgoing = rootStore.root
+            if let refusal = rootStore.setRoot(bookmark: entry.bookmark, name: entry.name) {
+                statusMessage = refusal.message
+                announce(statusMessage)
+                return
+            }
+            resetForAdoptedRoot(leaving: outgoing)
         }
-        resetForAdoptedRoot()
     }
 
-    /// The new root's view state and scan, once `rootStore` has adopted it.
-    private func resetForAdoptedRoot() {
+    /// File ▸ Open Recent's list after a switch: the folder opened first, then the one left (never a UI-test fixture).
+    func recordRecentRoots(adopted: URL, leaving outgoing: URL?) {
+        if let outgoing, outgoing != adopted, defaults.string(forKey: "ARUITestRootPath") == nil {
+            RecentArchiveFolders.note(outgoing, in: defaults)
+        }
+        RecentArchiveFolders.note(adopted, in: defaults)
+    }
+
+    /// The new root's view state and scan, once `rootStore` has adopted it. Open Recent gets the folder left as well
+    /// as the one opened, so the folder reopened at launch, which no pick recorded, is there to go back to.
+    private func resetForAdoptedRoot(leaving outgoing: URL?) {
         // Scan the root we ADOPTED, which is not necessarily the URL that was picked: a symlinked
         // pick is adopted as its target, because a security-scoped bookmark cannot open a link.
         guard let adopted = rootStore.root else { return }
-        RecentArchiveFolders.note(adopted, in: defaults)
+        recordRecentRoots(adopted: adopted, leaving: outgoing)
         // A scope from the old root can't apply to a new one, nor can its folders' Back and Forward.
         exitScope()
         placeHistory.clear()

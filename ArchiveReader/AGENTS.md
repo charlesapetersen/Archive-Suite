@@ -27,7 +27,7 @@ worktree."
   (`setResourceValue(s)`, `setxattr`, …). The [Core Directive](CLAUDE.md#core-directive-bulletproof--this-overrides-everything) protects
   source bytes and locations. The write-surface lint pins the exact allowed calls for the named JSON
   exceptions, including the [adopted catalogue writer](../SPEC/catalogue.md#guarded-local-saves-and-recovery).
-- **Root-identity exception:** only choosing a folder (`RootFolderStore.setRoot`) or an archive-link copy
+- **Root-identity exception:** only choosing a folder (`RootFolderStore.setRoot`, or File ▸ Open Recent's `setRoot(bookmark:name:)`) or an archive-link copy
   (`prepareMarkerForLinkCopy`) may create `.archive-suite-root.json`, both via `RootFolderStore.ensureMarker`
   → ArchiveCore `RootMarker.ensure`; reopening at launch only reads (W40.root-marker-auto).
   Existing identity files are never rewritten. See `CLAUDE.md` Core Directive.

@@ -146,7 +146,7 @@ final class RootFolderStore: ObservableObject {
         defaults.set(saved, forKey: key)
         let previous = accessing
         accessing = url
-        if let previous, previous != url { previous.stopAccessingSecurityScopedResource() }
+        previous?.stopAccessingSecurityScopedResource()   // after the new access is live, as `reResolveSavedRoot` does
         adopt(url)
         ensureMarker()   // as a pick does: the folder chosen gets its archive identity
         return nil

@@ -26,6 +26,15 @@ final class ArchiveReaderUITests: XCTestCase {
         )
     }
 
+    /// W49.reader-ux-gaps-small: with no folder chosen (none ever is in the VM: every folder panel is cancelled), the
+    /// empty list offers Choose Folder… itself rather than pointing at the toolbar.
+    func testNoFolderChosenOffersChooseFolder() throws {
+        XCTAssertTrue(app.windows["Archive Reader"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["No archive folder chosen"].waitForExistence(timeout: 10),
+                      "a launch with no saved folder shows the no-folder state")
+        XCTAssertTrue(app.buttons["ar.empty.chooseFolder"].exists, "and its way out")
+    }
+
     /// W26.walk2 — the incident's replacement sentence, through the real window in the headless VM.
     /// A brand-new path has never been Spotlight-indexed; the sole file is genuinely untagged. The UI
     /// may say that only after a complete walk, and the denominator must be visible in the rendered copy.

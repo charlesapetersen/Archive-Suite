@@ -554,6 +554,8 @@ Search/                       Discovery + disposable caches (never the corpus):
   CorpusWatcher.swift         FSEvents exact/subtree/root recovery; byte-exact coalescing + path reads.
   RootFolderStore.swift       Security-scoped root bookmark; read-only adoption, identity creation only
                               on archive-link copy; container-only display preference identity.
+  RecentArchiveFolders.swift  File ▸ Open Recent's folders (ar.recentArchiveFolders): path + security-scoped
+                              bookmark, newest first, 10 at most; reopened through `RootFolderStore.setRoot(bookmark:name:)`.
   ContentIndex.swift          SQLite FTS5 actor (import SQLite3) — full-text + classification; open() is
                               ALL-OR-NOTHING (setup failure ⇒ discardHandle + db = nil) (W23.m9). Keeps page
                               2's item fields and the user's corrections (`files.header_fields`/`user_fields`,
@@ -599,6 +601,8 @@ Views/
                               and ContainerLevelsSheet.
   NavigationModel+TagBatch.swift  W49.reader-batch-writes-async: `runTagBatch` (inline up to 8 files, else `TagBatch` with
                               the status bar's count and Cancel); other tag writes and Undo wait while one runs.
+  NavigationModel+SidebarFolder.swift  W49.reader-ux-gaps-small: a sidebar folder's menu — Reveal in Finder, Exclude
+                              Folder (ExcludedFoldersStore.placement; a list inside it goes to All Files), Container Levels….
   NavigationModel+ImproveOCR.swift  W44.reocr-reader: Flag as Poor OCR (off the main thread, one ledger group;
                               a stale batch result never overwrites a newer row), Connect Improve OCR Folder…,
                               Improve OCR… (ImproveOCROpener: Launch Services, or the DEBUG recorder), receipts →

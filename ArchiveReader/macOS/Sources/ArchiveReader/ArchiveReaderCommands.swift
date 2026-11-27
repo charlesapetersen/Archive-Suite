@@ -188,6 +188,7 @@ struct ArchiveReaderCommands: Commands {
                     .help(folder.path)
                     .disabled(folder.path == current)   // the folder showing
                 }
+                if recent.isEmpty { Button("No Recent Folders") {}.disabled(true) }
                 Divider()
                 Button("Clear Menu") { RecentArchiveFolders.clear(in: .standard) }
                     .disabled(recent.isEmpty)

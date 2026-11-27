@@ -10,6 +10,7 @@ import ArchiveCore
 final class DeepLinkRouter: ObservableObject {
     weak var nav: NavigationModel? {
         didSet {
+            objectWillChange.send()   // Settings' Excluded folders reads the root through it (W49.reader-ux-gaps-small)
             if let nav, chooseRootPending { runPendingChooseRoot(on: nav) }
             if let nav, let action = pendingNavigationAction {
                 pendingNavigationAction = nil
@@ -23,9 +24,9 @@ final class DeepLinkRouter: ObservableObject {
     private var pendingNavigationAction: ((NavigationModel) -> Void)?
 
     func requestOnNavigation(openNavigationWindow: () -> Void, _ action: @escaping (NavigationModel) -> Void) {
-        if let nav { action(nav); return }
-        pendingNavigationAction = action
-        openNavigationWindow()
+        openNavigationWindow()   // forward, so what the action says is seen
+        if let nav { pendingNavigationAction = nil; action(nav); return }
+        pendingNavigationAction = action   // the latest request only
     }
 
     /// W40.fix-reader-choose-folder-shortcut: File ▸ Choose Archive Folder… (⇧⌘O) works from any Reader

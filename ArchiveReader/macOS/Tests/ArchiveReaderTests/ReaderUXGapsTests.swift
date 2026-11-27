@@ -90,6 +90,23 @@ final class ReaderUXGapsTests: XCTestCase {
         XCTAssertTrue(model.statusMessage.contains("is not inside the archive folder"), model.statusMessage)
     }
 
+    func testTheSidebarExcludesAFolderInsideTheRootAndLeavesItsScope() throws {
+        let root = try scratchDir()
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("Box/Inner"),
+                                                withIntermediateDirectories: true)
+        let model = NavigationModel(defaults: fixtureDefaults(pinnedTo: root))
+        let prefix = try XCTUnwrap(model.rootStore.discoveredPathPrefix)
+        model.setFolderScope(prefix + "/Box/Inner")
+        model.excludeFolder(prefix + "/Box")
+        XCTAssertEqual(model.excludedFolders.excludedRelativePaths, ["Box"])
+        XCTAssertNil(model.filter.pathPrefix, "a list inside the excluded folder goes back to All Files")
+        XCTAssertTrue(model.statusMessage.contains("Excluded “Box”"), model.statusMessage)
+
+        model.setFolderScope(prefix + "/Other")
+        model.excludeFolder(prefix + "/Box/Inner")
+        XCTAssertEqual(model.filter.pathPrefix, prefix + "/Other", "another folder's list stays where it is")
+    }
+
     // MARK: Open Recent
 
     func testRecentFoldersAreNewestFirstWithoutRepeatsAndCapped() {
@@ -131,6 +148,21 @@ final class ReaderUXGapsTests: XCTestCase {
         XCTAssertEqual(RecentArchiveFolders.list(in: defaults).map(\.name), ["Second"])
         RecentArchiveFolders.clear(in: defaults)
         XCTAssertEqual(RecentArchiveFolders.list(in: defaults), [])
+    }
+
+    /// The switch itself asks the item-type question in a modal, which a unit host cannot answer, so the recording
+    /// step is driven alone.
+    func testASwitchKeepsTheFolderLeftToGoBackTo() throws {
+        let defaults = fixtureDefaults()
+        let launched = try scratchDir().appendingPathComponent("Launched", isDirectory: true)
+        let other = try scratchDir().appendingPathComponent("Other", isDirectory: true)
+        for dir in [launched, other] { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
+        let model = NavigationModel(defaults: defaults)
+        model.recordRecentRoots(adopted: other, leaving: launched)
+        XCTAssertEqual(RecentArchiveFolders.list(in: defaults).map(\.name), ["Other", "Launched"],
+                       "the folder reopened at launch, which no pick recorded, is kept to go back to")
+        model.recordRecentRoots(adopted: launched, leaving: other)
+        XCTAssertEqual(RecentArchiveFolders.list(in: defaults).map(\.name), ["Launched", "Other"])
     }
 
     func testARecentFolderThatIsGoneSaysSoAndChangesNothing() throws {
