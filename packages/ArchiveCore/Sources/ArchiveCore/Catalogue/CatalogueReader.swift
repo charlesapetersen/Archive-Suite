@@ -35,11 +35,11 @@ public struct CatalogueReader: Sendable {
         }
     }
 
-    private let root: URL
+    let root: URL
     public let rootInstanceID: UUID
     let mode: Mode
     let rootIdentity: CatalogueReadDirectory.Identity
-    private let identifyPDF: IdentifyPDF
+    let identifyPDF: IdentifyPDF
     let directory: CatalogueReadDirectory
 
     public init(grantedRoot: URL, rootInstanceID: UUID, mode: Mode, identifyPDF: @escaping IdentifyPDF) throws {

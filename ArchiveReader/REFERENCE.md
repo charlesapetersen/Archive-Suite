@@ -583,6 +583,10 @@ Views/
                               W47.ct-zotero-tags: Selection ▸ Add to Zotero sends the same items with the subjects
                               as tags to the running Zotero (ArchiveCore ZoteroConnector, 127.0.0.1 only; the
                               network.client entitlement is for this alone).
+  NavigationModel+CatalogueExport.swift  W49.storage-export: Selection ▸ Export with Catalogue Records… — the
+                              selection's PDFs and companions, with the split owners and members, enclosure owners,
+                              preserved originals and folder records they need, into a new folder outside the archive
+                              (ArchiveCore CatalogueExport, off main; all or nothing). Catalogue folders only.
   NavigationModel+ContainerEdits.swift  W47.ct-reader-edit: each edit read fresh, worked out and written off main
                               with the read's stamp (ContainerFileStore), one at a time; links inside the tree refused.
                               W47.ct-reader-edit-undo: each edit returns a ContainerUndoStep (what every file held,

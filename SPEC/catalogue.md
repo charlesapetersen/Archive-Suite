@@ -279,3 +279,31 @@ in place. Cloud synchronization and multi-device transactions need their own ver
 Live Capture uses the receipt in its existing filed-group ledger and source-retirement checks. It keeps
 the destination and operation IDs in the staging manifest so a repeated Finish can resume the same
 numbered filing. Optional image and segment JSON exports stay separate.
+
+## Pair and subset export
+
+`CatalogueExport` copies selected PDFs and their companions into a new folder outside the granted root,
+byte for byte, keeping each file's root-relative path. It also copies whatever the selection's documents
+depend on. That includes the owner and every other member of a split document, the owner of an
+enclosure's covering document, and the verified `Preservation/<document>/<file>/` map and originals.
+It also copies each ancestor folder's `.archivesuite/` container, level-map, container-name and
+collection-settings records, from the root down. It does not copy root markers, journals, receipts or
+other local state. Reader offers it as Selection ▸ Export with Catalogue Records….
+
+The export is all or nothing. Nothing is published if a needed file cannot be read as a verified pair,
+if an owner is missing or ambiguous, or if a preserved original is missing or damaged. It is also
+withheld when an owner of a split document is selected and any other companion in the root cannot be
+read, since that companion could be an unreadable member. Each file is copied from the descriptor that
+was verified against the scan, and its companion must match the scanned bytes. Files are written
+exclusively into a hidden staging folder beside the destination. The staging folder is then read back
+as its own root and must show the same records and document owners. Only then is it renamed to the
+destination without replacing anything. The destination may not be the archive folder or lie inside it.
+Its ancestors are compared by device and inode.
+
+`archivesuite-export.json` labels the folder a snapshot. It records the creation time, the archive
+folder's name and root instance (no machine path), and each file's role (`selected`, `document` or
+`enclosure`), IDs, revision and SHA-256 digests. It also lists the context records and preservation files
+that were copied. Opened as a root of its own, the folder is a separate occurrence: its records never
+update the archive's, and later archive edits do not update it. Each companion travels whole,
+including read state, flags, colour, quality and checks. A disclosure-limited copy for sharing is a
+separate open question (`W49.storage-export-share`).

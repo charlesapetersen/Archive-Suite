@@ -165,6 +165,13 @@ ALLOW=(
   # (`ZoteroExportReaderTests`). The archive itself is only read to gather the items (W49.storage-notes-zotero:
   # the same write, now also counting the items gathered).
   "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift${SEP}try ZoteroExport.export(sources).write(to: destination, options: .atomic)"
+  # W49.storage-export: the catalogue pair and subset export writes only into a new hidden staging folder it created
+  # beside a destination that must not exist and whose folder is not the archive or inside it (ancestors compared
+  # by device and inode, `CatalogueExport.checkDestination`). Files are created exclusively; the staging folder is
+  # removed only when publication did not happen, and published with RENAME_EXCL so nothing is ever replaced. The
+  # archive is only read, through `CatalogueReadDirectory` (`CatalogueExportTests`).
+  "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueExport.swift${SEP}defer { if !published { try? FileManager.default.removeItem(at: staging) } }"
+  "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueExport.swift${SEP}try data.write(to: target, options: [.withoutOverwriting])"
 
   # ── rule 4 (raw POSIX write) ────────────────────────────────────────────────────────────────────
   # The audit ledger's append handle (already audited above as the ledger's own file).
@@ -223,6 +230,9 @@ ALLOW=(
   # Both the copy identity and digest must match the staged name before a journal is created.
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}guard fcopyfile(input, output, nil, copyfile_flags_t(COPYFILE_ALL)) == 0 else {"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}guard renameatx_np(parent, source, parent, target, UInt32(RENAME_EXCL)) == 0 else {"
+  # W49.storage-export, audited above: the exclusive copy into its staging folder and the no-replace publication.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueExport.swift${SEP}return renamex_np(from, to, UInt32(RENAME_EXCL)) == 0 ? 0 : errno"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueExport.swift${SEP}path.map { raw in open(raw, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644) } ?? -1"
 
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`

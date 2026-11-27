@@ -272,6 +272,10 @@ struct ArchiveReaderCommands: Commands {
                 .disabled(noTagTarget)
             Button(ReaderCommand.addToZotero.title) { if let nav { nav.addToZotero() } else { docTags?.addToZotero() } }
                 .disabled(noTagTarget)
+            Button(ReaderCommand.exportWithCatalogue.title) {
+                if let nav { nav.exportWithCatalogue() } else { docTags?.exportWithCatalogue() }
+            }
+            .disabled(noTagTarget)
             Divider()
             Button(ReaderCommand.selectRun.title) { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)
