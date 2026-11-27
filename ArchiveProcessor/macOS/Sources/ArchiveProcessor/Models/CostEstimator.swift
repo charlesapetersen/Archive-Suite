@@ -276,8 +276,11 @@ struct CostEstimator {
             let inputPerCall = 4 * estimatedRotationCandidateTokens(for: model.provider) + estimatedRotationPromptTokens
             let calls = Double(fileCount) * gemini37RotationCalls(rotationMode)
             // A thinking model on a Gemini or OpenAI key may think before its letter: Gemini is held to its Low budget,
-            // an OpenAI reasoning model to the completion ceiling, each priced in full (the most a call can spend).
-            let thinking: Double = !model.supportsThinking ? 0
+            // an OpenAI reasoning model to the completion ceiling, each priced in full (the most a call can spend). A
+            // Gemini 3 model marked not thinking still thinks, held only by its output ceiling, priced in full too.
+            let thinking: Double = LLMRotationDetector.geminiThinksUnbudgeted(model)
+                    ? Double(LLMRotationDetector.geminiUnbudgetedCeiling)
+                : !model.supportsThinking ? 0
                 : model.provider == .gemini ? Double(LLMRotationDetector.directThinkingTokens)
                 : model.provider == .openai ? Double(LLMRotationDetector.openAIReasoningCeiling) : 0
             rotationCost = (calls * inputPerCall / 1_000_000) * rIn

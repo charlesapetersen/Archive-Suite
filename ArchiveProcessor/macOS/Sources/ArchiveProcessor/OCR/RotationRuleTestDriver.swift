@@ -176,6 +176,36 @@ enum RotationRuleTestDriver {
         let direct = await wire.seen()
         check("3 a direct Gemini key's disagreement asks the run's OCR model once",
               direct.count == 1 && direct.first?.url?.absoluteString.contains("/models/\(geminiOCR.id):generateContent") == true)
+        // A Gemini 3 model the catalog marks not thinking thinks anyway: it gets the lowest level it accepts and the
+        // output ceiling, never an unbounded call (W49.proc-rotation-thinking-price).
+        func geminiConfig(_ model: LLMModel) async -> [String: Any]? {
+            await wire.set(status: 200, letter: "D")
+            _ = await OCRProcessor.detectRotation(imageURL: page, provider: .gemini, apiKey: "k", mode: .llmSingle,
+                                                  gatewayConfig: nil, ocrModel: model)
+            let body = await wire.seen().first?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            return body?["generationConfig"] as? [String: Any]
+        }
+        func catalogGemini(_ id: String) -> LLMModel? { LLMModel.geminiModels.first { $0.id == id } }
+        func level(_ config: [String: Any]?) -> String? { (config?["thinkingConfig"] as? [String: Any])?["thinkingLevel"] as? String }
+        let ceiling = LLMRotationDetector.geminiUnbudgetedCeiling
+        if let pro = catalogGemini("gemini-3.1-pro"), let preview = catalogGemini("gemini-3-flash-preview") {
+            let proConfig = await geminiConfig(pro), previewConfig = await geminiConfig(preview)
+            check("3 a direct key's Gemini 3.1 Pro comparison thinks at low under the output ceiling",
+                  !pro.supportsThinking && level(proConfig) == "low" && proConfig?["maxOutputTokens"] as? Int == ceiling)
+            check("3 a direct key's Gemini 3 Flash Preview comparison thinks at minimal under the output ceiling",
+                  !preview.supportsThinking && level(previewConfig) == "minimal"
+                    && previewConfig?["maxOutputTokens"] as? Int == ceiling)
+        } else {
+            results.append("SKIP: 3 unbudgeted Gemini thinking: 3.1 Pro or 3 Flash Preview not in the catalog")
+        }
+        let budgeted = await geminiConfig(geminiOCR)
+        check("3 a thinking Gemini model keeps its Low budget and no ceiling",
+              !geminiOCR.supportsThinking || ((budgeted?["thinkingConfig"] as? [String: Any])?["thinkingBudget"] as? Int
+                == LLMRotationDetector.directThinkingTokens && budgeted?["maxOutputTokens"] == nil))
+        let older = LLMModel(id: "gemini-2.5-flash-lite", displayName: "", provider: .gemini, supportsThinking: false,
+                             returnsMd: false, inputCostPer1M: 0.1, outputCostPer1M: 0.4, batchDiscount: 0.5)
+        check("3 a Gemini 2.5 model marked not thinking gets no thinking settings",
+              LLMRotationDetector.geminiGenerationConfig(for: older).keys.sorted() == ["temperature"])
         let claudeOCR = LLMModel.anthropicModels[0]
         await wire.set(status: 200, letter: "D")   // each check reads only its own requests
         _ = await OCRProcessor.detectRotation(imageURL: page, provider: .anthropic, apiKey: "k", mode: .llmSingle,
@@ -290,6 +320,19 @@ enum RotationRuleTestDriver {
         let time = TimeEstimator.estimate(fileCount: 100, model: model, rotationMode: .llmSingle, enableTagging: false,
                                           useGateway: true, gatewayRotation: true)
         check("6 the time estimate counts the gateway's calls", time.rotationSeconds > 0)
+        // A Gemini 3 model marked not thinking is priced at its whole output ceiling on every call (three under ×3).
+        if let pro = LLMModel.geminiModels.first(where: { $0.id == "gemini-3.1-pro" }) {
+            let proCall = (4 * CostEstimator.estimatedRotationCandidateTokens(for: .gemini) + CostEstimator.estimatedRotationPromptTokens)
+                / 1_000_000 * pro.inputCostPer1M
+                + (CostEstimator.estimatedRotationOutputTokens + Double(LLMRotationDetector.geminiUnbudgetedCeiling))
+                  / 1_000_000 * pro.outputCostPer1M
+            let majority = CostEstimator.estimate(fileCount: 1000, model: pro, enableTagging: false, sendPreviousImage: false,
+                                                  contextCharCount: 0, rotationMode: .llmMajority).rotationCost
+            check("6 a direct Gemini 3.1 Pro comparison is priced at its output ceiling, three calls under ×3",
+                  abs(majority - 1000 * 3 * proCall) < 1e-9)
+        } else {
+            results.append("SKIP: 6 Gemini 3.1 Pro pricing: not in the catalog")
+        }
         // A direct OpenAI reasoning model is priced at its whole completion ceiling (no thinking budget to hold it to).
         if let reasoning = LLMModel.openaiModels.first(where: \.supportsThinking) {
             let openAICall = (4 * CostEstimator.estimatedRotationCandidateTokens(for: .openai) + CostEstimator.estimatedRotationPromptTokens)

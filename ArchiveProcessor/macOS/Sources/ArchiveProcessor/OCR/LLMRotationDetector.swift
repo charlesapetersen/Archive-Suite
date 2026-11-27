@@ -154,6 +154,34 @@ enum LLMRotationDetector {
     /// An OpenAI reasoning model's completion ceiling for one comparison: room to think at low effort before its letter.
     /// OpenAI takes no thinking budget, so the estimate prices the whole ceiling.
     static let openAIReasoningCeiling = 2048
+    /// The output ceiling for a Gemini model that thinks without a budget: thinking counts inside `maxOutputTokens`,
+    /// so a call can never spend more, and the estimate prices the whole ceiling (W49.proc-rotation-thinking-price).
+    static let geminiUnbudgetedCeiling = 2048
+
+    /// Whether a direct Gemini key's model thinks though the catalog does not mark it as thinking: every Gemini 3 or
+    /// later model thinks by default and takes a `thinkingLevel`, and Pro cannot turn it off (Google AI Studio
+    /// docs, "Thinking", checked 2026-11-27: 3.1 Pro and 3 Pro default to high; 3 Flash Preview to high).
+    static func geminiThinksUnbudgeted(_ model: LLMModel) -> Bool {
+        guard model.provider == .gemini, !model.supportsThinking else { return false }
+        let parts = model.id.split(separator: "-")
+        guard parts.count >= 2, parts[0] == "gemini", let version = Double(parts[1]) else { return false }
+        return version >= 3
+    }
+
+    /// The comparison's `generationConfig`. A thinking model is held to the Low classification budget, as the OCR
+    /// client sends it. A Gemini 3 model marked not thinking gets the lowest level it accepts ("low" on Pro, which
+    /// has no "minimal"; "minimal" on the rest) and the hard output ceiling, since a level bounds no token count.
+    static func geminiGenerationConfig(for model: LLMModel) -> [String: Any] {
+        var generation: [String: Any] = ["temperature": 0]
+        if model.supportsThinking {
+            generation["thinkingConfig"] = ["thinkingBudget": directThinkingTokens]
+        } else if geminiThinksUnbudgeted(model) {
+            let level = model.id.split(separator: "-").contains("pro") ? "low" : "minimal"
+            generation["thinkingConfig"] = ["thinkingLevel": level]
+            generation["maxOutputTokens"] = geminiUnbudgetedCeiling
+        }
+        return generation
+    }
 
     private static func askGemini(images: [(label: String, base64: String)], apiKey: String,
                                   model: LLMModel) async -> String? {
@@ -162,9 +190,7 @@ enum LLMRotationDetector {
             parts.append(["text": "\nImage \(img.label):"])
             parts.append(["inlineData": ["mimeType": "image/jpeg", "data": img.base64]])
         }
-        // The run's OCR model; a thinking model is held to the Low classification budget, as the OCR client sends it.
-        var generation: [String: Any] = ["temperature": 0]
-        if model.supportsThinking { generation["thinkingConfig"] = ["thinkingBudget": directThinkingTokens] }
+        let generation = geminiGenerationConfig(for: model)
         let body: [String: Any] = [
             "contents": [["parts": parts]],
             "generationConfig": generation
