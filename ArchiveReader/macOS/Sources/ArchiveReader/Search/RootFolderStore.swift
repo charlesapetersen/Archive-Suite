@@ -70,9 +70,14 @@ final class RootFolderStore: ObservableObject {
         /// It opens, but macOS refused to mint a security-scoped bookmark for it, so access could
         /// not survive the launch — adopting it anyway would work until the next one and then not.
         case couldNotBookmark(URL, String)
+        /// A File ▸ Open Recent folder whose bookmark no longer opens it: moved, deleted, or on a disk not connected.
+        case recentUnavailable(String)
 
         var message: String {
             switch self {
+            case let .recentUnavailable(name):
+                return "Could not open “\(name)”. It may have been moved, renamed or deleted, "
+                    + "or its disk may not be connected."
             case let .unreadable(url):
                 return "Could not open “\(url.lastPathComponent)”. "
                     + "Check that the folder still exists and that you have permission to read it."
@@ -119,6 +124,32 @@ final class RootFolderStore: ObservableObject {
             NSLog("RootFolderStore: could not bookmark \(target.path): \(error)")
             return .couldNotBookmark(target, "\(error)")
         }
+    }
+
+    /// Set the archive root from a File ▸ Open Recent bookmark (W49.reader-ux-gaps-small), as `reResolveSavedRoot`
+    /// adopts the saved one. Nothing is written unless the folder opens: a dead entry leaves the current root and
+    /// `archiveRootBookmark` as they were.
+    @discardableResult
+    func setRoot(bookmark data: Data, name: String) -> RootPickRefusal? {
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil,
+                                 bookmarkDataIsStale: &stale) else { return .recentUnavailable(name) }
+        guard url.startAccessingSecurityScopedResource() else { return .recentUnavailable(name) }
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            url.stopAccessingSecurityScopedResource()
+            return .recentUnavailable(name)
+        }
+        // Refreshed while access is held, as `reResolveSavedRoot` does.
+        let saved = stale ? (try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil,
+                                                   relativeTo: nil)) ?? data : data
+        defaults.set(saved, forKey: key)
+        let previous = accessing
+        accessing = url
+        if let previous, previous != url { previous.stopAccessingSecurityScopedResource() }
+        adopt(url)
+        ensureMarker()   // as a pick does: the folder chosen gets its archive identity
+        return nil
     }
 
     func clear() {

@@ -20,6 +20,8 @@ struct OptionsView: View {
     // Applied app-wide by `AppAppearance.follow()`, which watches this key (W48.appearance-reader).
     @AppStorage(AppAppearance.defaultsKey) private var appearance: AppAppearance = AppAppearance.defaultValue
     @ObservedObject private var excludedFolders = ExcludedFoldersStore.shared
+    /// Holds the navigation window's model, whose root the excluded folders are relative to.
+    @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
 
     var body: some View {
         Form {
@@ -105,7 +107,8 @@ struct OptionsView: View {
                         }
                     }
                 }
-                Button("Add Folder\u{2026}") { addExcludedFolder() }
+                // W49.reader-ux-gaps-small: off with no folder open, and a refused pick says why.
+                ExcludedFolderAddButton(rootStore: deepLinkRouter.nav?.rootStore, excludedFolders: excludedFolders)
             }
         }
         .formStyle(.grouped)
@@ -113,34 +116,70 @@ struct OptionsView: View {
         // Item types (W40.suite-item-types) adds 80 pt rather than its whole height.
         .frame(width: 500, height: 740)
     }
+}
 
-    private func addExcludedFolder() {
-        guard let rootURL = resolveArchiveRoot() else { return }
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = rootURL
-        panel.prompt = "Exclude"
-        panel.message = "Choose a subfolder to exclude from the library."
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        // BOTH sides resolved, because the relative path stored here is later re-joined to the root
-        // and tested against DISCOVERED paths (`ExcludedFoldersStore.isExcludedAbsolute`). The panel
-        // and the root need not agree on spelling, and the difference would either discard the
-        // exclusion silently or store one that matches nothing. (`W26.symroot-fu1`.)
-        let rootPath = CorpusWalker.discoveredPathPrefix(for: rootURL) ?? rootURL.path
-        let chosen = CorpusWalker.discoveredPathPrefix(for: url) ?? url.path
-        // Must be a descendant of root.
-        guard chosen.hasPrefix(rootPath + "/") else { return }
-        let relative = String(chosen.dropFirst(rootPath.count + 1))
-        excludedFolders.add(relative)
+/// Settings ▸ Excluded folders' Add Folder…, observing the root it needs.
+private struct ExcludedFolderAddButton: View {
+    let rootStore: RootFolderStore?
+    let excludedFolders: ExcludedFoldersStore
+
+    var body: some View {
+        if let rootStore { Observed(rootStore: rootStore, excludedFolders: excludedFolders) } else { disabled }
     }
 
-    /// Resolve the archive root from the persisted bookmark (same key as RootFolderStore).
-    private func resolveArchiveRoot() -> URL? {
-        guard let data = UserDefaults.standard.data(forKey: "archiveRootBookmark") else { return nil }
-        var stale = false
-        return try? URL(resolvingBookmarkData: data, options: .withSecurityScope,
-                        relativeTo: nil, bookmarkDataIsStale: &stale)
+    private var disabled: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button("Add Folder\u{2026}") {}.disabled(true)
+                .accessibilityIdentifier("ar.settings.excludedFolders.add")
+            Text("Choose an archive folder first (File ▸ Choose Archive Folder…).")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private struct Observed: View {
+        @ObservedObject var rootStore: RootFolderStore
+        let excludedFolders: ExcludedFoldersStore
+        @State private var refusal: String?
+
+        var body: some View {
+            if rootStore.root == nil {
+                ExcludedFolderAddButton(rootStore: nil, excludedFolders: excludedFolders)
+            } else {
+                Button("Add Folder\u{2026}") { addExcludedFolder() }
+                    .accessibilityIdentifier("ar.settings.excludedFolders.add")
+                    .alert("Folder Not Excluded", isPresented: Binding(get: { refusal != nil },
+                                                                       set: { if !$0 { refusal = nil } })) {
+                        Button("OK", role: .cancel) { refusal = nil }
+                    } message: {
+                        Text(refusal ?? "")
+                    }
+            }
+        }
+
+        private func addExcludedFolder() {
+            // The live root, whose security scope is held: the folder the library is showing.
+            guard let rootURL = rootStore.root else { return }
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.allowsMultipleSelection = false
+            panel.directoryURL = rootURL
+            panel.prompt = "Exclude"
+            panel.message = "Choose a subfolder to exclude from the library."
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            // BOTH sides resolved, because the relative path stored here is later re-joined to the root
+            // and tested against DISCOVERED paths (`ExcludedFoldersStore.isExcludedAbsolute`). The panel
+            // and the root need not agree on spelling, and the difference would either discard the
+            // exclusion silently or store one that matches nothing. (`W26.symroot-fu1`.)
+            let rootPath = rootStore.discoveredPathPrefix ?? CorpusWalker.discoveredPathPrefix(for: rootURL) ?? rootURL.path
+            let chosen = CorpusWalker.discoveredPathPrefix(for: url) ?? url.path
+            let placement = ExcludedFoldersStore.placement(of: chosen, rootPath: rootPath)
+            guard case let .inside(relative) = placement else {
+                refusal = ExcludedFoldersStore.refusal(placement, folderName: url.lastPathComponent,
+                                                       rootName: rootURL.lastPathComponent)
+                return
+            }
+            excludedFolders.add(relative)
+        }
     }
 }

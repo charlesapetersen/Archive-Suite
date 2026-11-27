@@ -146,8 +146,14 @@ enum SavedSearchFixtures {
                             search: AdvancedSearch(combine: .any, rules: rows))]
     }
 
-    /// The newest coverage includes the unchanged legacy fixture and the supplementary catalogue fixture.
-    static var newest: [SavedSearch] { november2026Container + november2026Catalogue }
+    /// The Both Read and Unread field from W49.reader-ux-gaps-small, in another supplementary fixture.
+    static var november2026BothReadStates: [SavedSearch] {
+        let rows = [rule(4001, .bothReadStates, .is), rule(4002, .bothReadStates, .isNot)]
+        return [SavedSearch(id: id(10), name: "Both read states", search: AdvancedSearch(combine: .any, rules: rows))]
+    }
+
+    /// The newest coverage includes the unchanged legacy fixture and the supplementary fixtures.
+    static var newest: [SavedSearch] { november2026Container + november2026Catalogue + november2026BothReadStates }
 }
 
 @MainActor
@@ -204,6 +210,10 @@ final class SavedSearchFixtureTests: XCTestCase {
 
     func testTheCatalogueFixtureLoadsUnchanged() throws {
         try assertLoads("saved-searches-2026-11-catalogue", as: SavedSearchFixtures.november2026Catalogue)
+    }
+
+    func testTheBothReadStatesFixtureLoadsUnchanged() throws {
+        try assertLoads("saved-searches-2026-11-bothread", as: SavedSearchFixtures.november2026BothReadStates)
     }
 
     /// W40.reader-quality-levels: the November fixture saved Quality rows with 0, 2 and 5; they load, keeping

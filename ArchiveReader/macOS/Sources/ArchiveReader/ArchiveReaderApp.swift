@@ -78,6 +78,7 @@ struct ArchiveReaderApp: App {
 
         Settings {
             OptionsView()
+                .environmentObject(deepLinkRouter)   // the navigation window's root, for Excluded folders
         }
     }
 

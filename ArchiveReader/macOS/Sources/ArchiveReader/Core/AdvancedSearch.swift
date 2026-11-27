@@ -36,6 +36,8 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
     case ambiguousDate
     case poorOCR
     case flagged
+    /// Tagged both Read and Unread (W49.reader-ux-gaps-small), so the health filter can be saved.
+    case bothReadStates
     /// A container facet's value (W47.ct-reader-facet-rules): `SearchRule.containerFacet` and `text`, compared by
     /// `ContainerFacet.key` against the model's `ContainerCatalog` through `RuleContext.containers`.
     case container
@@ -65,7 +67,7 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
         case .tags: return [.hasAll, .hasAny, .hasNone]
         case .quality, .readState, .fileType, .folder, .container: return [.is, .isNot]
         case .date: return [.between, .after, .before, .undated]
-        case .needsAttention, .ambiguousDate, .poorOCR, .flagged: return [.is, .isNot]
+        case .needsAttention, .ambiguousDate, .poorOCR, .flagged, .bothReadStates: return [.is, .isNot]
         case .group: return [.is]
         }
     }
@@ -164,7 +166,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
         case .readState: return read != .all
         case .fileType: return !fileType.isEmpty
         case .date: return op == .undated || dateBounds != nil
-        case .needsAttention, .ambiguousDate, .poorOCR, .flagged: return true
+        case .needsAttention, .ambiguousDate, .poorOCR, .flagged, .bothReadStates: return true
         case .group: return children.contains(where: \.isActive)
         }
     }
@@ -378,6 +380,7 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
                 return value == positive
             }
             return file.tags.hasPoorOCR == positive
+        case .bothReadStates: return file.hasBothReadStates == positive
         case .flagged:
             if file.isCatalogue {
                 guard let flag = file.catalogueFlag else { return false }
@@ -471,6 +474,7 @@ extension AdvancedSearch {
         }
         if f.needsAttentionOnly { rules.append(SearchRule(field: .needsAttention)) }
         if f.ambiguousDatesOnly { rules.append(SearchRule(field: .ambiguousDate)) }
+        if f.bothReadStatesOnly { rules.append(SearchRule(field: .bothReadStates)) }
         if f.poorOCROnly {
             if catalogueMode {
                 rules.append(SearchRule(field: .poorOCR))

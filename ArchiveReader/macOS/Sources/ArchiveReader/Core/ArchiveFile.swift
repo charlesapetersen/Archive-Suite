@@ -181,6 +181,11 @@ struct ArchiveFile: Identifiable, Sendable {
     }
     /// Whether the file carries `tag` in any case (W40.fix-tags-case-insensitive).
     func hasSubject(_ tag: String) -> Bool { subjectKeys.contains(tagKey(tag)) }
+    /// Tagged both Read and Unread, in any case: a damaged read state, counted by Library health.
+    var hasBothReadStates: Bool {
+        tags.raw.contains { $0.caseInsensitiveCompare("Read") == .orderedSame }
+            && tags.raw.contains { $0.caseInsensitiveCompare("Unread") == .orderedSame }
+    }
     /// W40.suite-item-types: Box or Folder, from the token or the root's older-material colours.
     var itemType: ItemType? { tags.itemType }
 }

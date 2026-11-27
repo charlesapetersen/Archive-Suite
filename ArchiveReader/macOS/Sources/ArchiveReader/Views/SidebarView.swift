@@ -67,6 +67,7 @@ struct SidebarView: View {
                             .tag(node.path)
                             .help(node.path)
                             .accessibilityIdentifier("ar.sidebar.folder")
+                            .contextMenu { folderMenu(node.path) }
                     }
                 }
             }
@@ -76,6 +77,16 @@ struct SidebarView: View {
         .onChange(of: selection) { _, new in applySelection(new) }
         .onChange(of: model.filter.pathPrefix) { _, _ in syncSelectionFromModel() }
         .onChange(of: model.scope?.id) { _, _ in syncSelectionFromModel() }
+    }
+
+    /// A folder's right-click menu (W49.reader-ux-gaps-small).
+    @ViewBuilder private func folderMenu(_ path: String) -> some View {
+        Button(ReaderCommand.revealInFinder.title) { model.revealFolderInFinder(path) }
+            .accessibilityIdentifier("ar.sidebar.folder.reveal")
+        Button("Exclude Folder") { model.excludeFolder(path) }
+            .accessibilityIdentifier("ar.sidebar.folder.exclude")
+        Button(ReaderCommand.containerLevels.title) { model.openContainerLevels(forFolder: path) }
+            .accessibilityIdentifier("ar.sidebar.folder.containerLevels")
     }
 
     /// Perform the action for a newly-clicked row: enter a smart-folder scope, or scope to a folder.

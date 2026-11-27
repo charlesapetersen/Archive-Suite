@@ -1,0 +1,41 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "name": "Both read states",
+    "search": {
+      "combine": "any",
+      "rules": [
+        {
+          "children": [],
+          "combine": "all",
+          "containerFacet": "container",
+          "dateRole": "either",
+          "field": "bothReadStates",
+          "fileType": "PDF",
+          "id": "00000000-0000-4000-8000-000000004001",
+          "op": "is",
+          "qualities": [],
+          "read": "unread",
+          "tags": [],
+          "text": "",
+          "text2": ""
+        },
+        {
+          "children": [],
+          "combine": "all",
+          "containerFacet": "container",
+          "dateRole": "either",
+          "field": "bothReadStates",
+          "fileType": "PDF",
+          "id": "00000000-0000-4000-8000-000000004002",
+          "op": "isNot",
+          "qualities": [],
+          "read": "unread",
+          "tags": [],
+          "text": "",
+          "text2": ""
+        }
+      ]
+    }
+  }
+]

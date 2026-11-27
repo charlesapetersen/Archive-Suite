@@ -62,6 +62,37 @@ final class ExcludedFoldersStore: ObservableObject {
         return excludedRelativePaths.map { root + "/" + $0 }
     }
 
+    /// Where a folder chosen to exclude stands against the archive root (W49.reader-ux-gaps-small). Both paths
+    /// must be spelled alike (`CorpusWalker.discoveredPathPrefix`); a pick outside used to be dropped silently.
+    enum Placement: Equatable, Sendable {
+        /// Inside the root, as the root-relative path to store.
+        case inside(String)
+        /// The archive folder itself, which cannot be hidden from itself.
+        case isRoot
+        case outside
+    }
+
+    nonisolated static func placement(of chosenPath: String, rootPath: String) -> Placement {
+        let root = rootPath.count > 1 && rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath
+        let chosen = chosenPath.count > 1 && chosenPath.hasSuffix("/") ? String(chosenPath.dropLast()) : chosenPath
+        if chosen == root { return .isRoot }
+        let prefix = root == "/" ? "/" : root + "/"
+        guard chosen.hasPrefix(prefix) else { return .outside }
+        return .inside(String(chosen.dropFirst(prefix.count)))
+    }
+
+    /// What to tell the user when a chosen folder cannot be excluded; nil when it can.
+    nonisolated static func refusal(_ placement: Placement, folderName: String, rootName: String) -> String? {
+        switch placement {
+        case .inside: return nil
+        case .isRoot:
+            return "“\(folderName)” is the archive folder itself. Choose a folder inside it to exclude."
+        case .outside:
+            return "“\(folderName)” is not inside the archive folder “\(rootName)”, so it was not excluded. "
+                + "Only folders inside the archive folder can be excluded."
+        }
+    }
+
     // MARK: - Private
 
     private func persist() {

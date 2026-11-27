@@ -9,7 +9,23 @@ import ArchiveCore
 @MainActor
 final class DeepLinkRouter: ObservableObject {
     weak var nav: NavigationModel? {
-        didSet { if let nav, chooseRootPending { runPendingChooseRoot(on: nav) } }
+        didSet {
+            if let nav, chooseRootPending { runPendingChooseRoot(on: nav) }
+            if let nav, let action = pendingNavigationAction {
+                pendingNavigationAction = nil
+                DispatchQueue.main.async { action(nav) }
+            }
+        }
+    }
+
+    /// A menu command for the navigation window's model given with none attached (File ▸ Open Recent with only a
+    /// document window open, W49.reader-ux-gaps-small): run once the window it opens has attached its model.
+    private var pendingNavigationAction: ((NavigationModel) -> Void)?
+
+    func requestOnNavigation(openNavigationWindow: () -> Void, _ action: @escaping (NavigationModel) -> Void) {
+        if let nav { action(nav); return }
+        pendingNavigationAction = action
+        openNavigationWindow()
     }
 
     /// W40.fix-reader-choose-folder-shortcut: File ▸ Choose Archive Folder… (⇧⌘O) works from any Reader

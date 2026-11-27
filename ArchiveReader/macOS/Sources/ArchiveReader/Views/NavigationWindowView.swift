@@ -355,16 +355,31 @@ struct NavigationWindowView: View {
             switch model.emptyListState {
             case .none:
                 EmptyView()
+            // W49.reader-ux-gaps-small: both states carry their way out, as the others do.
             case .noRoot:
-                ContentUnavailableView("No archive folder chosen", systemImage: "folder.badge.questionmark",
-                                       description: Text("Choose a folder in the toolbar to browse its tagged PDFs."))
+                ContentUnavailableView {
+                    Label("No archive folder chosen", systemImage: "folder.badge.questionmark")
+                } description: {
+                    Text("Choose a folder to browse its tagged PDFs.")
+                } actions: {
+                    chooseFolderButton
+                }
             case .scanning:
                 ContentUnavailableView(model.library.usesCatalogue ? "Looking for PDFs…" : "Looking for tagged documents…",
                                        systemImage: "magnifyingglass",
                                        description: Text("Scanning \(model.library.scopeDescription)."))
             case let .couldNotLook(failure):
-                ContentUnavailableView(failure.message, systemImage: "exclamationmark.triangle.fill",
-                                       description: Text(failure.detail))
+                ContentUnavailableView {
+                    Label(failure.message, systemImage: "exclamationmark.triangle.fill")
+                } description: {
+                    Text(failure.detail)
+                } actions: {
+                    HStack {
+                        Button("Rescan") { model.rescan() }
+                            .accessibilityIdentifier("ar.empty.rescan")
+                        chooseFolderButton
+                    }
+                }
             // The second sentence squares the scanned count with the status bar's "0 total", which counts
             // only listed (tagged) documents; both offer the way out (W40.fix-reader-visual-polish).
             // The button sits outside the combined element, which UI tests read as one sentence, so it stays
@@ -919,6 +934,7 @@ struct NavigationWindowView: View {
                     DataQualityView(model: model,
                                     showNeedsAttention: { model.filter.needsAttentionOnly = true; showingHealth = false },
                                     showAmbiguousDates: { model.filter.ambiguousDatesOnly = true; showingHealth = false },
+                                    showBothReadStates: { model.filter.bothReadStatesOnly = true; showingHealth = false },
                                     showContainerWarning: { model.showContainerWarning($0); showingHealth = false })
                 }
             Spacer()
@@ -1003,7 +1019,7 @@ private extension View {
     }
 }
 
-/// A small library-health readout (data-quality counts). The two counts that have a list filter carry a Show
+/// A small library-health readout (data-quality counts). The three counts that have a list filter carry a Show
 /// button for it; the filter bar shows those filters only while they are on (W40.fix-reader-health-counts).
 /// Below them, the container warnings of every folder, each with its folder and a Show for the file it starts at
 /// (W49.reader-ct-warnings-all); the Inspector lists only the selected file's folder.
@@ -1012,6 +1028,7 @@ struct DataQualityView: View {
     @ObservedObject var model: NavigationModel
     let showNeedsAttention: () -> Void
     let showAmbiguousDates: () -> Void
+    var showBothReadStates: () -> Void = {}
     var showContainerWarning: (ContainerWarningRow) -> Void = { _ in }
     var body: some View {
         let q = model.dataQuality
@@ -1022,7 +1039,10 @@ struct DataQualityView: View {
             row("No quality", q.noQuality)
             row("Date uncertain", q.dateUncertain)
             row("Box/folder markers", q.markers)
-            row("Both Read + Unread (corrupt)", q.bothReadUnread, warn: q.bothReadUnread > 0)
+            // W49.reader-ux-gaps-small: a Show, as the other counts with a list filter have.
+            filterRow("Both Read + Unread (corrupt)", q.bothReadUnread,
+                      help: "Show only files tagged both Read and Unread, to choose one",
+                      id: "ar.health.bothReadStates", action: showBothReadStates)
             filterRow("Non-standard PDFs (need attention)", model.needsAttentionCount,
                       help: "Show only non-standard PDFs — files that couldn't be opened, or have no selectable text",
                       id: "ar.health.needsAttention", action: showNeedsAttention)

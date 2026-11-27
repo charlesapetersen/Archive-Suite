@@ -10,6 +10,8 @@ import Foundation
 /// One thing in effect that narrows the list.
 enum FilterFacet: Hashable, Sendable {
     case smartFolder, folder, read, quality(Int), tag(String), dates, name, text, needsAttention, ambiguousDates, poorOCR
+    /// Tagged both Read and Unread (W49.reader-ux-gaps-small), from Library health's Show.
+    case bothReadStates
     /// A container facet (W47.ct-reader-view).
     case container(ContainerFacet)
 
@@ -40,6 +42,7 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         case .needsAttention: return "ar.filter.needsAttention"
         case .ambiguousDates: return "ar.filter.ambiguousDates"
         case .poorOCR: return "ar.filter.poorOCR"
+        case .bothReadStates: return "ar.filter.bothReadStates"
         case let .container(c): return "ar.filter.chip.container.\(c.rawValue)"
         }
     }
@@ -81,6 +84,7 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         if f.needsAttentionOnly { add(.needsAttention, "Needs attention", "the needs-attention filter") }
         if f.ambiguousDatesOnly { add(.ambiguousDates, "Ambiguous dates", "the ambiguous-dates filter") }
         if f.poorOCROnly { add(.poorOCR, "Poor OCR", "the poor-OCR filter") }
+        if f.bothReadStatesOnly { add(.bothReadStates, "Read + Unread", "the Read-and-Unread filter") }
         return chips
     }
 
@@ -121,6 +125,7 @@ extension LibraryFilter {
         case .needsAttention: f.needsAttentionOnly = false
         case .ambiguousDates: f.ambiguousDatesOnly = false
         case .poorOCR: f.poorOCROnly = false
+        case .bothReadStates: f.bothReadStatesOnly = false
         case let .container(c): f.setContainerFacet(c, nil)
         }
         return f

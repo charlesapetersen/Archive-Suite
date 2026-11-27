@@ -39,6 +39,8 @@ struct ArchiveReaderCommands: Commands {
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
     @AppStorage(SettingsKey.copyCleanedOnCommandC) private var copyCleanedOnCommandC = false
+    /// File ▸ Open Recent's folders (W49.reader-ux-gaps-small), watched so the menu follows each folder opened.
+    @AppStorage(RecentArchiveFolders.key) private var recentFoldersData: Data?
 
     private var noReadingPane: Bool { doc == nil || doc?.showingAllPages == true }
 
@@ -174,6 +176,22 @@ struct ArchiveReaderCommands: Commands {
                 }
             }
             .keyboardShortcut(.chooseFolder)
+            Menu("Open Recent") {
+                let recent = RecentArchiveFolders.decode(recentFoldersData)
+                let current = nav?.rootStore.root?.path
+                ForEach(recent) { folder in
+                    Button(folder.name) {
+                        router.requestOnNavigation(openNavigationWindow: { openWindow(id: WindowID.navigation) }) {
+                            $0.openRecentRoot(folder)
+                        }
+                    }
+                    .help(folder.path)
+                    .disabled(folder.path == current)   // the folder showing
+                }
+                Divider()
+                Button("Clear Menu") { RecentArchiveFolders.clear(in: .standard) }
+                    .disabled(recent.isEmpty)
+            }
             // Explicit recovery even though FSEvents normally keeps the library live. ⌘⌥R because
             // ⌘R is Mark Read.
             Button(ReaderCommand.rescan.title) { nav?.rescan() }

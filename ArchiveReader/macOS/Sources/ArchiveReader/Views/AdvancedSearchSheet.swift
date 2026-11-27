@@ -357,7 +357,7 @@ private struct RuleValueView: View {
                     .frame(width: 340)
                 }
             }
-        case .needsAttention, .ambiguousDate, .poorOCR, .flagged, .group:
+        case .needsAttention, .ambiguousDate, .poorOCR, .flagged, .bothReadStates, .group:
             EmptyView()
         }
     }
@@ -391,6 +391,7 @@ extension RuleField {
         case .poorOCR: return "OCR Poor"
         case .ambiguousDate: return "Ambiguous date"
         case .flagged: return "Flagged"
+        case .bothReadStates: return "Both Read and Unread"
         case .container: return "Container"
         case .group: return "Group"
         }
@@ -420,7 +421,7 @@ extension RuleOperator {
             switch field {
             case .quality: return yes ? "is one of" : "is none of"
             case .folder: return yes ? "is inside" : "is not inside"
-            case .needsAttention, .ambiguousDate, .poorOCR, .flagged: return yes ? "yes" : "no"
+            case .needsAttention, .ambiguousDate, .poorOCR, .flagged, .bothReadStates: return yes ? "yes" : "no"
             default: return yes ? "is" : "is not"
             }
         }

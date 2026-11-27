@@ -63,6 +63,13 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         get { poorOCR ?? false }
         set { poorOCR = newValue ? true : nil }
     }
+    /// W49.reader-ux-gaps-small: only files tagged both Read and Unread (`ArchiveFile.hasBothReadStates`), the
+    /// Library health count's Show. Optional for the same reason as `ambiguousDates`. Use `bothReadStatesOnly`.
+    var bothReadStates: Bool? = nil
+    var bothReadStatesOnly: Bool {
+        get { bothReadStates ?? false }
+        set { bothReadStates = newValue ? true : nil }
+    }
 
     /// W47.ct-reader-view: the container facets, by `ContainerFacet` raw value, each the shown value a file must
     /// have (compared by `ContainerFacet.key`). The values are the model's `ContainerCatalog`, not the file's, so this
@@ -100,7 +107,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         !subjects.isEmpty || !qualities.isEmpty || read != .all || dateRange != nil
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
             || (pathPrefix?.isEmpty == false)
-            || needsAttentionOnly || ambiguousDatesOnly || poorOCROnly
+            || needsAttentionOnly || ambiguousDatesOnly || poorOCROnly || bothReadStatesOnly
             || !activeContainerFacets.isEmpty
     }
 
@@ -142,6 +149,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         }
         if ambiguousDatesOnly, !file.dateIsAmbiguous { return false }
         if poorOCROnly, !file.tags.hasPoorOCR { return false }
+        if bothReadStatesOnly, !file.hasBothReadStates { return false }
         // Filename text
         let q = searchText.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty, file.name.range(of: q, options: .caseInsensitive) == nil { return false }

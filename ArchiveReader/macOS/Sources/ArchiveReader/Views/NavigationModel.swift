@@ -2446,9 +2446,27 @@ final class NavigationModel: ObservableObject {
             announce(statusMessage)
             return
         }
+        resetForAdoptedRoot()
+    }
+
+    /// File ▸ Open Recent (W49.reader-ux-gaps-small): reopen a folder opened before, through its bookmark. A folder
+    /// that no longer opens says why and leaves the current one showing, as a refused pick does.
+    func openRecentRoot(_ entry: RecentArchiveFolder) {
+        guard !choosingRoot else { return }
+        if let refusal = rootStore.setRoot(bookmark: entry.bookmark, name: entry.name) {
+            statusMessage = refusal.message
+            announce(statusMessage)
+            return
+        }
+        resetForAdoptedRoot()
+    }
+
+    /// The new root's view state and scan, once `rootStore` has adopted it.
+    private func resetForAdoptedRoot() {
         // Scan the root we ADOPTED, which is not necessarily the URL that was picked: a symlinked
         // pick is adopted as its target, because a security-scoped bookmark cannot open a link.
         guard let adopted = rootStore.root else { return }
+        RecentArchiveFolders.note(adopted, in: defaults)
         // A scope from the old root can't apply to a new one, nor can its folders' Back and Forward.
         exitScope()
         placeHistory.clear()
@@ -3213,9 +3231,7 @@ final class NavigationModel: ObservableObject {
             if f.tags.quality == nil { q.noQuality += 1 }
             if f.tags.dateUncertain { q.dateUncertain += 1 }
             if f.itemType != nil { q.markers += 1 }
-            let hasRead = f.tags.raw.contains { $0.caseInsensitiveCompare("Read") == .orderedSame }
-            let hasUnread = f.tags.raw.contains { $0.caseInsensitiveCompare("Unread") == .orderedSame }
-            if hasRead && hasUnread { q.bothReadUnread += 1 }   // corruption: both state tokens
+            if f.hasBothReadStates { q.bothReadUnread += 1 }   // corruption: both state tokens
         }
         return q
     }
