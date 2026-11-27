@@ -1,6 +1,6 @@
 """W46.layout-partition-score, step 2: one small open reader on three arms of the 15 L9 scans.
 
-  heavy-run.py run -- "$HOME/Library/Application Support/Vision OCR/Runtime/bin/python3" \
+  heavy-run.py run -- "$HOME/Library/Application Support/ArchiveSuite/VisionOCRKit/Runtime/bin/python3" \
       ArchiveProcessor/scripts/segbench/layout_partition_read.py [--arms whole raw partition] [--pages N]
 
 Run by the app's own runtime python (its mlx-vlm), offline, against Vision OCR's installed PaddleOCR-VL 1.6 4-bit.
@@ -32,7 +32,7 @@ sys.path.insert(0, str(HERE / 'corpus'))
 import regions_cluster as C   # noqa: E402  (stdlib only at import)
 
 WORK = Path(os.environ.get('ARCHIVE_BENCH_CACHE', Path.home() / 'Library/Caches/ArchiveSuiteRehearsal')) / 'layout-partition-score'
-MODELS = Path.home() / 'Library/Application Support/Vision OCR/Models'
+MODELS = Path.home() / 'Library/Application Support/ArchiveSuite/VisionOCRKit/Models'
 REPO = 'mlx-community/PaddleOCR-VL-1.6-4bit'
 REVISION = 'c8987b277bdd8aaec8bd265d154f391bd03ad165'
 PROMPT = 'OCR:'

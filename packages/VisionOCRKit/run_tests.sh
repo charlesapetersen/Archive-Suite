@@ -55,7 +55,7 @@ HELPER_FLAGS=(-O -target "$TARGET")
 PLATES_FLAGS=(-target "$TARGET")
 # The recognition helper's sources: Recogniser's own closure, as build.sh builds it.
 HELPER_SOURCES=(Sources/VisionOCRKit/Prefs.swift Sources/VisionOCRKit/Runner.swift Sources/VisionOCRKit/Recogniser.swift
-  Sources/VisionOCRKit/SearchableWriter.swift Sources/VisionOCRKit/Flattener.swift Sources/VisionOCRKit/JBIG2.swift Helper/main.swift)
+  Sources/VisionOCRKit/SearchableWriter.swift Sources/VisionOCRKit/Flattener.swift Sources/VisionOCRKit/JBIG2.swift Sources/VisionOCRKit/PDFChildBudget.swift Helper/main.swift)
 
 # ── The compiled-binary cache and the green stamp (Agent Manager EFFICIENCY-PLAN rounds 1-2) ──────────
 # CACHE. Each of the three binaries is keyed by the sha-256 of everything that goes into compiling it: the

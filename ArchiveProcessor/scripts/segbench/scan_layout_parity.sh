@@ -14,7 +14,7 @@ cd "$(dirname "$0")/../.."
 . ../ops/autonomous/heavy-enter.sh
 WORK="${ARCHIVE_BENCH_CACHE:-$HOME/Library/Caches/ArchiveSuiteRehearsal}/wh-yolo-scans"
 bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
-runtime="$HOME/Library/Application Support/Vision OCR/Runtime"
+runtime="$HOME/Library/Application Support/ArchiveSuite/VisionOCRKit/Runtime"
 [ -x "$bin" ] || { echo "Build the Debug Processor first"; exit 1; }
 [ -x "$runtime/bin/python3" ] || { echo 'Missing shared runtime'; exit 1; }
 [ -f "$WORK/doclayout-yolo-1280.tgz" ] || { echo "Run make-scan-newspaper-layout.sh first"; exit 1; }

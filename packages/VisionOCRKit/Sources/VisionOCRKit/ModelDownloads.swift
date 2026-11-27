@@ -10,8 +10,10 @@ import CryptoKit
 ///
 /// The models come from Hugging Face at the revision `ocr-compare-run` measured. The runtime
 /// (`ops/ocrlab/make-runtime.sh`) and the layout model (`ops/ocrlab/convert-layout.py`) are this
-/// project's builds, attached to the repository's `models-1` release; the archives the hashes
-/// below were taken from are kept in the autonomous state's `model-files/`.
+/// project's builds, fetched from Archive Suite's `visionocrkit-models-1` release and, until the
+/// owner has uploaded the same files there, from Vision OCR's `models-1` (`Source.published`).
+/// The files must be byte-identical: a rebuilt archive fails its hash rather than falling back.
+/// The archives the hashes below were taken from are kept in the autonomous state's `model-files/`.
 enum ModelDownloads {
     struct File: Equatable {
         let path: String
@@ -177,10 +179,18 @@ enum ModelDownloads {
     struct Source: Equatable {
         var release: URL
         var hub: URL
+        /// Where an archive is tried next when `release` cannot serve it (the server refuses it or
+        /// cannot be reached). A file that arrives but fails its size or hash check is not retried.
+        var fallbacks: [URL] = []
 
+        /// The suite's own release first. The archives were first published on the Vision OCR
+        /// repository, which retires (W42.int-s7-standalone); it stays a fallback until the
+        /// owner has put the same files on the suite's release, and the pinned size and hash
+        /// make the two interchangeable.
         static let published = Source(
-            release: URL(string: "https://github.com/charlesapetersen/vision-ocr/releases/download/models-1/")!,
-            hub: URL(string: "https://huggingface.co/")!)
+            release: URL(string: "https://github.com/charlesapetersen/Archive-Suite/releases/download/visionocrkit-models-1/")!,
+            hub: URL(string: "https://huggingface.co/")!,
+            fallbacks: [URL(string: "https://github.com/charlesapetersen/vision-ocr/releases/download/models-1/")!])
 
         static func current(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> Source {
             guard let raw = environment["VISIONOCR_MODEL_SOURCE"], !raw.isEmpty else { return published }
@@ -188,11 +198,14 @@ enum ModelDownloads {
             return Source(release: url, hub: url)
         }
 
-        func url(_ plan: Plan, _ file: File) -> URL {
+        func url(_ plan: Plan, _ file: File) -> URL { urls(plan, file)[0] }
+
+        /// Every place `file` may come from, in the order they are tried.
+        func urls(_ plan: Plan, _ file: File) -> [URL] {
             switch plan {
-            case .archive: return release.appendingPathComponent(file.path)
+            case .archive: return ([release] + fallbacks).map { $0.appendingPathComponent(file.path) }
             case .hub(let repo, let revision, _):
-                return hub.appendingPathComponent("\(repo)/resolve/\(revision)/\(file.path)")
+                return [hub.appendingPathComponent("\(repo)/resolve/\(revision)/\(file.path)")]
             }
         }
     }
@@ -266,7 +279,7 @@ enum ModelDownloads {
         switch plan {
         case .archive(let file, let top, _):
             let archive = staging.appendingPathComponent(file.path)
-            try await fetch(source.url(plan, file), to: archive, expecting: file, done: 0, progress: progress)
+            try await fetch(source.urls(plan, file), to: archive, expecting: file, done: 0, progress: progress)
             let unpacked = staging.appendingPathComponent("unpacked")
             try fm.createDirectory(at: unpacked, withIntermediateDirectories: true)
             let tar = Process()
@@ -290,7 +303,7 @@ enum ModelDownloads {
             for file in files {
                 let target = snapshot.appendingPathComponent(file.path)
                 try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try await fetch(source.url(plan, file), to: target, expecting: file, done: done, progress: progress)
+                try await fetch(source.urls(plan, file), to: target, expecting: file, done: done, progress: progress)
                 done += file.bytes
             }
             let refs = built.appendingPathComponent("refs")
@@ -305,11 +318,24 @@ enum ModelDownloads {
         try fm.moveItem(at: built, to: destination)
     }
 
-    /// One file to `target`, checked against `file`'s size and hash.
-    private static func fetch(_ url: URL, to target: URL, expecting file: File, done: Int64,
+    /// One file to `target` from the first of `urls` that serves it, checked against `file`'s
+    /// size and hash. Only a failure to fetch moves on to the next; when none serves it, each
+    /// one's reason is reported, the first source's first.
+    private static func fetch(_ urls: [URL], to target: URL, expecting file: File, done: Int64,
                               progress: @escaping @Sendable (Int64) -> Void) async throws {
-        try Task.checkCancellation()
-        try await Fetcher(url: url, target: target) { progress(done + $0) }.run()
+        var reasons: [String] = []
+        for url in urls {
+            try Task.checkCancellation()
+            do {
+                try await Fetcher(url: url, target: target) { progress(done + $0) }.run()
+                break
+            } catch Failure.fetch(let why) {
+                try? FileManager.default.removeItem(at: target)
+                reasons.append(why)
+                if reasons.count == urls.count { throw Failure.fetch(reasons.joined(separator: "; then ")) }
+                progress(done)
+            }
+        }
         let size = (try? FileManager.default.attributesOfItem(atPath: target.path)[.size] as? NSNumber)?.int64Value
         guard size == file.bytes, try sha256(target) == file.sha256 else {
             try? FileManager.default.removeItem(at: target)

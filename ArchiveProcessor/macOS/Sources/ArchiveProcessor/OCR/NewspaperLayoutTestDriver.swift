@@ -213,7 +213,7 @@ enum NewspaperLayoutTestDriver {
                   !ScanNewspaperLayout.isInstalled(bareHome)
                       && NewspaperDetector.forPage(photographed: false, scans: .docLayoutYOLO, environment: bareHome) == .ppDocLayoutV3)
             let runtime = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support/Vision OCR/Runtime")
+                .appendingPathComponent("Library/Application Support/ArchiveSuite/VisionOCRKit/Runtime")
             if FileManager.default.isExecutableFile(atPath: runtime.appendingPathComponent("bin/python3").path) {
                 let home = dir.appendingPathComponent("scan-home")
                 try FileManager.default.createDirectory(at: home.appendingPathComponent("Models/doclayout-yolo-1280.mlmodelc"),

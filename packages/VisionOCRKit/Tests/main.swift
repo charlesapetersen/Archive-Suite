@@ -13724,9 +13724,10 @@ do {
                        sha256: (try? MD.sha256(archive)) ?? "")
     }
     final class Outcome: @unchecked Sendable { var done = false; var error: Error? }
-    func install(_ plan: MD.Plan, _ home: URL, from: URL? = nil, cancelled: Bool = false) -> Error? {
+    func install(_ plan: MD.Plan, _ home: URL, from: URL? = nil, fallbacks: [URL] = [],
+                 cancelled: Bool = false) -> Error? {
         let outcome = Outcome()
-        let src = MD.Source(release: from ?? source, hub: from ?? source)
+        let src = MD.Source(release: from ?? source, hub: from ?? source, fallbacks: fallbacks)
         Task.detached {
             if cancelled { withUnsafeCurrentTask { $0?.cancel() } }
             do { try await MD.install(plan, home: home, source: src) } catch { outcome.error = error }
@@ -13787,6 +13788,31 @@ do {
     check("a download that cannot be fetched says so and installs nothing",
           missingFile != nil && !MD.Item.runtime.installed(["VISIONOCR_MODEL_HOME": other.path]),
           String(describing: missingFile))
+    // The suite's release first, the retiring Vision OCR one behind it (W49.visionocrkit-release-paths).
+    let published = MD.Source.published.urls(runtime, MD.File(path: "runtime.tgz", bytes: 1, sha256: ""))
+    check("archives come from the suite's release, with Vision OCR's only as a fallback",
+          published.map(\.absoluteString) == [
+              "https://github.com/charlesapetersen/Archive-Suite/releases/download/visionocrkit-models-1/runtime.tgz",
+              "https://github.com/charlesapetersen/vision-ocr/releases/download/models-1/runtime.tgz"]
+              && MD.Source.published.urls(falcon, MD.File(path: "config.json", bytes: 1, sha256: "")).count == 1,
+          String(describing: published))
+    check("the runtime and models live in the suite's Application Support folder, not Vision OCR's",
+          ModelRuntime.home([:]).path.hasSuffix("/Library/Application Support/ArchiveSuite/VisionOCRKit"),
+          ModelRuntime.home([:]).path)
+    let fallbackHome = root.appendingPathComponent("fallback home")
+    let viaFallback = install(runtime, fallbackHome, from: root.appendingPathComponent("no mirror"), fallbacks: [source])
+    check("an archive the first release cannot serve is fetched from the next",
+          viaFallback == nil && MD.Item.runtime.installed(["VISIONOCR_MODEL_HOME": fallbackHome.path])
+              && leftovers(fallbackHome).isEmpty,
+          String(describing: viaFallback))
+    let badMirror = root.appendingPathComponent("bad mirror")
+    try? fm.createDirectory(at: badMirror, withIntermediateDirectories: true)
+    try? Data("not the runtime".utf8).write(to: badMirror.appendingPathComponent("runtime.tgz"))
+    let refusedHome = root.appendingPathComponent("refused home")
+    let refused = install(runtime, refusedHome, from: badMirror, fallbacks: [source])
+    check("…but a file that arrives and fails its check is refused, not retried elsewhere",
+          (refused as? MD.Failure) == .mismatch && !MD.Item.runtime.installed(["VISIONOCR_MODEL_HOME": refusedHome.path]),
+          String(describing: refused))
     let stale = root.appendingPathComponent("stale home")
     try? fm.createDirectory(at: stale.appendingPathComponent("Models/hub/models--tiiuae--Falcon-OCR/snapshots/0000"),
                             withIntermediateDirectories: true)

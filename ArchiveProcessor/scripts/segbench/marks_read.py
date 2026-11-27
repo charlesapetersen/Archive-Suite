@@ -13,7 +13,7 @@ crop the YOLO11m box (Sherlock PyTorch run) matched to the mark one to one at Io
 at the default floor 0.25 and at 0.05; a mark with no matched box reads as nothing. Scored per box: NES, 1 -
 Levenshtein / longer length, on NFKC text with whitespace collapsed, case kept; a mark counts as read at NES >= 0.8.
 A box that contains other marks (RG165) is scored on its own text, so the others' words count against it.
-(*) With ARCHIVE_MODEL_HF_HOME="~/Library/Application Support/Vision OCR/Models" where the shared cache lacks the
+(*) With ARCHIVE_MODEL_HF_HOME="~/Library/Application Support/ArchiveSuite/VisionOCRKit/Models" where the shared cache lacks the
 weights (the Vision OCR app holds them); loaded by path, offline, read only.
 Mark texts and readings stay in the private cache; the report holds aggregates only. No network, no money.
 """

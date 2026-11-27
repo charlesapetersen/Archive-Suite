@@ -2,6 +2,15 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Model downloads still lean on the retiring Vision OCR release (W49.visionocrkit-release-paths, 2026-11-27)
+
+- The accurate mode's runtime, layout, hands, scan-layout and page-kind archives are now fetched from Archive Suite's
+  `visionocrkit-models-1` release first, but that release has no files yet, so every download falls back to Vision
+  OCR's `models-1` (`ModelDownloads.Source.published`). Once W42.int-s7-standalone retires that repository, a fresh
+  install could not fetch them. The owner has to publish the five archives byte-identical to the suite's release
+  (a GitHub release is owner-only); the follow-up then drops the fallback.
+  (asked: W49.visionocrkit-drop-legacy-source-owner-ok)
+
 ## FIXED (2026-11-27) — The live-capture journey exceeded the heavy lock's memory limit
 
 - `PROCESSOR_JOURNEY=livecapture` (W40.d5: the macOS 27.2 guest plus the host's headless Android emulator) was stopped

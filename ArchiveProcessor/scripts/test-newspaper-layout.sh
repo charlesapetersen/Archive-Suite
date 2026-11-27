@@ -15,7 +15,7 @@ if [ -n "${NEWSPAPER_MODEL_FILES:-}" ]; then
     home="$work/models"
     snapshot="$home/Models/hub/models--HashNuke--pp-doclayout-v3-mlx/snapshots/cd50996ad0c7e35a7e20c27480f99cec1822cf7b"
     mkdir -p "$snapshot"
-    runtime="$HOME/Library/Application Support/Vision OCR/Runtime"
+    runtime="$HOME/Library/Application Support/ArchiveSuite/VisionOCRKit/Runtime"
     [ -x "$runtime/bin/python3" ] || { echo 'Missing shared runtime'; exit 1; }
     ln -s "$runtime" "$home/Runtime"
     cp "$NEWSPAPER_MODEL_FILES/config.json" "$NEWSPAPER_MODEL_FILES/model.safetensors" "$snapshot/"

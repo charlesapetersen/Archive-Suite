@@ -7,7 +7,7 @@
 # VENV_PYTHON is the shared torch env (`ArchiveProcessor/scripts/segbench/torch-env.sh`, with `add timm coremltools`).
 # WORKDIR gets the Core ML package, its compiled model and
 #   WORKDIR/atrium-page-kind.tgz   the download (`ModelDownloads.Item.atrium`), its size and sha256 printed for the
-#                                  plan; published to the models-1 release by the owner
+#                                  plan; published to the visionocrkit-models-1 release by the owner
 set -euo pipefail
 PY="$1"; WORK="$2"
 HERE="$(cd "$(dirname "$0")" && pwd)"

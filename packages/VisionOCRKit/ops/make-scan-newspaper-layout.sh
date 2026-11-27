@@ -7,7 +7,7 @@
 # VENV_PYTHON has torch 2.7.0, torchvision 0.22.0, coremltools 9.0, doclayout-yolo 0.0.4, dill and huggingface-hub.
 # WORKDIR gets newspaper-ocr's checkout at the measured commit, the pinned checkpoint, the Core ML package and
 #   WORKDIR/doclayout-yolo-1280.tgz   the download (`ModelDownloads.Item.scanNewspaperLayout`), its size and sha256
-#                                     printed for the plan; published to the models-1 release by the owner
+#                                     printed for the plan; published to the visionocrkit-models-1 release by the owner
 # and regenerates Sources/VisionOCRKit/Resources/npo_layout.py, newspaper-ocr's `models.py` and
 # `layout_processor.py` joined into one module (MIT; the licence is Resources/newspaper-ocr-LICENSE), changed only
 # by dropping the package import and the second `from __future__` line. The app runs it in the shared runtime.

@@ -6,7 +6,7 @@
 #
 #   scripts/measure-hands.sh <in-dir> <out-dir> [<model home> [<model source>]]
 #
-# <model home> stands in for ~/Library/Application Support/Vision OCR (VISIONOCR_MODEL_HOME); with a <model source>
+# <model home> stands in for ~/Library/Application Support/ArchiveSuite/VisionOCRKit (VISIONOCR_MODEL_HOME); with a <model source>
 # (a folder holding hands.tgz, as ModelDownloads.Source reads one) the placer is first downloaded into it through the
 # app's own download path. Run it under the heavy lock: each page loads blla and McCATMuS (about 3.5 GB).
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox

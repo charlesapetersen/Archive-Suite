@@ -15,7 +15,7 @@ cd "$(dirname "$0")/../.."
 WORK="${ARCHIVE_BENCH_CACHE:-$HOME/Library/Caches/ArchiveSuiteRehearsal}/layout-partition-score"
 bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
 lab="$HOME/.local/share/visionocr-ocrlab/layout/pp-doclayout-v3-mlx"
-runtime="$HOME/Library/Application Support/Vision OCR/Runtime"
+runtime="$HOME/Library/Application Support/ArchiveSuite/VisionOCRKit/Runtime"
 [ -x "$bin" ] || { echo "Build the Debug Processor first"; exit 1; }
 [ -x "$runtime/bin/python3" ] || { echo 'Missing shared runtime'; exit 1; }
 home="$WORK/model-home"

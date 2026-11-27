@@ -86,6 +86,7 @@ HELPER_NAME="visionocr-recognise"
 HELPER_SOURCES=(
   Sources/VisionOCRKit/Prefs.swift Sources/VisionOCRKit/Runner.swift Sources/VisionOCRKit/Recogniser.swift
   Sources/VisionOCRKit/SearchableWriter.swift Sources/VisionOCRKit/Flattener.swift Sources/VisionOCRKit/JBIG2.swift
+  Sources/VisionOCRKit/PDFChildBudget.swift
   Helper/main.swift
 )
 HELPER="$APP/Contents/Resources/$HELPER_NAME"

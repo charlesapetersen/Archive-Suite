@@ -5920,13 +5920,16 @@ enum ModelRuntime {
 
     /// Where the runtime (`Runtime/bin/python3`, `ops/ocrlab/make-runtime.sh`) and the
     /// models (`Models/`, the Hub's cache layout) live. `VISIONOCR_MODEL_HOME` moves it,
-    /// for the suite and for measuring a runtime before the downloads exist.
+    /// for the suite and for measuring a runtime before the downloads exist. It is the suite's
+    /// own folder beside `ArchiveSuite/ImproveOCR`, not the retiring Vision OCR app's
+    /// (W49.visionocrkit-release-paths): a fresh install starts empty there, and a Vision OCR
+    /// user is a new user (W42.int-s7), so nothing is read from or moved out of the old folder.
     static func home(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
         if let override = environment["VISIONOCR_MODEL_HOME"], !override.isEmpty {
             return URL(fileURLWithPath: override)
         }
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Vision OCR")
+            .appendingPathComponent("Library/Application Support/ArchiveSuite/VisionOCRKit")
     }
 
     /// The reader script, found beside the helper at run time and never from a stored
