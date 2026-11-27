@@ -2,11 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## OPEN (2026-11-26) — The live-capture journey exceeds the heavy lock's memory limit
+## FIXED (2026-11-27) — The live-capture journey exceeded the heavy lock's memory limit
 
 - `PROCESSOR_JOURNEY=livecapture` (W40.d5: the macOS 27.2 guest plus the host's headless Android emulator) was stopped
-  at 10.9 GB against the 10.8 GB limit for one heavy job, so the hand-driven live-capture journey cannot be re-run
-  unattended (`verification/evidence/core/W40.h2-journeys.md`). (queued: W40.fix-livecapture-journey-memory)
+  at 10.9 GB against the 10.8 GB limit for one heavy job (`verification/evidence/core/W40.h2-journeys.md`). Since
+  W40.fix-livecapture-journey-memory the lane builds the companion APK before the guest boots and starts the AVD with
+  `-memory 1536`; the journey peaked at 9.9 GB and was not stopped
+  (`verification/evidence/processor/W40.d5-live-capture.md`, "Re-run 2026-11-27"). (accepted: fixed history)
 
 ## FIXED (2026-11-26) — A tag removed in the Processor's Tags window stayed on the files and came back
 
