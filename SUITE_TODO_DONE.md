@@ -19120,3 +19120,22 @@ the same three lines and landing them separately would silently revert part of t
   entry, remove with its note; screenshots read). No migration written: nothing to migrate. $0; bench cache: nothing
   created. Commits: checkpoint 1 and this one.
   <!-- /W40.tag-window-processor -->
+- [x] **W49.proc-metadata-consolidate-sherlock-prep — Prepare Sherlock pack for unified structured metadata benchmark [S]** · §Archive Processor — pipeline simplification, unification & architecture (owner, 2026-11-24) (lane: segbench) (cluster: sherlock) — SHIPPED 2026-11-26.
+  The unified structured metadata prompt (`ArchiveProcessor/scripts/segbench/metadata_unified.py`, `PROMPT`; tagging,
+  traceable dating, entities, item fields and a text-only enclosure proposal in one call, its design and the removed
+  US/owner-corpus priors in the script's header) froze as a Sherlock pack for Qwen3.6 27B FP8 over the Vision text of
+  W47.item-fields-retruth's 299 documents (checkpoint 7d454b8e: 299 text-only requests, `max_tokens` 6144, temperature
+  0, thinking off; one arm; size-and-necessity review said one GPU, at most 0.5 GPU-hours, useful now). A 3-document
+  Mac pilot on Qwen3-VL 8B parsed every field; its weak content (sender/recipient swap, a neighbour's year,
+  `sent_with_previous` without a cue) tightened the enclosure and `date_uncertain` rules before the freeze; pilot
+  replies kept in the bench cache (`metadata-unified/replies/pilot-qwen3-vl-8b-mlx4/`, about 20 KB) for comparison.
+  The owner's Sherlock session submitted it on 2026-11-25 (batch 20261125-071250; stage job 53669520 COMPLETED in
+  16 s, GPU job 53669522 COMPLETED in 14 min 26 s, about 0.24 GPU-hours): pilot 8 of 8 stopped cleanly, then 291 more,
+  299 of 299 finished `stop`, 0 capped, 0 errors, 596 s of generation (median 64.5 s per request at 32 concurrent,
+  longest 158.5 s). Released 2026-11-26 with `unified/out/` in the Mac artifact
+  (`~/.local/state/archive-autonomous/artifacts/metadata-unified-27b-20261124`). `metadata_unified.py collect`: the
+  prompts matched the frozen ones, 299 replies, 0 unparsed, written with their parses to the bench cache's
+  `metadata-unified/replies/unified-qwen3.6-27b/` (1.2 MB, kept: it is W49.proc-metadata-consolidate-lead's Sherlock
+  fold, scored there by `metadata_unified_score.py`). No measured score committed here, so ArchiveOCRBench is
+  unchanged. $0. Item notes folded in and deleted.
+  <!-- /W49.proc-metadata-consolidate-sherlock-prep -->
