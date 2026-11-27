@@ -196,6 +196,38 @@ enum ManagedLocalOCRContract {
         let again = try? await client.ocr(imageURL: page)
         check("4 a model stopped between pages loads again for the next", again?.text != nil, "\(String(describing: again))")
 
+        // 6. W49.proc-managed-mac-image-calls: the Mac's page-image date search and the image half of the item-field call
+        //    go to the installed Qwen3-VL 8B's worker, each with its own request and limits. The user's server address
+        //    answers 503 here and is counted (nothing listens on it, and the app's session waits for connectivity); every
+        //    other request goes on the wire, the stand-in worker's included.
+        let serverHits = ServerHits()
+        let wire = URLSession(configuration: .ephemeral)
+        NetworkSession.testTransport = { request in
+            guard request.url?.port == 8080 else { return try await wire.data(for: request) }
+            serverHits.add(request)
+            return (Data(), HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: nil)!)
+        }
+        defer { NetworkSession.testTransport = nil }
+        let undated = DateRoute.Input(text: "Dear Sir, nothing here says when.", near: [], pages: [(url: page, rotation: 0)])
+        let beforeDate = requests().count
+        let dating = await DateRoute.runLocal(undated)
+        let dateCall = requests().count == beforeDate + 1 ? requests().last : nil
+        check("6 the date search's page image goes to the managed worker, with its own limits",
+              dateCall?["images"] as? Int == 1 && dateCall?["max_tokens"] as? Int == 700
+                && dateCall?["temperature"] as? Int == 0 && dateCall?["stream"] is NSNull, "\(String(describing: dateCall))")
+        check("6 and the date search names the image route", dating.route == DateRoute.localImageRoute, dating.route)
+        let beforeFields = requests().count
+        _ = await ItemFieldExtractor.extract(ItemFieldExtractor.Input(texts: ["Dear Sir"], pages: [(url: page, rotation: 0)]),
+                                             via: .mac)
+        let fieldCalls = requests().dropFirst(beforeFields)
+        check("6 the item-field call's image half goes to the managed worker, with its own limits",
+              fieldCalls.count == 1 && fieldCalls.first?["images"] as? Int == 1
+                && fieldCalls.first?["max_tokens"] as? Int == ItemFieldExtractor.macMaxTokens
+                && fieldCalls.first?["enable_thinking"] as? Bool == false, "\(Array(fieldCalls))")
+        check("6 and its Qwen3.5 4B text half still goes to the server", serverHits.models == [ItemFieldExtractor.macTextModel],
+              "\(serverHits.models)")
+        NetworkSession.testTransport = nil
+
         // 5. A removal waits for a read in flight (another model's here), and a page for a removed model fails as one,
         //    without starting a worker.
         let slow = Task { try await s.read(small, image: Data([1]), prompt: "SLOW", maxTokens: 64, timeout: 20) }
@@ -214,7 +246,33 @@ enum ManagedLocalOCRContract {
               gone?.text == nil && gone?.errorCode == "503" && (gone?.errorMessage ?? "").contains("not installed"),
               "\(String(describing: gone))")
         check("5 and starts no worker", s.events.filter { $0.hasPrefix("load") }.count == loadsBefore)
+        // 6. Not installed: the date search goes to the user's own server address, as before, and starts no worker.
+        let beforeServer = requests().count
+        let hitsBefore = serverHits.models.count
+        NetworkSession.testTransport = { request in
+            serverHits.add(request)
+            return (Data(), HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: nil)!)
+        }
+        let undatedAfter = await DateRoute.runLocal(undated)
+        NetworkSession.testTransport = nil
+        check("6 with the model removed, the date search goes to the server and starts no worker",
+              Array(serverHits.models.dropFirst(hitsBefore)) == [ItemFieldExtractor.macImageModel]
+                && serverHits.ports.last == 8080
+                && s.events.filter { $0.hasPrefix("load") }.count == loadsBefore && requests().count == beforeServer,
+              "\(serverHits.models) \(undatedAfter.imageNote)")
         return out
+    }
+
+    /// The requests the contract's stand-in for the user's mlx-vlm server received: each one's model and port.
+    private final class ServerHits: @unchecked Sendable {
+        private let lock = NSLock()
+        private var hits: [(model: String, port: Int?)] = []
+        func add(_ request: URLRequest) {
+            let body = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            lock.withLock { hits.append((body?["model"] as? String ?? "", request.url?.port)) }
+        }
+        var models: [String] { lock.withLock { hits.map(\.model) } }
+        var ports: [Int?] { lock.withLock { hits.map(\.port) } }
     }
 
     /// The physical-Mac proof, under the heavy lock: a fresh install into an empty scratch root (uv, Python and mlx-vlm

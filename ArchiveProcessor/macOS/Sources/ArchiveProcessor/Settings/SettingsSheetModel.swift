@@ -1016,7 +1016,7 @@ struct SettingsSheetModel {
     }
 
     static let dateLocalImageNote = """
-        In Process Files, choose Apple Vision with LLM judgment off and Auto date, manual subjects. Confirm document boundaries yourself. On a Mac with at least 16 GB of memory, start a local mlx-vlm server with Qwen3-VL 8B Instruct 4-bit on port 8080. It checks up to the first two pages when the OCR text has no year. In the benchmark, the image pass got 32 of 55 years right versus 33 from text and nearby documents alone. False years rose from 20 to 21 on 90 undated documents. If the server is unavailable, dating uses the text and nearby documents.
+        In Process Files, choose Apple Vision with LLM judgment off and Auto date, manual subjects. Confirm document boundaries yourself. On a Mac with at least 16 GB of memory, download Qwen3-VL 8B in Settings › Accounts › Local models on this Mac, or start a local mlx-vlm server with Qwen3-VL 8B Instruct 4-bit on port 8080. It checks up to the first two pages when the OCR text has no year. In the benchmark, the image pass got 32 of 55 years right versus 33 from text and nearby documents alone. False years rose from 20 to 21 on 90 undated documents. If neither is available, dating uses the text and nearby documents.
         """
 
     static let lowConfidenceNamesNote = """

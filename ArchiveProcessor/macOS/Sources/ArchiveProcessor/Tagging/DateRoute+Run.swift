@@ -184,8 +184,8 @@ extension DateRoute {
         let result: (Data, URLResponse)
         do {
             try Task.checkCancellation()
-            result = try await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0,
-                                                   followRedirects: false)
+            // The app's own Qwen3-VL 8B when installed (W49.proc-managed-mac-image-calls), else the server.
+            result = try await ManagedOCRModel.sendImageCall(request)
         } catch {
             await localImageLimiter.release()
             throw error

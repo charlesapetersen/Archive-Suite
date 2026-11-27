@@ -1233,9 +1233,13 @@ included, at a 7.71 GB peak. Open:
   already on this Mac and the disk had 14 GB free; Qwen3.5 9B's 6 GB size is the Vision OCR lab's record and its
   9.1 GB peak the bench's, outside the app (Gemma's in-app peak was 1 GB above its bench figure). (queued:
   W49.proc-managed-ocr-9b-check)
-- **The optional page-image date search and the Mac item-field call still go to an mlx-vlm server at
-  127.0.0.1:8080** (`DateRoute+Run`, `ItemFieldExtractor`), not to the managed model, so with only the app's own model
-  they find no server and add nothing, as for any user without that server. (queued: W49.proc-managed-mac-image-calls)
+- **The Mac item-field call's publication date still needs an mlx-vlm server.** Its page-image half (kind, byline) goes to
+  the app's own Qwen3-VL 8B when installed, as the page-image date search does (W49.proc-managed-mac-image-calls); its
+  Qwen3.5 4B text half, the only source of the publication date, goes to 127.0.0.1:8080 only, so with only the app's own
+  models a document gets no publication date. (queued: W49.proc-managed-item-fields-text)
+- **A Mac image or item-field call to an absent mlx-vlm server waits up to 600 s instead of failing.** `NetworkSession`'s
+  session waits for connectivity, so a refused loopback connection stalls until the request's timeout; the managed-model
+  contract stalled past a 500 s limit on the 4B half until a stand-in answered for the port. (queued: W49.proc-mac-server-absent-wait)
 - **Live Capture labels with a managed page reader** go to the Gemma label reader, so the supervisor stops the page
   model and loads Gemma for each label and back (about 9.5 s of switching a label, `segbench-results/ct-gemma-swap.md`);
   never both in memory. Whether to keep that, read labels with Vision and the parser during such a session, or batch

@@ -26,7 +26,8 @@ enum ItemFieldExtractor {
     static let macTextModel = "lmstudio-community/Qwen3.5-4B-MLX-4bit"
     static let macRoute = "This Mac · Qwen3-VL 8B and Qwen3.5 4B"
     static let macCost = "Item fields on this Mac: 8B images ~15.5 s/document, 9.0 GB peak; 4B text ~5.0 s/document, 4.8 GB peak"
-    static let macSetup = "Requires mlx-vlm on this Mac (port 8080) with Qwen3-VL 8B and Qwen3.5 4B, both 4-bit."
+    static let macSetup = "Reads page images with Qwen3-VL 8B, downloaded in Settings › Accounts › Local models on this "
+        + "Mac or served by mlx-vlm on this Mac (port 8080), and text with Qwen3.5 4B through mlx-vlm on port 8080, both 4-bit."
     static let macTimingNote = "Times are for model inference. Vision reading and model loading add time."
     static let macImageLongSide = 1280
     static let macMaxTokens = 1024
@@ -297,9 +298,12 @@ enum ItemFieldExtractor {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer " + LocalModelRoute.placeholderKey, forHTTPHeaderField: "Authorization")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        // The image half goes to the app's own Qwen3-VL 8B when installed (W49.proc-managed-mac-image-calls).
+        let send: () async throws -> (Data, URLResponse) = model == macImageModel
+            ? { try await ManagedOCRModel.sendImageCall(request) }
+            : { try await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0, followRedirects: false) }
         guard request.httpBody != nil,
-              let (data, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent,
-                                                                    maxRetries: 0, followRedirects: false),
+              let (data, response) = try? await send(),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choice = (json["choices"] as? [[String: Any]])?.first,

@@ -78,6 +78,25 @@ enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
     static func stored(_ d: UserDefaults = .standard) -> ManagedOCRModel? {
         ManagedOCRModel(rawValue: d.string(forKey: DefaultsKeys.gatewayManagedModel) ?? "")
     }
+
+    /// W49.proc-managed-mac-image-calls — the Mac's page-image calls to Qwen3-VL 8B (the date search in
+    /// `DateRoute.runLocal`, the image half of `ItemFieldExtractor`'s `.mac` call). With the app's own copy installed,
+    /// the request goes to its worker through `LocalModelSupervisor.withEndpoint` (its secret, one model loaded, one
+    /// request at a time); otherwise to the mlx-vlm server at the request's own address, as before. The body and its
+    /// limits are the caller's either way. A managed failure throws, which the callers read as no reply.
+    static func sendImageCall(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let supervisor = await LocalModelSupervisor.serving
+        let model = qwen3VL8B.model
+        guard await supervisor.isInstalled(model) else {
+            return try await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0, followRedirects: false)
+        }
+        return try await supervisor.withEndpoint(model) { url, secret in
+            var pointed = request
+            pointed.url = url
+            pointed.setValue(secret, forHTTPHeaderField: "Authorization")
+            return try await NetworkSession.data(for: pointed, policy: .nonIdempotent, maxRetries: 0, followRedirects: false)
+        }
+    }
 }
 
 /// The downloads, removals and failures the operator sees for the managed page readers. `LocalModelSupervisor` installs
