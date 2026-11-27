@@ -153,6 +153,22 @@ struct NotesBrowserView: View {
         .focusedSceneValue(\.tagSheetAction, TagSheetAction(selectedSubject: selectedSubject,
                                                              open: { tagSheet = $0 }))
         .sheet(item: $tagSheet) { sheet in tagSheetView(sheet, undo: windowUndo) }
+        // Window ▸ Tags asks the Archive Notes window for Tag Changes from Other Apps (Review…) and for the list
+        // filtered to a tag (Show Notes), opening it first if it was closed (W40.tag-window-notes).
+        .onReceive(model.$pendingTagSheet) { request in
+            guard let request, nav.windowKind == .note else { return }
+            DispatchQueue.main.async {
+                model.pendingTagSheet = nil
+                tagSheet = request
+            }
+        }
+        .onReceive(model.$pendingShowTag) { tag in
+            guard let tag, nav.windowKind == .note else { return }
+            DispatchQueue.main.async {
+                model.pendingShowTag = nil
+                nav.showNotes(withTag: tag)
+            }
+        }
         // Other apps' tag changes: read when the library is settled and whenever an archive is granted or lost, and
         // offered in the Notes window only (the Extracts window shares the same notes).
         .task(id: model.isIndexReady) {

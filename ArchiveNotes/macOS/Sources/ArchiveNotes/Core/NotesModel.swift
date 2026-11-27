@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ArchiveCore
+import ArchiveCoreUI
 import CryptoKit
 
 /// The UI façade every Notes view binds to (00-overview §16.1). It owns the single organization graph
@@ -102,6 +103,21 @@ final class NotesModel: ObservableObject {
     var tagChangeLibraryKey: String?
     /// Other apps' changes waiting for the user's Apply or Skip, and withdrawals of ones Notes applied.
     @Published var tagChangeOffers: [TagChangeOffer] = []
+
+    // MARK: Window ▸ Tags (W40.tag-window-notes; `NotesModel+TagsWindow`)
+
+    /// The Tags window's model, made on first use (`tagsWindow`).
+    var tagsWindowModel: TagsWindowModel?
+    /// The Tags window's own undo manager (its NSWindow's: Edit ▸ Undo reads that one), where its changes go.
+    weak var tagsWindowUndo: UndoManager?
+    /// The Tags window's Undo and Redo steps, one after another (`enqueueTagsWindowHistory`).
+    var tagsWindowHistoryTail: Task<Void, Never>?
+    /// What the Tags window asks of the Archive Notes window, which takes it when it shows (opened for it if closed):
+    /// a tag sheet (Review… opens Tag Changes from Other Apps), or the list filtered to one tag (Show Notes).
+    @Published var pendingTagSheet: NotesTagSheet?
+    @Published var pendingShowTag: String?
+    /// Counts list builds, so an older build finishing late never replaces a newer list.
+    var tagsWindowGeneration = 0
 
     // MARK: In-app navigation (W7-S3 jump-to-source; also consumes external archivenotes:// opens)
 

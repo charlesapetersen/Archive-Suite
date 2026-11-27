@@ -570,9 +570,13 @@ struct ExtractCommands: Commands {
 /// renames other apps recorded in the archive. The focused window's sheets (`NotesTagRenameSheets`).
 struct TagCommands: Commands {
     @FocusedValue(\.tagSheetAction) private var tags
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandMenu("Tags") {
+            // Every subject in use, renamed, merged or removed in one place (W40.tag-window-notes).
+            Button("Tags Window") { openWindow(id: NotesWindowID.tags) }
+            Divider()
             Button("Rename Tag\u{2026}") { tags?.open(.rename(from: tags?.selectedSubject, to: "")) }
                 .disabled(tags == nil)
             Button("Find Similar Tags\u{2026}") { tags?.open(.similar) }

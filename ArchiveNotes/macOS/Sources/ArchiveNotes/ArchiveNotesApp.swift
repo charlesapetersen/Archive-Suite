@@ -102,6 +102,16 @@ struct ArchiveNotesApp: App {
                     .environmentObject(appDelegate.flushRegistry)   // W7-S6
             }
         }
+        // Window ▸ Tags (W40.tag-window-notes): every subject on the notes and extracts, renamed, merged or removed.
+        Window("Tags", id: NotesWindowID.tags) {
+            if ArchiveTestHost.isUnitTestHost {
+                ArchiveTestHost.HiddenWindowStub()
+            } else {
+                NotesTagsWindow()
+                    .environmentObject(notesModel)
+            }
+        }
+        .defaultSize(width: 520, height: 560)
         Settings { NotesSettingsView() }
     }
 
@@ -284,6 +294,7 @@ final class NotesAppDelegate: NSObject, NSApplicationDelegate {
 enum NotesWindowID {
     static let notes = "notes"
     static let extracts = "extracts"
+    static let tags = "tags"
 }
 
 /// Item kind the shell is scoped to (mirrors 00-overview §3.1 `kind`). Placeholder until W2 defines the store.

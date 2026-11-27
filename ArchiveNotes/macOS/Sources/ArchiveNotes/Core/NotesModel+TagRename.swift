@@ -145,6 +145,59 @@ extension NotesModel {
         return s
     }
 
+    // MARK: Undo and Redo
+
+    /// Runs one Undo or Redo step after the ones before it: the Archive Notes window's delete queue for a change made
+    /// there, the Tags window's own for one made in it.
+    typealias RenameHistoryQueue = @MainActor (@escaping @MainActor () async -> Void) -> Void
+
+    /// Edit ▸ Undo Rename Tag on `undo`: puts back what the rename changed on each note (`undoRename`); Redo renames
+    /// those notes again and clears the withdrawal of the recorded change. Each step registers its opposite at once,
+    /// while the manager is undoing or redoing, and its work runs on `queue` after the step before it, so a quick
+    /// Undo-Redo-Undo always finds its step and never runs ahead of one still saving.
+    func registerUndoOfRename(_ outcome: SubjectRenameOutcome, with undo: UndoManager,
+                              queue: @escaping RenameHistoryQueue) {
+        let step = RenameHistoryStep()
+        step.outcome = outcome
+        registerUndoOfRename(step, name: Self.renameActionName(outcome), with: undo, queue: queue)
+    }
+
+    private func registerUndoOfRename(_ step: RenameHistoryStep, name: String, with undo: UndoManager,
+                                      queue: @escaping RenameHistoryQueue) {
+        undo.registerUndo(withTarget: self) { [weak undo] model in
+            guard let undo else { return }
+            model.registerRedoOfRename(step, name: name, with: undo, queue: queue)
+            queue {
+                guard let outcome = step.outcome else { return }
+                step.restored = await model.undoRename(outcome)
+            }
+        }
+        undo.setActionName(name)
+    }
+
+    private func registerRedoOfRename(_ step: RenameHistoryStep, name: String, with undo: UndoManager,
+                                      queue: @escaping RenameHistoryQueue) {
+        undo.registerUndo(withTarget: self) { [weak undo] model in
+            guard let undo else { return }
+            let next = RenameHistoryStep()
+            model.registerUndoOfRename(next, name: name, with: undo, queue: queue)
+            queue {
+                guard let outcome = step.outcome, !step.restored.isEmpty,
+                      var redone = await model.renameSubjects(outcome.from, to: outcome.to, only: step.restored,
+                                                              recording: false)
+                else { return }
+                redone.recorded = outcome.recorded
+                await model.withdrawTagChanges(Set(outcome.recorded), false)
+                next.outcome = redone
+            }
+        }
+        undo.setActionName(name)
+    }
+
+    nonisolated static func renameActionName(_ outcome: SubjectRenameOutcome) -> String {
+        outcome.isRemoval ? "Remove Tag" : outcome.from.count > 1 ? "Merge Tags" : "Rename Tag"
+    }
+
     // MARK: The archives' change logs
 
     /// Appends `entries` to the log of every archive Notes can reach. Returns what was recorded, and why it was not
@@ -194,6 +247,13 @@ extension NotesModel {
         default: error.localizedDescription
         }
     }
+}
+
+/// One rename's Undo history: the rename it undoes (filled in once a Redo has run) and the notes its Undo put back.
+@MainActor
+final class RenameHistoryStep {
+    var outcome: SubjectRenameOutcome?
+    var restored: Set<UUID> = []
 }
 
 // MARK: - Other apps' changes (the inbox)

@@ -131,6 +131,10 @@ macOS/Sources/ArchiveNotes/
                                    puts back only what it changed), recorded in each reachable archive's
                                    ArchiveCore TagChangeLog; other apps' changes read into tagChangeOffers,
                                    applied or skipped (W40.tag-rename-suite)
+    NotesModel+TagsWindow.swift    Window ▸ Tags' list (ArchiveCoreUI TagsWindowModel over every note's and
+                                   extract's subjects, built off the main actor) and its writer, which runs a
+                                   plan through NotesNavigationModel.applyTagPlan (renameSubjects; a remove is a
+                                   rename to nothing), one Undo in the Tags window (W40.tag-window-notes)
     NotesModel.swift               @MainActor UI façade (§16.1) — owns the shared OrganizationStore
                                    (+ index/root in the app path); @Published folder tree + scope;
                                    async create/rename/move/delete folders + selection scope (W6-S2);
@@ -400,6 +404,8 @@ macOS/Sources/ArchiveNotes/
     NotesTagRenameSheets.swift     Tags menu sheets: Rename Tag…, Find Similar Tags… (ArchiveCore TagSimilarity),
                                    Tag Changes from Other Apps…; they only choose, the navigation model writes
                                    with one Undo (W40.tag-rename-suite)
+    NotesTagsWindow.swift          Window ▸ Tags (and Tags ▸ Tags Window): the shared TagsWindowView, Show Notes,
+                                   and Tag Changes from Other Apps as a section (W40.tag-window-notes)
     NoteBulkInspector.swift        The inspector with several notes selected: Quality and Tags (add on Return,
                                    ✕ removes) for them all, each note saved on its own; `NoteBulkTags` counts
                                    the tags across them, also for the row menu's Remove Tag (W49.notes-multiselect-actions)
