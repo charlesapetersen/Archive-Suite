@@ -134,11 +134,12 @@ extension NavigationModel {
         let listed = Set(plan.itemIDs)
         let catalogue = library.usesCatalogue
         // The files the plan counted, and any that took one of its tags since; the fresh read decides each. In
-        // catalogue mode by the catalogue subjects the list counted, not the Finder tags.
+        // catalogue mode by the catalogue subjects the list counted, not the Finder tags, and only a PDF that still
+        // carries one: its documents are read from the same scan, and one with none is not changed.
         let candidates = library.files.filter { file in
             let carries = catalogue ? file.subjects.contains { plan.sourceKeys.contains(tagKey($0)) }
                                     : !file.subjectKeys.isDisjoint(with: plan.sourceKeys)
-            return (listed.contains(file.path) || carries) && isInsideMainArchive(file.url)
+            return (carries || !catalogue && listed.contains(file.path)) && isInsideMainArchive(file.url)
         }
         let entries = recording ? plan.logEntries(app: TagChangeLog.reader) : []
         let title = Self.tagPlanTitle(plan)
@@ -146,8 +147,10 @@ extension NavigationModel {
             let paths = candidates.map(\.path)
             let operation = UUID()
             return await withCheckedContinuation { done in
+                // Every document of a PDF that carries a source tag, as the list counted them all.
+                let carries = { (subjects: [String]) in subjects.contains { plan.sourceKeys.contains(tagKey($0)) } }
                 let started = editCatalogueSubjects(paths: paths, title: "Tag Change", operationID: operation,
-                                                    completed: { [weak self] verified in
+                                                    documents: carries, completed: { [weak self] verified in
                     // Only records that changed count, and only then is the change recorded: the journal holds its
                     // Undo, which withdraws these entries (`tagChangeReversed`).
                     let changed = self?.catalogueLastSaveChanged ?? 0

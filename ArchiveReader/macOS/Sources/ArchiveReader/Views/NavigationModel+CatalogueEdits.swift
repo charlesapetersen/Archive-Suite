@@ -101,11 +101,18 @@ extension NavigationModel {
     /// Use the same owner resolution and duplicate handling for inline and Inspector subject edits.
     /// `operationID` is the journal operation's id, given when a change recorded for the other apps must follow its
     /// Undo and Redo (W40.tag-window-reader: the entry's id is the operation's, as a file rename's is its ledger group).
+    /// Given `documents`, every catalogue document of each PDF whose subjects it accepts is edited, in the one
+    /// operation, rather than the one document the PDF resolves to (the Tags window, W40.tag-window-reader-multidoc).
     @discardableResult
     func editCatalogueSubjects(paths: [String], title: String = "Subjects Change", operationID: UUID? = nil,
+                               documents: (([String]) -> Bool)? = nil,
                                completed: ((Set<String>) -> Void)? = nil,
                                _ update: ([String]) -> [String]) -> Bool {
-        editCatalogue(title: title, paths: paths, operationID: operationID, completed: completed) { facts in
+        let carries = documents.map { accepts in
+            { (facts: ItemFacts) in accepts(Self.value((try? facts.document.get())?.document.fields?.subjects) ?? []) }
+        }
+        return editCatalogue(title: title, paths: paths, operationID: operationID, documents: carries,
+                      completed: completed) { facts in
             facts.catalogueDocumentEdit { id, fields in
                 CatalogueEdit(.document(id, .subjects), .set(.names(update(Self.value(fields.subjects) ?? []))))
             }
@@ -172,6 +179,7 @@ extension NavigationModel {
     @discardableResult
     private func editCatalogue(title: String, paths: [String]?, physicalPageIndex: Int? = nil,
                                observed: [ItemFacts]? = nil, operationID: UUID? = nil,
+                               documents: ((ItemFacts) -> Bool)? = nil,
                                completed: ((Set<String>) -> Void)? = nil,
                                edit: (ItemFacts) -> (ItemFacts.FileFacts, CatalogueEdit)?) -> Bool {
         guard !catalogueEditSaving else {
@@ -185,18 +193,40 @@ extension NavigationModel {
         let rows = tagTargets(paths)
         let requested = paths?.count ?? rows.count
         guard requested > 0 else { return false }
-        let current = rows.compactMap { catalogueFacts(for: $0, physicalPageIndex: physicalPageIndex) }
-        let selected = Dictionary(current.compactMap { facts -> (CatalogueAssociation.Occurrence, ItemFacts)? in
-            (try? facts.file.get()).map { ($0.pair.occurrence, facts) }
+        let current: [ItemFacts]
+        var refused: Int
+        if let documents {
+            // Each document a PDF counts, at its first page as the row lists it, read again now; a PDF with none
+            // that `documents` accepts is not changed (W40.tag-window-reader-multidoc).
+            let perRow = rows.map { row in
+                (row.catalogueDocuments.isEmpty ? [row.catalogueFacts].compactMap { $0 } : row.catalogueDocuments)
+                    .compactMap { listed in catalogueFacts(for: row, physicalPageIndex: listed.page?.physicalIndex) }
+                    .filter(documents)
+            }
+            current = perRow.flatMap { $0 }
+            refused = max(0, requested - perRow.count { !$0.isEmpty })
+        } else {
+            current = rows.compactMap { catalogueFacts(for: $0, physicalPageIndex: physicalPageIndex) }
+            refused = 0
+        }
+        // By page as well when every document is edited, as one PDF then gives several selections.
+        func key(_ facts: ItemFacts, _ file: ItemFacts.FileFacts) -> SelectionKey {
+            SelectionKey(occurrence: file.pair.occurrence, page: documents == nil ? nil : facts.page?.id)
+        }
+        let selected = Dictionary(current.compactMap { facts -> (SelectionKey, ItemFacts)? in
+            (try? facts.file.get()).map { (key(facts, $0), facts) }
         }, uniquingKeysWith: { first, _ in first })
         let selection = observed ?? current
-        var refused = max(0, requested - selection.count)
+        if documents == nil { refused = max(0, requested - selection.count) }
+        // With every document edited, the PDFs a refused document belongs to: none of them is reported as saved.
+        var refusedSources: Set<String> = []
         let operations = selection.compactMap { facts -> CatalogueEditPlan.Intent? in
             guard let (base, edit) = edit(facts), base.pair.occurrence.rootInstanceID == reader.rootInstanceID,
-                  let source = try? facts.file.get(), let refreshed = selected[source.pair.occurrence],
+                  let source = try? facts.file.get(), let refreshed = selected[key(facts, source)],
                   let refreshedFile = try? refreshed.file.get(), source.samePhysicalOccurrence(as: refreshedFile)
             else {
                 refused += 1
+                if let source = try? facts.file.get() { refusedSources.insert(source.pair.occurrence.relativePath) }
                 return nil
             }
             var member: CatalogueEditPlan.Member?
@@ -205,6 +235,7 @@ extension NavigationModel {
                 guard let resolved = try? refreshed.document.get(), id == resolved.document.id,
                       base.samePhysicalOccurrence(as: resolved.owner), facts.page?.id == refreshed.page?.id else {
                     refused += 1
+                    refusedSources.insert(source.pair.occurrence.relativePath)
                     return nil
                 }
                 if source.pair.occurrence != base.pair.occurrence {
@@ -220,6 +251,19 @@ extension NavigationModel {
             return .init(base: base, edit: edit, member: member)
         }
         let plan = CatalogueEditPlan(operations)
+        // `completed` hears of the PDFs asked for rather than the records written: with every document edited one PDF
+        // may need several records (a split document's owner is another PDF's), and it is saved only when all are.
+        var report = completed
+        if documents != nil, let heard = completed {
+            let needs = Dictionary(operations.map {
+                (($0.member?.source ?? $0.base).pair.occurrence.relativePath, Set([$0.base.pair.occurrence.relativePath]))
+            }, uniquingKeysWith: { $0.union($1) })
+            report = { [refusedSources] written in
+                heard(Set(needs.compactMap { source, records in
+                    !refusedSources.contains(source) && records.isSubset(of: written) ? source : nil
+                }))
+            }
+        }
         if plan.files.isEmpty, plan.refused + refused == 0 { return false }
         let preflightRefusals = plan.refused + refused
         let preflightFailures: [String]
@@ -236,7 +280,7 @@ extension NavigationModel {
         } else {
             preflightFailures = []
         }
-        runCatalogueAction(reader: reader, verb: "Saved", completed: completed) { journal in
+        runCatalogueAction(reader: reader, verb: "Saved", completed: report) { journal in
             let writer = CatalogueWriter(reader: reader)
             let operation = CatalogueEditJournal.Operation(title: title, id: operationID ?? UUID())
             var result = CatalogueActionResult()
@@ -384,6 +428,11 @@ private extension ItemFacts {
               let edit = make(resolved.document.id, fields) else { return nil }
         return (resolved.owner, edit)
     }
+}
+
+private struct SelectionKey: Hashable {
+    let occurrence: CatalogueAssociation.Occurrence
+    let page: UUID?
 }
 
 private struct CatalogueEditPlan: Sendable {

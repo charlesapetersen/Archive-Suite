@@ -19225,3 +19225,18 @@ the same three lines and landing them separately would silently revert part of t
   applying it, and that the Processor's follow skips its own entries. Processor builds with no new warnings.
   $0; bench cache: nothing created.
   <!-- /W40.tag-window-processor-remove -->
+- [x] **W40.tag-window-reader-multidoc — a Tags window change reaches every catalogue document of a PDF [S · Tier-2]** (lane: reader) (uses: build) · §W40 — verification phase: prove the Suite works (owner-approved 2026-10-04) — In catalogue mode the Reader's Tags window rename, merge and remove (and another app's change applied there) edit the one catalogue document each PDF resolves to (`ItemFacts.catalogueDocumentEdit`), while the window counts a PDF's subjects from all its documents (`ArchiveFile.subjects`), so a tag another document of the same PDF carries stays there. Edit every document of the PDF that carries a source tag, as one journal operation (Reader KNOWN_ISSUES §"Tag changes across the apps"). Tier-2: a write to catalogue companions; scratch tests with a two-document companion, Undo and the recorded entry's withdrawal included. SHIPPED 2026-11-26.
+  `editCatalogueSubjects(documents:)` edits every catalogue document of each PDF whose subjects the predicate accepts
+  (each read at its first page, as `ArchiveFile.catalogueDocuments` lists them), in the one journal operation, so one
+  Undo; the Tags window's rename, merge and remove and another app's rename (`renameTag`) pass it. In that mode
+  `completed` reports the PDFs asked for, each saved only when every record it needed was (a split document's owner
+  may be another PDF) and none of its documents was refused, so a failure is never hidden and another app's change
+  stays offered. The Tags window now writes only PDFs that still carry a source tag. Callers without `documents` are
+  unchanged (selection keyed by occurrence alone, as before). Tier-2 review (independent, Opus): the per-owner
+  failure count (fixed as above) and the other-app rename path (fixed); its re-check found the fix correct and one
+  refusal guard not marking its PDF refused (unreachable today; closed).
+  Tests: TagsWindowReaderTests +2 (a two-document companion renamed, Undo restoring both and withdrawing the recorded
+  entry, Redo, a remove leaving the other tag; another app's rename applied to both and settled), 11 green; with the
+  catalogue, journal, tag-log, document-window and case-identity suites 50 green; write-surface lint clean. No
+  migration: nothing to migrate. $0; bench cache: nothing created.
+  <!-- /W40.tag-window-reader-multidoc -->

@@ -3118,7 +3118,10 @@ final class NavigationModel: ObservableObject {
             // Recorded, and reported to `completed`, once the save has reported what it wrote. Its id is the journal
             // operation's, so the catalogue's Undo and Redo withdraw and restore it (`tagChangeReversed`).
             let operation = UUID()
-            let started = editCatalogueSubjects(paths: paths, operationID: operation, completed: { [weak self] verified in
+            // Every document of a PDF that carries it, as `hasSubject` reads them all (W40.tag-window-reader-multidoc).
+            let started = editCatalogueSubjects(paths: paths, operationID: operation,
+                                                documents: { $0.contains { isSameTag($0, old) } },
+                                                completed: { [weak self] verified in
                 if recording, !verified.isEmpty { self?.recordTagChange(id: operation, from: old, to: new) }
                 completed?(verified.count, paths.count - verified.count)
             }) { subjects in

@@ -293,13 +293,120 @@ final class TagsWindowReaderTests: XCTestCase {
         try await waitUntil("restored by its Redo") { log(root).first?.withdrawn == false }
     }
 
-    private func writePDF(at url: URL, metadata: Data?) throws {
+    /// A PDF whose companion holds two documents, each carrying the tag, is changed in both by one rename (the window
+    /// counts a PDF's subjects from all its documents), as one journal operation: its Undo restores both and withdraws
+    /// the recorded entry, and its Redo restores the entry (W40.tag-window-reader-multidoc).
+    func testInCatalogueModeAChangeReachesEveryDocumentOfAPDFAsOneUndo() async throws {
+        let (root, model, perDocument) = try await multiDocumentLibrary()
+        let window = try await window(model)
+        let plan = try XCTUnwrap(window.renamePlan(try XCTUnwrap(window.inventory.entry(for: "Lincoln")), to: "Emancipation"))
+        let outcome = await window.perform(plan)
+        XCTAssertEqual(outcome?.changed, 1, "one catalogue record, both its documents")
+        XCTAssertEqual(outcome?.failed, 0)
+        try await waitUntil("renamed in both documents") {
+            perDocument() == [["Emancipation"], ["War", "Emancipation"]] && !model.catalogueEditSaving
+        }
+        try await waitUntil("recorded") { log(root).count == 1 }
+
+        model.reverseCatalogueEdit(redo: false)
+        try await waitUntil("both undone by one Undo") {
+            perDocument() == [["Lincoln"], ["War", "lincoln"]] && !model.catalogueEditSaving
+        }
+        try await waitUntil("withdrawn by the journal's Undo") { log(root).first?.withdrawn == true }
+        model.reverseCatalogueEdit(redo: true)
+        try await waitUntil("both redone") {
+            perDocument() == [["Emancipation"], ["War", "Emancipation"]] && !model.catalogueEditSaving
+        }
+        try await waitUntil("restored by its Redo") { log(root).first?.withdrawn == false }
+
+        // A remove takes the tag off both; a document without it is left as it was.
+        try await waitUntil("the list follows") { window.inventory.entry(for: "Emancipation") != nil }
+        let remove = try XCTUnwrap(window.removePlan([try XCTUnwrap(window.inventory.entry(for: "Emancipation"))]))
+        let removed = await window.perform(remove)
+        XCTAssertEqual(removed?.changed, 1)
+        try await waitUntil("removed from both documents") {
+            perDocument() == [[], ["War"]] && !model.catalogueEditSaving
+        }
+    }
+
+    /// One PDF in catalogue mode whose companion holds two documents (a page each), subjects ["Lincoln"] and
+    /// ["War", "lincoln"]; `perDocument` reads each document's subjects from the library, in page order.
+    private func multiDocumentLibrary() async throws -> (root: URL, model: NavigationModel, perDocument: () -> [[String]]) {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TagsWindowReaderTests-multidoc-\(UUID())", isDirectory: true).resolvingSymlinksInPath()
+        let root = folder.appendingPathComponent("Archive", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        _ = try RootMarker.ensure(at: root, kind: .reader, name: "Scratch")
+        let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+        let pages = (UUID(), UUID()), documents = (UUID(), UUID())
+        let packet = Data("""
+            <x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            </rdf:RDF></x:xmpmeta>
+            """.utf8)
+        try writePDF(at: root.appendingPathComponent("Letters.pdf"), metadata: XCTUnwrap(identity.adding(to: packet)),
+                     pages: 2)
+        func subjects(_ values: String) -> String {
+            #"{"subjects":{"state":"value","value":\#(values),"fieldRevision":"\#(UUID())","origin":"user"}}"#
+        }
+        try Data("""
+            {"schema":1,"fileID":"\(identity.fileID)","contentRevision":"\(identity.contentRevision)",
+             "revision":"\(UUID())","parents":[],
+             "pages":[{"id":"\(pages.0)","physicalIndex":0,"documentID":"\(documents.0)","role":"searchable"},
+                      {"id":"\(pages.1)","physicalIndex":1,"documentID":"\(documents.1)","role":"searchable"}],
+             "documents":[{"id":"\(documents.0)","ownerFileID":"\(identity.fileID)","fields":\(subjects(#"["Lincoln"]"#))},
+                          {"id":"\(documents.1)","ownerFileID":"\(identity.fileID)",
+                           "fields":\(subjects(#"["War","lincoln"]"#))}],"fileFields":{}}
+            """.utf8).write(to: root.appendingPathComponent("Letters.pdf.archivesuite.json"))
+
+        let defaults = fixtureDefaults()
+        let indexer = ContentIndexer(url: folder.appendingPathComponent("index.sqlite"))
+        let model = NavigationModel(defaults: defaults, indexer: indexer, thumbnailer: nil)
+        model.tagChangeDefaultsSuite = suite
+        XCTAssertNil(model.rootStore.setRoot(root))
+        let key = try XCTUnwrap(ReaderRootIdentity.legacyCatalogueKey(for: root))
+        defaults.set(UUID().uuidString, forKey: key)
+        defaults.set(true, forKey: key + ".enabled")
+        model.startLibrary(root)
+        // Each document's subjects, in page order.
+        func perDocument() -> [[String]] {
+            (model.library.files.first?.catalogueDocuments ?? []).map {
+                (try? $0.document.get())?.document.fields?.subjects?.readerValue ?? []
+            }
+        }
+        try await waitUntil("catalogue mode") {
+            model.library.usesCatalogue && model.catalogueReader != nil && perDocument().count == 2
+        }
+        XCTAssertEqual(perDocument(), [["Lincoln"], ["War", "lincoln"]])
+        return (root, model, perDocument)
+    }
+
+
+    /// Another app's rename, applied here, also reaches both documents, and the offer is settled.
+    func testInCatalogueModeAnotherAppsRenameReachesEveryDocumentOfAPDF() async throws {
+        let (root, model, perDocument) = try await multiDocumentLibrary()
+        try TagChangeLog.record([TagChange(app: TagChangeLog.notes, from: "Lincoln", to: "Emancipation")], root: root)
+        await model.refreshTagChangeInbox()
+        let offer = try XCTUnwrap(model.tagChangeOffers.first)
+        model.applyTagChange(offer)
+        try await waitUntil("applied to both documents") {
+            perDocument() == [["Emancipation"], ["War", "Emancipation"]] && !model.catalogueEditSaving
+        }
+        try await waitUntil("settled") { model.tagChangeOffers.isEmpty }
+        await model.refreshTagChangeInbox()
+        XCTAssertTrue(model.tagChangeOffers.isEmpty, "handled")
+        XCTAssertEqual(log(root).count, 1, "applying it records nothing new")
+    }
+
+    private func writePDF(at url: URL, metadata: Data?, pages: Int = 1) throws {
         var bounds = CGRect(x: 0, y: 0, width: 60, height: 60)
         let pdf = try XCTUnwrap(CGContext(url as CFURL, mediaBox: &bounds, nil))
         if let metadata { pdf.addDocumentMetadata(metadata as CFData) }
-        pdf.beginPDFPage(nil)
-        pdf.fill(bounds.insetBy(dx: 10, dy: 10))
-        pdf.endPDFPage()
+        for _ in 0..<pages {
+            pdf.beginPDFPage(nil)
+            pdf.fill(bounds.insetBy(dx: 10, dy: 10))
+            pdf.endPDFPage()
+        }
         pdf.closePDF()
     }
 
