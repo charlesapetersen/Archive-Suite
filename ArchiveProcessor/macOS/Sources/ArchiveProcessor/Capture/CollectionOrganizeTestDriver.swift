@@ -343,8 +343,14 @@ enum CollectionOrganizeTestDriver {
             let file = ContainerFileStore.load(directory: folder).document
             let at4 = file.map { ContainerResolver.resolve(fileName: "000004 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
             let at2 = file.map { ContainerResolver.resolve(fileName: "000002 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
+            // With no gateway and no local label model (as here), the run says so; any other note is a problem
+            // (W49.proc-gemma-offer-download added that note; W49.proc-fix-red-checks-1125).
+            func onlyNoModelNote(_ note: String?, labels: Int) -> Bool {
+                note == nil || note == "No model supplied suggestions for \(labels) box or folder label\(labels == 1 ? "" : "s"). "
+                    + "Check the proposals in Archive Reader."
+            }
             check("labels: the box and folder labels' runs are written beside the filed PDFs, as proposals",
-                  problem == nil && at4?.values[.container]?.value == "Box 17" && at4?.values[.folder]?.value == "8"
+                  onlyNoModelNote(problem, labels: 2) && at4?.values[.container]?.value == "Box 17" && at4?.values[.folder]?.value == "8"
                   && at4?.values[.container]?.source == .label && at2?.values[.folder] == nil
                   && at2?.values[.repository]?.value == "HOOVER INSTITUTION ARCHIVES")
             let filed = (try? fm.contentsOfDirectory(atPath: folder.path))?.sorted() ?? []
@@ -579,7 +585,9 @@ enum CollectionOrganizeTestDriver {
             let problem = await processor.recordContainerLabels(moves: [:], outputDirectory: out, preOCRedInput: false)
             let labelFile = ContainerFileStore.load(directory: out.appendingPathComponent("Glotzer papers")).document
             check("tree: a label filed in the tree is recorded in its folder",
-                  problem == nil && labelFile?.runs.first?.start == "label.pdf")
+                  (problem == nil || problem == "No model supplied suggestions for 1 box or folder label. "
+                      + "Check the proposals in Archive Reader.")
+                  && labelFile?.runs.first?.start == "label.pdf")
 
             let left = (fm.enumerator(atPath: input.path)?.allObjects as? [String] ?? [])
                 .map { input.appendingPathComponent($0).path }

@@ -250,7 +250,8 @@ enum BatchPollPersistFailureContract {
               healthy.requests > 0 && healthy.journalExistedBefore
                   && !healthy.interrupted && !healthy.journalSurvived)
         if provider == .gemini {
-            check("batch collection persists the measured Gemini reader's flag", healthy.flag?.reader == "Gemini 3.8 Flash")
+            // Gemini 3.5 Flash keeps a fitted cut; owner call 24 removed Gemini 3.8 Flash's (W46.p17-flag-unflag-five).
+            check("batch collection persists the measured Gemini reader's flag", healthy.flag?.reader == "Gemini 3.5 Flash")
         } else {
             check("batch collection leaves the unmeasured \(provider.rawValue) reader unflagged", healthy.flag == nil)
         }
@@ -309,7 +310,7 @@ enum BatchPollPersistFailureContract {
     private static func model() -> LLMModel { model(.gemini) }
 
     private static func model(_ provider: LLMProvider) -> LLMModel {
-        if provider == .gemini, let measured = LLMModel.geminiModels.first(where: { $0.id == "gemini-3.8-flash" }) {
+        if provider == .gemini, let measured = LLMModel.geminiModels.first(where: { $0.id == "gemini-3.5-flash" }) {
             return measured
         }
         return LLMModel(id: "poll-persist-\(provider.rawValue.lowercased())",
