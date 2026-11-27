@@ -1514,3 +1514,62 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open` — verification queued as `W49.proc-s062-verify`.
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure classes 3 and 5).
+
+### S-063 · Processor catalogue records spell the item type `Box` / `Folder`, not the catalogue's `box` / `folder`
+
+- **Raised:** 2026-11-27 · W49.corpus-adoption-tool · code reading while mapping adopted facts.
+- **Suspected behaviour:** `SPEC/catalogue.md` gives `box` and `folder` as the item-type vocabulary, and the Reader's
+  Inspector and `CatalogueEdit` write only those. `ProcessorCatalogueRecord.documentFields` and `applySourceTags`
+  write `ItemType.rawValue`, which is `Box` / `Folder`. The Reader reads it case-insensitively, so the display may
+  be right, but a consumer that compares the catalogue value exactly (an export, Notes, Zotero, a filter) can treat
+  Processor output and Reader edits as two different types.
+- **Where:** `ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ProcessorCatalogueRecord.swift` `documentFields`,
+  `applySourceTags`.
+- **Would confirm it:** a Processor Box capture filed on a scratch root whose companion's `fields.itemType.value` is
+  `Box`, and a consumer that compares it exactly and misses it.
+- **Would clear it:** every consumer compares case-insensitively and the SPEC says either spelling is valid.
+- **Status:** `open` — verification queued as `W49.proc-s063-verify`.
+- **History:**
+  - 2026-11-27 W49.corpus-adoption-tool — raised. The adoption tool writes `box` / `folder`.
+
+### S-064 · Fields copied by Copy Source Tags have origin `import`, which no catalogue edit accepts
+
+- **Raised:** 2026-11-27 · W49.corpus-adoption-tool · Tier-2 review of the adoption tool (Claude Opus 5.5 reviewer).
+- **Suspected behaviour:** `ProcessorCatalogueRecord.applySourceTags` writes every copied fact with origin `import`.
+  `SPEC/catalogue.md` names the origin `imported`, and `CatalogueEdit.apply` refuses any field whose origin is not
+  `user`, `model` or `imported` (`unsupportedFieldData`). A date, type, subject, read state or quality copied from a
+  pre-OCRed PDF's tags then cannot be corrected or checked in the Reader.
+- **Where:** `ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ProcessorCatalogueRecord.swift` `applySourceTags`;
+  `packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueEdit.swift` `apply`.
+- **Would confirm it:** a pre-OCRed scratch PDF with a date tag filed with Copy Source Tags; a `CatalogueWriter.save`
+  of a new date for it fails with `unsupportedFieldData`.
+- **Would clear it:** the save succeeds.
+- **Status:** `open` — verification queued as `W49.proc-s064-verify`.
+- **History:**
+  - 2026-11-27 W49.corpus-adoption-tool — raised. The adoption tool writes `imported`.
+
+### S-065 · Copy Source Tags takes a Decade over a Year
+
+- **Raised:** 2026-11-27 · W49.corpus-adoption-tool · Tier-2 review of the adoption tool.
+- **Suspected behaviour:** `SPEC/tag-format.md` has a Year supersede a Decade. `applySourceTags` reads
+  `tags.decade ?? year`, so a file tagged `1957` and `1950s` is filed with the date `1950s`.
+- **Where:** `ProcessorCatalogueRecord.swift` `applySourceTags`.
+- **Would confirm it:** a scratch pre-OCRed PDF tagged `1957`, `1950s` filed with Copy Source Tags; its companion's
+  `documentDate` is `1950s`.
+- **Would clear it:** the companion reads `1957`.
+- **Status:** `open` — verification queued as `W49.proc-s065-verify`.
+- **History:**
+  - 2026-11-27 W49.corpus-adoption-tool — raised. The adoption tool reads the Year first.
+
+### S-066 · Pages of a pre-OCRed or adopted PDF cannot be rotated in the Reader
+
+- **Raised:** 2026-11-27 · W49.corpus-adoption-tool · Tier-2 review of the adoption tool.
+- **Suspected behaviour:** a pre-OCRed PDF without Suite provenance is filed with page role `page`
+  (`OCRProcessor+Catalogue` and the adoption tool alike), and `CatalogueEdit` offers a view rotation only for `image`,
+  `text` and `searchable` pages. A sideways page in such a file cannot be turned in the Reader.
+- **Where:** `OCR/OCRProcessor+Catalogue.swift` (roles `["page"]`); `CatalogueEdit.swift` (rotation targets).
+- **Would confirm it:** a rotation edit on a scratch pre-OCRed pair is refused.
+- **Would clear it:** the Reader rotates such pages another way, or the refusal is intended and documented.
+- **Status:** `open` — verification queued as `W49.proc-s066-verify`.
+- **History:**
+  - 2026-11-27 W49.corpus-adoption-tool — raised.

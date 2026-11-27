@@ -50,7 +50,7 @@ test-item-fields.sh test-newspaper-layout.sh test-page-reader.sh test-provider-e
 test-reocr-filewriter.sh test-reocr-job.sh test-reocr-pairs.sh test-reocr-preservation.sh test-reocr-ranking.sh
 test-reocr-request-store.sh test-reocr-writer.sh test-review-corrections.sh test-rotation-rule.sh
 test-run-quit-resume.sh test-settings-interviews.sh test-settings-layers.sh test-settings-sheet.sh
-test-settings-solver.sh test-settings-tabs.sh test-tagging-failure.sh test-text-layer.sh"
+test-settings-solver.sh test-settings-tabs.sh test-tagging-failure.sh test-text-layer.sh test-adoption.sh"
 
 worst=0
 extract() {  # $1 = xcresult, $2 = run name

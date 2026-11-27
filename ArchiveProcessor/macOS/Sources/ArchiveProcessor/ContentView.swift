@@ -86,6 +86,8 @@ struct ContentView: View {
             LiveCaptureTestDriver.runIfRequested(session: capture)
             FileRelayTestDriver.runIfRequested(session: capture)
             ProcessFilesTestDriver.runIfRequested()
+            AdoptionCommand.runIfRequested()                 // W49 the pre-app archive's adoption steps (env-gated)
+            AdoptionTestDriver.runIfRequested()              // $0 W49 adoption on scratch fixtures (env-gated)
             KeyWizardTestDriver.runIfRequested()              // $0 W49 S-024: the key row after a refused save
             LiveCaptureRecoveryTestDriver.runIfRequested()   // $0 data-safety self-test (env-gated)
             BatchResumeTestDriver.runIfRequested()           // $0 Process-Files crash-resume self-test (env-gated)

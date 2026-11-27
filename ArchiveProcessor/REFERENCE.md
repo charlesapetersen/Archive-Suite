@@ -548,6 +548,15 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                after-training points by the fine-tuning answer. A click sets the card's override, the
                                app's own pick clears it. View: `Views/SettingsRangeView.swift` (plain shapes, so the
                                offscreen render sees it); self-test section 8 of `SettingsSheetTestDriver`.
+Adoption/                      W49 the pre-app archive's adoption tool (Tier-2: it files a derived archive; the
+                               source is read only). Contract: `SPEC/adoption.md`; run: `scripts/adopt-archive.sh`.
+  AdoptionManifest.swift       The reviewable plan: proposed facts with rule and evidence, review reasons, decisions.
+  AdoptionInventory.swift      Read-only walk: tag/colour facts, original pairing, review routing, corpus refusal.
+  AdoptionConversion.swift     Catalogue pairs and Preservation originals in a new root, frozen first in the ledger.
+  AdoptionVerification.swift   Re-reads the derived archive against the manifest and the untouched source.
+  AdoptionLabels.swift         The old label backfill: Box/Folder labels from originals into container runs.
+  AdoptionCommand.swift        The headless steps (`ARCHIVE_ADOPT`, Debug) and their reports.
+  AdoptionTestDriver.swift     $0 self-test on a fixture tree (`scripts/test-adoption.sh`).
 ReOCR/                         W44 Improve OCR (Tier-2: it replaces archive PDFs' text pages). Contract:
                                `SPEC/improve-ocr.md`; why: its §6.
   ReOCRPairs.swift             Positive validation of suite image/text pairs; the replacement text page (header kept).
