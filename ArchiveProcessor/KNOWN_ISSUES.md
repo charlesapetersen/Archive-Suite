@@ -203,8 +203,10 @@ that were turned but still need checking. See W49.proc-fix-s029 and the
 ## FIXED (S-026, 2026-11-24) — Batch OCR bypassed the file-size target
 
 - Anthropic, Gemini and Mistral batch requests now scale each image toward the run's standard size, as direct OCR
-  does. At 100% and 3 MB, a 12.3 MB 2000×1500 scan goes up at 985×739 (602,467 B) by both routes, byte for byte.
-  The 2,048-pixel cap still applies. (accepted: fixed by W49.proc-fix-s026)
+  does. At 100% and 3 MB, a 12.3 MB 2000×1500 scan went up at 985×739 (602,467 B) by both routes, byte for byte.
+  The 2,048-pixel cap still applies. Since W49.proc-ocr-scale-by-pixels (2026-11-27) the target is checked against
+  the upload JPEG, not the input file's bytes, so an uncompressed TIFF/PNG or maximum-quality JPEG is no longer
+  over-shrunk; direct and batch still match. (accepted: fixed by W49.proc-fix-s026)
   [Scratch VM verification](../verification/evidence/processor/W49.proc-suspects-money-check.md#s-026-fix-verification).
 
 ## FIXED (S-027, 2026-11-23) — A stored Batch flag affected standard OpenAI runs
