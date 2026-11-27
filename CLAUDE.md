@@ -253,7 +253,9 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   'results in <path>'`; the engine scores. FarmShare's data is on Sherlock, so a pack may already exist there: the engine never checks, it names the
   possible pack in the hand-over and the owner's session looks before one is rebuilt. File a new
   cluster item with `(cluster: sherlock)` alone. Rules for a Sherlock session:
-  [`execution-plans/sherlock-access.md`](execution-plans/sherlock-access.md).
+  [`execution-plans/sherlock-access.md`](execution-plans/sherlock-access.md). Future GPU packs may also run on
+  Google Colab under the owner's Google AI Ultra plan (owner, 2026-11-27):
+  [`execution-plans/colab-access.md`](execution-plans/colab-access.md).
 - ⛔ **Every Sherlock job is reviewed for size and necessity before it is submitted (owner, 2026-10-22).** The
   preparing session writes, in `execution-plans/items/<TAG>.md` before its hand-over: (1) the question and the route,
   default or recommendation the answer could change; (2) why results in hand do not settle it; (3) the job count and
