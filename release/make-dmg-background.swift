@@ -1,13 +1,15 @@
 #!/usr/bin/env swift
 // make-dmg-background.swift — render the Archive Suite DMG window background.
-// Usage: swift make-dmg-background.swift [out.png]   (default: ./dmg-background.png)
-// Runs on the dev Mac only (uses AppKit). The window layout in build-suite-dmg.sh places the two
+// Usage: swift make-dmg-background.swift [--notarized] [out.png]   (default: ./dmg-background.png)
+// Runs on the dev Mac only (uses AppKit). The window layout in build-suite-dmg.sh places the three
 // app icons on the left and the Applications alias on the right, vertically centered — matching the
 // arrow drawn here.
 import AppKit
 
 let W: CGFloat = 760, H: CGFloat = 400   // matches the Finder window content size in build-suite-dmg.sh
-let out = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "dmg-background.png"
+let args = Array(CommandLine.arguments.dropFirst())
+let notarized = args.contains("--notarized")
+let out = args.first { !$0.hasPrefix("--") } ?? "dmg-background.png"
 
 let img = NSImage(size: NSSize(width: W, height: H))
 img.lockFocus()
@@ -48,8 +50,11 @@ arrow.line(to: NSPoint(x: x0, y: midY + shaftH/2))
 arrow.close()
 arrow.fill()
 
-// Footer: first-launch note (ad-hoc signed, not notarized).
-draw("First launch: Control-click each app → Open", cx: W/2, yTop: H - 44, size: 12, weight: .medium, white: 0.38)
+// Footer: macOS 15+ Gatekeeper note for unsigned/self-signed builds (omitted for notarized Developer ID DMGs).
+if !notarized {
+    draw("Unsigned build: open each app, then System Settings ▸ Privacy & Security ▸ Open Anyway",
+         cx: W/2, yTop: H - 44, size: 11.5, weight: .medium, white: 0.38)
+}
 
 img.unlockFocus()
 

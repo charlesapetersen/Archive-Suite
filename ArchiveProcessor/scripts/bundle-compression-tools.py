@@ -72,11 +72,21 @@ def bundle():
             target = (binary.parent / dependency[len(prefix):]).resolve()
             if not target.is_relative_to(resources.resolve()) or not target.is_file():
                 raise RuntimeError(f"missing bundled dependency: {binary.name} -> {dependency}")
-        # The self-signed suite certificate has no Team ID. Helpers are separate
-        # processes without hardened runtime, so they can load their signed dylibs.
-        # The outer Processor retains hardened runtime and strict library validation.
-        print(run("codesign", "--force", "--sign", identity, "--options", "0",
-                  "--timestamp=none", str(binary)), end="")
+        # When signing with a Developer ID certificate (notarized distribution), Apple notarization
+        # requires hardened runtime and a secure timestamp on every bundled executable and dylib.
+        # Local self-signed suite certificates have no Team ID, so helpers stay without hardened
+        # runtime to load their signed sibling dylibs while the outer Processor keeps strict validation.
+        identity_names = (
+            os.environ.get("EXPANDED_CODE_SIGN_IDENTITY_NAME", ""),
+            os.environ.get("CODE_SIGN_IDENTITY", ""),
+            identity,
+        )
+        is_developer_id = any(name.startswith("Developer ID Application") for name in identity_names)
+        if is_developer_id:
+            sign_cmd = ("codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp", str(binary))
+        else:
+            sign_cmd = ("codesign", "--force", "--sign", identity, "--options", "0", "--timestamp=none", str(binary))
+        print(run(*sign_cmd), end="")
         run("codesign", "--verify", "--strict", str(binary))
     patents = resources / "third-party-licences/jbig2enc-PATENTS"
     if not patents.is_file() or not patents.stat().st_size:

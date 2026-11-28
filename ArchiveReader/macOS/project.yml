@@ -10,6 +10,9 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ARCHIVE_GIT_SHA: "dev"
     ENABLE_HARDENED_RUNTIME: YES
     # Certificate-based signing, NOT ad-hoc ("-"). An ad-hoc signature's designated requirement is
     # pinned to the CDHASH, which changes on every rebuild — so macOS forgets every TCC grant

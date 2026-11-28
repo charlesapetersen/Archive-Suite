@@ -34,9 +34,10 @@ posted yet. When one is, it will appear on the
 [Releases page](https://github.com/charlesapetersen/Archive-Suite/releases) as a single DMG holding
 all three apps.
 
-A note for whenever that lands: the apps are signed with a **self‑signed certificate and are not
-notarized**, so the first time you open each one you'll need to right‑click it in Applications →
-**Open** → **Open**. After that they launch normally.
+A note for whenever that lands: unsigned / self‑signed builds are **not notarized**. On macOS 15+
+(Sequoia and later), macOS removed the old Control‑click → Open shortcut; the first time you open each
+app from Applications, dismiss the Gatekeeper alert and then go to
+**System Settings ▸ Privacy & Security ▸ Open Anyway**. After that they launch normally.
 
 You can build just the apps you need, but the Suite is designed to be used together.
 
