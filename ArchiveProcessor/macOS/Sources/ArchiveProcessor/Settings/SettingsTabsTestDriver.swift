@@ -79,7 +79,7 @@ enum SettingsTabsTestDriver {
             DefaultsKeys.offerExperimentalRoutes, AppAppearance.defaultsKey,
         ] + [SettingsKey.straightenReadingCopy, .placeHandOnImage, .searchableFor, .dateImageEveryDocument, .dateLocalImage,
              .lowConfidenceNames, .numericDatesDayFirst, .scanNewspapersDocLayoutYOLO, .staysOnMac, .noTraining,
-             .keepPreservationCopies, .moneyHabit, .monthCeilingUSD, .batchCeilingUSD].map(\.rawValue)
+             .keepPreservationCopies, .mirrorFinderTags, .moneyHabit, .monthCeilingUSD, .batchCeilingUSD].map(\.rawValue)
             + LLMProvider.allCases.filter { $0 != .appleVision }.map { "keychain:\($0.rawValue)" }
         let homeless = expected.filter { seen[$0] == nil }
         check("2 every setting the window sets has a home tab", homeless.isEmpty, homeless.joined(separator: ", "))

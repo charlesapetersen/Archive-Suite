@@ -357,6 +357,13 @@ final class SettingsLayerStore: ObservableObject {
     var keepsPreservationCopies: Bool {
         SettingsResolver(general: general).resolve(.keepPreservationCopies).value.bool ?? true
     }
+    var mirrorsFinderTags: Bool {
+#if DEBUG
+        // A scratch test's switch (`scripts/test-finder-mirror.sh`, the journeys that check filed tags).
+        if ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS"] == "1" { return true }
+#endif
+        return SettingsResolver(general: general).resolve(.mirrorFinderTags).value.bool ?? false
+    }
     var projects: [SettingsLayer] { file.projects }
 
     func project(_ id: UUID?) -> SettingsLayer? {

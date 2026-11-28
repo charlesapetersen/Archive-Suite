@@ -7,6 +7,15 @@ Fixed and closed entries, and the July–October 2026 fix logs, are archived in
 keeps the open limits, measured costs, verified facts, deferred hardening, open risks and environment notes,
 and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 
+## Finder tags are no longer mirrored by default (W49.storage-finder, 2026-11-27)
+
+- **New Processor output carries no Finder tags unless mirroring is on.** The owner's call (W49.storage-finder-owner-ok:
+  off everywhere by default) means a PDF the Processor files has its fields, read state included, only in its catalogue
+  record. A folder read without File ▸ Use Catalogue Companions for This Folder lists only Read- or Unread-tagged PDFs,
+  so such output does not appear there until that mode is turned on or the Processor's Settings ▸ Output ▸ Mirror
+  archive fields to Finder tags is on. The Reader's own mirroring, Import or Re-publish of a Finder edit and an undoable
+  Remove Suite Tags follow in the same item (queued: W49.storage-finder).
+
 ## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
 
 - Both thumbnail sidebars put an unnamed element (type other) around each page thumbnail button, which is labelled

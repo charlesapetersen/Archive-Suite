@@ -19,6 +19,11 @@ of 2026-07-06; treat the surrounding function, not the exact line, as the anchor
 Status: **settled / non-negotiable.** Reflects Processor + Reader source as merged into the
 Archive-Suite monorepo.
 
+**Where the vocabulary applies now (owner, 2026-11-27, `W49.storage-finder-owner-ok`).** A PDF the Processor files
+keeps its fields in its catalogue companion ([catalogue.md](catalogue.md)). It carries this Finder-tag vocabulary only
+when the archive mirrors its fields to Finder tags (the Processor's `mirrorFinderTags`, off by default). The rules
+below still govern a mirrored PDF, the working copies a run tags before filing, and the pre-app archive.
+
 ---
 
 ## Finder tag model

@@ -2837,7 +2837,8 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         let plans: [MovePlan]
         do {
-            plans = try Self.pinCatalogueDestinations(requestedPlans, alreadyStaged: staged, outputRoot: outputDir)
+            plans = try Self.pinCatalogueDestinations(requestedPlans, alreadyStaged: staged, outputRoot: outputDir,
+                                                      carriesFinderTags: config?.mirrorFinderTags == true)
         } catch {
             // W40.fix-livecapture-fail-phase-warning — both early returns here file nothing, so each summary
             // carries the "⚠️" `summaryReportsProblem` reads; without it the pane drew the green check over the
@@ -3228,7 +3229,7 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     nonisolated private static func pinCatalogueDestinations(
-        _ plans: [MovePlan], alreadyStaged: [StagedSegment], outputRoot: URL
+        _ plans: [MovePlan], alreadyStaged: [StagedSegment], outputRoot: URL, carriesFinderTags: Bool
     ) throws -> [MovePlan] {
         let root = outputRoot.standardizedFileURL
         let rootInstance = UUID()
@@ -3269,7 +3270,7 @@ final class LiveCaptureProcessor: ObservableObject {
                         pinned.preservationCopies?[index] = preservation
                     }
                     return try ProcessorCatalogueFiling(operationID: record.fileID, root: root, rootInstanceID: rootInstance,
-                                                        destination: destination)
+                                                        destination: destination, carriesFinderTags: carriesFinderTags)
                 }
                 pinned.catalogueDestination = CatalogueDestination(root: root, folder: folder, name: plan.name,
                                                                   firstNumber: first, pdfs: pdfs)

@@ -535,6 +535,7 @@ public enum CollectionSettingsVocabulary {
         "dateLocalImage": "Search page images for dates on this Mac (no measured gain)",
         "lowConfidenceNames": "Find names on this Mac (low confidence)",
         "keepPreservationCopies": "Keep full-resolution originals",
+        "mirrorFinderTags": "Mirror archive fields to Finder tags",
         "numericDatesDayFirst": "Numeric dates are written day first (DD/MM/YYYY)",
         "scanNewspapersDocLayoutYOLO": "Scanned newspapers' columns found by DocLayout-YOLO",
         "searchableFor": "Pages written as one searchable page, with no text page",
@@ -549,7 +550,7 @@ public enum CollectionSettingsVocabulary {
     /// The values only the general layer holds (`SettingsKey.generalOnly`); a collection's copy is ignored.
     public static let generalOnlyKeys: Set<String> = [
         "keys", "plans", "cluster", "gpusPerJob", "downloadsAllowed", "moneyHabit", "monthCeilingUSD", "fineTuning",
-        "trainingOff", "keepPreservationCopies",
+        "trainingOff", "keepPreservationCopies", "mirrorFinderTags",
     ]
 
     static let overridePrefix = "override."

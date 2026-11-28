@@ -88,8 +88,10 @@ above), so a collection's mix is never read beside a project's `strata`.
 answer it follows, `_1`: the date; the general layer's `staysOnMac` follows "Spending" until the user sets it).
 
 The general layer alone holds `keys`, `plans`, `cluster`, `gpusPerJob`, `downloadsAllowed`, `moneyHabit`,
-`monthCeilingUSD`, `fineTuning`, `trainingOff` and `keepPreservationCopies` (`bool`, on by default: keep the
-full-resolution originals). A collection's or project's copy of one of these is ignored on reading.
+`monthCeilingUSD`, `fineTuning`, `trainingOff`, `keepPreservationCopies` (`bool`, on by default: keep the
+full-resolution originals) and `mirrorFinderTags` (`bool`, off by default: filed PDFs also carry their fields as
+Finder tags; owner, 2026-11-27, `W49.storage-finder`). A collection's or project's copy of one of these is ignored on
+reading.
 
 `settings` in a run record is the resolution frozen when the run started (`ResolvedSettingsSnapshot`):
 

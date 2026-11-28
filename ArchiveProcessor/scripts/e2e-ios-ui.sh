@@ -44,7 +44,7 @@ KEY="${OCR_KEY:-$(security find-generic-password -s com.archiveprocessor.app -a 
 [ -n "$KEY" ] || { echo "no OCR key (OCR_KEY or the Keychain's Gemini entry)" >&2; exit 1; }
 start_mac(){   # $1 = output dir
   MACN=$((MACN+1)); TESTOUT="$1"; rm -f "$READYFILE"
-  ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$RUN/backup" LIVECAPTURE_AUTOSTART=1 \
+  ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$RUN/backup" LIVECAPTURE_AUTOSTART=1 ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS=1 \
   LIVECAPTURE_TRANSPORT=lan LIVECAPTURE_READYFILE="$READYFILE" LIVECAPTURE_OCRKEY="$KEY" \
   LIVECAPTURE_AUTOSKIPTAGS=1 LIVECAPTURE_AUTOFINALIZE=1 LIVECAPTURE_TESTOUT="$TESTOUT" \
   python3 -c 'import os, signal, sys; signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM}); os.execv(sys.argv[1], sys.argv[1:])' \

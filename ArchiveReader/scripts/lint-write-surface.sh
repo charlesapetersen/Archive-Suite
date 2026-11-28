@@ -228,7 +228,7 @@ ALLOW=(
   # the journal under the same guarded parent lock. Each rename exclusively claims an empty name.
   # The copy reads a stable working PDF descriptor and writes only a newly created exclusive sibling.
   # Both the copy identity and digest must match the staged name before a journal is created.
-  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}guard fcopyfile(input, output, nil, copyfile_flags_t(COPYFILE_ALL)) == 0 else {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}result = fcopyfile(input, output, state, copyfile_flags_t(COPYFILE_ALL))"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}guard renameatx_np(parent, source, parent, target, UInt32(RENAME_EXCL)) == 0 else {"
   # W49.storage-export, audited above: the exclusive copy into its staging folder and the no-replace publication.
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueExport.swift${SEP}return renamex_np(from, to, UInt32(RENAME_EXCL)) == 0 ? 0 : errno"

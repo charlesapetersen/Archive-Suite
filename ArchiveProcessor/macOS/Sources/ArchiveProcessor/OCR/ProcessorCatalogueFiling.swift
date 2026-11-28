@@ -9,11 +9,14 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
     let rootInstanceID: UUID
     let relativePath: String
     let destination: CataloguePairFiler.Destination
+    /// Frozen with the request so a retry after relaunch files the PDF as the run began (W49.storage-finder).
+    /// Absent means the archive does not mirror its fields to Finder tags.
+    let carriesFinderTags: Bool?
     private var occurrence: CatalogueAssociation.Occurrence {
         CatalogueAssociation.Occurrence(rootInstanceID: rootInstanceID, relativePath: relativePath)
     }
 
-    init(operationID: UUID, root: URL, rootInstanceID: UUID, destination: URL) throws {
+    init(operationID: UUID, root: URL, rootInstanceID: UUID, destination: URL, carriesFinderTags: Bool) throws {
         let directory = root.standardizedFileURL
         let relative = try Self.relativeComponents(destination, in: directory)
         guard !relative.isEmpty else { throw ItemFacts.Unavailable.invalid(.root) }
@@ -26,6 +29,7 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         self.rootInstanceID = rootInstanceID
         relativePath = path
         self.destination = try filer.destination(at: occurrence)
+        self.carriesFinderTags = carriesFinderTags
     }
 
     func file(preparedPDF: URL, record data: Data, preservation: ProcessorPreservationFiling? = nil)
@@ -39,7 +43,8 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         }
         let filer = try Self.filer(root: root, instance: rootInstanceID)
         return try filer.filePair(operationID: operationID, at: occurrence, record: record,
-                                  preparedPDF: preparedPDF, destination: destination, verifyPreservation: verify)
+                                  preparedPDF: preparedPDF, destination: destination,
+                                  carriesFinderTags: carriesFinderTags == true, verifyPreservation: verify)
     }
 
     private static func filer(root: URL, instance: UUID) throws -> CataloguePairFiler {
@@ -89,7 +94,8 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         let filer = try Self.filer(root: root, instance: rootInstanceID)
         try filer.withDestinationDirectory(at: occurrence, matching: destination) { parent in
             guard let child else {
-                try Self.copyExport(source, to: export.lastPathComponent, in: parent)
+                try Self.copyExport(source, to: export.lastPathComponent, in: parent,
+                                    carriesFinderTags: carriesFinderTags == true)
                 return
             }
             guard mkdirat(parent, child, 0o755) == 0 || errno == EEXIST else { throw Self.ioError() }
@@ -97,12 +103,14 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
             guard directory >= 0 else { throw Self.ioError() }
             defer { close(directory) }
             try Self.requireLocal(directory)
-            try Self.copyExport(source, to: export.lastPathComponent, in: directory)
+            try Self.copyExport(source, to: export.lastPathComponent, in: directory,
+                                carriesFinderTags: carriesFinderTags == true)
             guard fsync(parent) == 0 else { throw Self.ioError() }
         }
     }
 
-    private static func copyExport(_ source: URL, to name: String, in parent: Int32) throws {
+    /// An exported image leaves its working copy's Finder tags behind like the PDF it belongs to (W49.storage-finder).
+    private static func copyExport(_ source: URL, to name: String, in parent: Int32, carriesFinderTags: Bool) throws {
         let input = open(source.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
         guard input >= 0 else { throw ioError() }
         defer { close(input) }
@@ -121,7 +129,9 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
             }
             close(output)
         }
-        guard fcopyfile(input, output, nil, copyfile_flags_t(COPYFILE_ALL)) == 0 else { throw ioError() }
+        guard CataloguePairFiler.copyFile(input, to: output, carriesFinderTags: carriesFinderTags) == 0 else {
+            throw ioError()
+        }
 
         let original = FileHandle(fileDescriptor: input, closeOnDealloc: false)
         let staged = FileHandle(fileDescriptor: output, closeOnDealloc: false)

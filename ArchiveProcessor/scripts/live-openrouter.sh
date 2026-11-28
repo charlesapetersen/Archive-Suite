@@ -67,7 +67,7 @@ mkdir -p "$work/in"
 bad=0
 for i in "${!models[@]}"; do
   m="${models[$i]}"; out="$work/out-$i"; mkdir -p "$out"; done_file="$out/TEST_DONE.txt"
-  PROCESSFILES_TESTMODE=1 PROCESSFILES_TESTKEY="$KEY" PROCESSFILES_PROVIDER=OpenRouter PROCESSFILES_MODEL="$m" \
+  ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS=1 PROCESSFILES_TESTMODE=1 PROCESSFILES_TESTKEY="$KEY" PROCESSFILES_PROVIDER=OpenRouter PROCESSFILES_MODEL="$m" \
     PROCESSFILES_MAXIMAGES=2 PROCESSFILES_TESTIN="$work/in" PROCESSFILES_TESTOUT="$out" PROCESSFILES_TESTDONE="$done_file" \
     ARCHIVEPROC_HEADLESS=1 processor_test_start pid "$bin" >"$work/app-$i.log" 2>&1
   for _ in $(seq 1 90); do [ -f "$done_file" ] && break; sleep 2; done

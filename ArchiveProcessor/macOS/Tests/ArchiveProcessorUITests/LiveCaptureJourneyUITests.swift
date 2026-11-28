@@ -182,6 +182,7 @@ final class LiveCaptureJourneyUITests: XCTestCase {
         ])
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",          // keychain quiet (KeychainHelper); the window still draws
+            "ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS": "1",   // the journey checks the filed PDFs' Finder tags
             "ARCHIVEPROC_TEST_BACKUP_ROOT": backup.path,
             "LIVECAPTURE_AUTOSTART": "1",
             "LIVECAPTURE_TRANSPORT": "lan",

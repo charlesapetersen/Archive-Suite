@@ -769,6 +769,7 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         ] + inputs + settings)
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",   // keychain quiet; the window still draws
+            "ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS": "1",   // these journeys check the filed PDFs' Finder tags
             "FAKE_AGENT_CLASS_CYCLE": classificationCycle ? "1" : "0",
             "FAKE_AGENT_CLASS": agentClass ?? "document_start",
             "FAKE_AGENT_LOG": scratchRoot.appendingPathComponent("\(name)-agent.log").path

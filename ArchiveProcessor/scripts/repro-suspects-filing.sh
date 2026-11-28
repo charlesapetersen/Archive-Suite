@@ -21,6 +21,8 @@ echo "scratch: $WORK"
 source "$REPO/scripts/test-child.sh"
 processor_test_init "$WORK"
 PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')
+# These verdicts read the filed PDFs' Finder tags, so the runs mirror them (W49.storage-finder; off by default).
+export ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS=1
 
 # Six photos: the stand-in's class cycle makes them box label, folder label, start, continuation, start, start.
 make_photos() {   # dir [source tag]

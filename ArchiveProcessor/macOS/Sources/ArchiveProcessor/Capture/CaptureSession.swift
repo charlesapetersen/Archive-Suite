@@ -354,6 +354,7 @@ final class CaptureSession: ObservableObject {
         if liveModeEnabled {
             var cfg = SessionProcessingConfig.fromDefaults(allowCredentialInteraction: allowCredentialInteraction)
             cfg.keepPreservationCopies = SettingsLayerStore.shared.keepsPreservationCopies
+            cfg.mirrorFinderTags = SettingsLayerStore.shared.mirrorsFinderTags
             config = cfg
             processingMode = .live
             // W46.settings-layers: the processing settings as this session took them, for the record finalize writes
@@ -426,6 +427,7 @@ final class CaptureSession: ObservableObject {
         var cfg = recoveryTestSettings ?? SessionProcessingConfig.fromDefaults()
         if recoveryTestSettings == nil, let previous = config {
             cfg.keepPreservationCopies = previous.keepPreservationCopies
+            cfg.mirrorFinderTags = previous.mirrorFinderTags
         }
         config = cfg
         liveProcessor.adoptSettingsSnapshot(cfg)

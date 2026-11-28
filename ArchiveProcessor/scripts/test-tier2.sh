@@ -39,6 +39,7 @@ run_case(){
   mkdir -p "$out"
   say ""; say "── case: $name  (mode=$mode, max=$max, export=$export)"
   ARCHIVEPROC_HEADLESS=1 \
+  ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS=1 \
   PROCESSFILES_TESTMODE=1 \
   PROCESSFILES_TESTKEY="$GKEY" \
   PROCESSFILES_TESTIN="$indir" \

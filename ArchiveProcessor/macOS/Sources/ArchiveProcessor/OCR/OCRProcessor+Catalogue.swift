@@ -117,6 +117,7 @@ extension OCRProcessor {
                                                  exportingImages: exportingImages, stampsUnread: stampsUnread)
                 let workingRoot = run.workingRoot
                 let outputRoot = run.outputRoot
+                let carriesFinderTags = activeRunConfig?.mirrorFinderTags == true
                 let captureCandidates: [URL: PreservationCopy.Fingerprint] = run.captureHandoffPhotos.map { snapshot in
                     let read = Set(jobs.lazy.filter { $0.status == .succeeded }.map(\.sourceURL))
                     let warnings = Set(placeholderOutputs)
@@ -124,7 +125,8 @@ extension OCRProcessor {
                 } ?? [:]
                 let prepared = try await PDFGenerator.runWorker(priority: .utility) {
                     try Self.prepareCatalogueFiles(drafts, workingRoot: workingRoot, outputRoot: outputRoot,
-                                                   captureSources: Set(captureCandidates.keys))
+                                                   captureSources: Set(captureCandidates.keys),
+                                                   carriesFinderTags: carriesFinderTags)
                 }
                 run.files = prepared.files
                 run.captureHandoffPhotos = captureCandidates.filter { prepared.completedCapture.contains($0.key) }
@@ -398,7 +400,7 @@ extension OCRProcessor {
     }
 
     nonisolated private static func prepareCatalogueFiles(_ drafts: [DraftFile], workingRoot: URL, outputRoot: URL,
-                                                          captureSources: Set<URL>)
+                                                          captureSources: Set<URL>, carriesFinderTags: Bool)
         throws -> (files: [ProcessorCatalogueRun.File], completedCapture: Set<URL>) {
         let rootInstance = UUID()
         var completedCapture = Set<URL>()
@@ -445,7 +447,8 @@ extension OCRProcessor {
             try OutputFileSafety.copyExtendedAttributes(from: draft.pdf, to: prepared)
             try ProcessorCatalogueRun.flushFileAndParent(prepared)
             let filing = try ProcessorCatalogueFiling(operationID: draft.identity.fileID, root: outputRoot,
-                                                      rootInstanceID: rootInstance, destination: draft.destination)
+                                                      rootInstanceID: rootInstance, destination: draft.destination,
+                                                      carriesFinderTags: carriesFinderTags)
             return ProcessorCatalogueRun.File(workingPDF: draft.pdf, prepared: prepared, sources: draft.sources,
                                               destination: draft.destination, record: data, filing: filing, exports: draft.exports,
                                               preservation: preservation)

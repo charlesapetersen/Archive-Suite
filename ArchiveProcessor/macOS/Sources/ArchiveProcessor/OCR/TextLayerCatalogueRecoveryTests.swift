@@ -80,7 +80,7 @@ extension TextLayerTestDriver {
                                              catalogueIdentity: identity)
         let instance = UUID()
         let filing = try ProcessorCatalogueFiling(operationID: identity.fileID, root: output,
-                                                   rootInstanceID: instance, destination: target)
+                                                   rootInstanceID: instance, destination: target, carriesFinderTags: false)
         let base = output.appendingPathComponent(PreservationCopy.directoryName)
         try fm.createSymbolicLink(at: base, withDestinationURL: namesakeFolder)
         let receiptURL = output.appendingPathComponent(".archivesuite-pair-\(identity.fileID.uuidString.lowercased()).receipt")
@@ -318,7 +318,8 @@ extension TextLayerTestDriver {
                                                       document: document, fileFields: .init())
                 let target = output.appendingPathComponent("\(index + 1).pdf")
                 let filing = try ProcessorCatalogueFiling(operationID: identity.fileID, root: output,
-                                                          rootInstanceID: rootInstance, destination: target)
+                                                          rootInstanceID: rootInstance, destination: target,
+                                                          carriesFinderTags: false)
                 return ProcessorCatalogueRun.File(workingPDF: prepared, prepared: prepared, sources: [source],
                                                   destination: target, record: try record.encoded(), filing: filing, exports: [])
             }

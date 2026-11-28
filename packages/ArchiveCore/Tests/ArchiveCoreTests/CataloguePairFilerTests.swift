@@ -230,6 +230,36 @@ struct CataloguePairFilerTests {
         #expect(try Data(contentsOf: fixture.input) == fixture.pdfBytes)
     }
 
+    /// W49.storage-finder: the filed PDF leaves the working copy's Finder tags and label behind unless the
+    /// archive mirrors to Finder tags. Other attributes travel either way and the working copy keeps its tags.
+    @Test(arguments: [false, true])
+    func preparedFilingCarriesFinderTagsOnlyWhenMirroring(mirrors: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        try FileManager.default.removeItem(at: fixture.pendingPDF)
+        _ = try CoordinatedTagWriter.write(fixture.input) { _, _ in (["1958", "Unread", "Q2"], 2) }
+        let attribute = "org.archivesuite.test-projection"
+        let wrote = Data("kept".utf8).withUnsafeBytes {
+            setxattr(fixture.input.path, attribute, $0.baseAddress, $0.count, 0, XATTR_NOFOLLOW)
+        }
+        try #require(wrote == 0)
+        let filer = CataloguePairFiler(reader: try fixture.reader())
+        _ = try filer.filePair(operationID: fixture.id, at: fixture.occurrence, record: fixture.record,
+                               preparedPDF: fixture.input, carriesFinderTags: mirrors)
+        #expect(try Data(contentsOf: fixture.finalPDF) == fixture.pdfBytes)
+        #expect(TagReading.read(fixture.input) == .success(tagNames: ["1958", "Unread", "Q2"], labelNumber: 2))
+        let filed = TagReading.read(fixture.finalPDF)
+        if mirrors {
+            #expect(filed == .success(tagNames: ["1958", "Unread", "Q2"], labelNumber: 2))
+        } else {
+            #expect(filed.tagNames ?? [] == [])
+            for name in CataloguePairFiler.finderTagAttributes {
+                #expect(getxattr(fixture.finalPDF.path, name, nil, 0, 0, XATTR_NOFOLLOW) < 0)
+            }
+        }
+        #expect(getxattr(fixture.finalPDF.path, attribute, nil, 0, 0, XATTR_NOFOLLOW) == 4)
+    }
+
     @Test func copiesPreparedPDFWithoutConsumingTheWorkingFile() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
