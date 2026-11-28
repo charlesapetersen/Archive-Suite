@@ -77,16 +77,16 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
 A file's tag array intermixes the facets below. Classification into facets is **display / sort /
 filter only** and **must never drive a destructive write** — subjects can collide with any facet
 token (a subject literally `1984`, `P7`, `Read`, `Folder`), so a mis-classified facet is acceptable
-(the user corrects it in the UI) but a facet-driven token removal is not. Reader's canonical parser
-is `DocumentTags.parse` (`Core/DocumentTags.swift`); Processor emits them from `GeneratedTags.allTags`
-(`Tagging/TagGenerator.swift`).
+(the user corrects it in the UI) but a facet-driven token removal is not. The suite's canonical parser
+is `ArchiveCore.DocumentTags.parse` (`packages/ArchiveCore/Sources/ArchiveCore/Tags/DocumentTags.swift`); Processor emits them from `GeneratedTags.allTags`
+(`ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/TagGenerator.swift`).
 
 Parse order matters (read-state / quality — incl. the legacy `P7`–`P10` priority alias — / month / day are
 recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is never taken for a year).
 
 | Facet | Exact string form | Cardinality | Notes |
 |---|---|---|---|
-| **Year** | bare digits, e.g. `1980` | 0–1 | Processor's LLM prompt forces a **4-digit** year and never null for a dated doc. Reader's `parseYear` accepts **3–4 digits** (medieval-friendly: `800`, `1215`). See discrepancy #1. |
+| **Year** | bare digits, e.g. `1980` | 0–1 | Processor's LLM prompt forces a **4-digit** year and never null for a dated doc. `ArchiveCore.DocumentTags.parseYear` accepts **3–4 digits** (medieval-friendly: `800`, `1215`). |
 | **Month** | `M Month`, e.g. `3 March` | 0–1 | Written with no leading zero (`3 March`, `10 October`; owner, 2026-11-13). Read as 1–12 in one or two ASCII digits (`3` or `03`; no sign, no longer zero run), so `03 March` still reads; the name must match that month (case-insensitive). Processor applies `capitalizeFirstLetters`, so it is emitted title-cased. An app that orders Month tags orders them by the month's number, never as text (`3 March` sorts after `10 October` as text). Month is written **only when explicit in the doc**, never inferred. |
 | **Day** | `Day N` (unpadded), e.g. `Day 25`, `Day 1` | 0–1 | N = 1–31, one or two ASCII digits (a reader also takes `Day 05`; `Day 013`, `Day +5` stay subjects). Often absent. |
 | **Decade** | `NNNNs`, e.g. `1970s` (a 3–4 ASCII-digit run, no sign, whose **last digit is `0`**, then a **lowercase** `s`; medieval-friendly `970s`) | 0–1 | An **approximate** date spanning ten years. **Mutually exclusive with Year** — a concrete Year supersedes a Decade. Recognized alongside the bare-number Year test (the trailing `s` means it can never match the digits-only Year test, so order is immaterial). Written by the Processor when the user types it into the manual tag dialog's Year field, and by its dating route for a document that takes a folder's confirmed 8-to-19-year range (W47.ct-folder-date, with `Date Uncertain`), and by the Reader for the same rule when the user accepts its offer to date a folder run's documents (W47.ct-folder-date-reader); the LLM tagger never emits it. Reader parser: `DocumentTags.parseDecade`. |
@@ -649,18 +649,18 @@ sets it, the Processor's filing follows it, and outside any archive the Processo
 
 ## Where each side lives
 
-| Facet / element | Processor (writer) | Reader (reader / editor) |
+| Facet / element | Processor (writer) | ArchiveCore / Reader / Notes |
 |---|---|---|
-| Tag read/write primitives | `ArchiveProcessor/.../Tagging/MacOSTagger.swift` | `ArchiveReader/.../Core/TagWriter.swift`, `Core/TagReading.swift` |
-| Year / Month / Day / Date Uncertain | `Tagging/TagGenerator.swift` (`GeneratedTags`, prompt) | `Core/DocumentTags.swift` (`parseYear`/`parseMonth`/`parseDay`) |
-| Decade `NNNNs` | `Views/ManualTaggingSheet.swift` + `Views/ManualSegmentTagView.swift` (Year date field → verbatim via `GeneratedTags.allTags`/`MacOSTagger`) | `Core/DocumentTags.swift` (`parseDecade`/`sortDate`/`displayDate`) |
-| **Quality `Q1`–`Q3`** (the rating facet; supersedes Priority, W19) | user-set in the Live Capture tag card (`Views/LiveCaptureView.swift`) + Process Files manual tagging (`Views/ManualTaggingSheet.swift`, `ManualSegmentTagView.swift`) via `GeneratedTags`/`MacOSTagger`; **companions emit `Q`** (`net/MacClient` ↔ `Net/CaptureServer` route — SHARED HOTSPOT, change all sides together); never LLM-emitted | `Core/DocumentTags.swift` (`parseQuality`, shared; **legacy `P8`–`P10`→`Q1`–`Q3` alias on read**) + `Core/TagWriter.swift` (set/clear). **Also set by Notes** (`NotesTagProjector` ← front-matter `quality`). |
-| **Notes date facets** (Year/Month/Day/Decade) | (n/a) | **Deferred — W19.date.** Notes currently keeps front-matter `date`+`datePrecision` authoritative; the queued projector work will reuse the existing date facets and `ArchiveCore.DocumentTags.sortDateKey` (no new vocabulary). |
-| Read/Unread + `Unread`-last | `Tagging/MacOSTagger.swift` (`stampUnread`) | `Core/DocumentTags.swift` (`ReadState`), `Core/TagWriter.swift` (`setReadState`) |
-| Subjects | `Tagging/TagGenerator.swift` | `Core/DocumentTags.swift` (`subjects`) |
-| Item type (`Box`/`Folder`) + the user's colour | `Tagging/TagGenerator.swift`, `OCR/OCRProcessor+Tagging.swift` (`structureTag`, `authoritativeColor`), `Tagging/ItemTypeColourSetting.swift`, `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | ArchiveCore `Tags/ItemType.swift` (`ItemType`, `FinderLabel`, `ItemTypeColors`) + `DocumentTags.itemType`; Reader `Core/ItemTypePreferences.swift`, `Core/TagWriter.swift`, `Views/TagEditorView.swift` (Item type) |
-| **Sent With** date (W37) | `Tagging/DocumentSegmenter.swift` (`enclosureOf`), `OCR/OCRProcessor+Tagging.swift` (cover date → `GeneratedTags.sentWith`), `Views/ManualTaggingSheet.swift` | ArchiveCore `Tags/ArchiveDate.swift` (`ArchiveDate`, `SentWithTag`, `DateRangeFilter`) + `DocumentTags.sentWith`; Reader `Core/LibraryFilter.swift` (year range), `Views/TagEditorView.swift` (⌘I sheet); Notes front-matter `additional_dates` → `NotesTagProjector` |
-| Chronological sort key | (n/a — Reader-derived) | `Core/DocumentTags.swift` (`sortDate`; own date, sent-with fallback) |
+| Tag read/write primitives | `ArchiveProcessor/.../Tagging/MacOSTagger.swift` (via `ArchiveCore.CoordinatedTagWriter`) | `ArchiveCore` `Tags/TagReading.swift`, `Tags/TagWrite.swift`; Reader `Core/TagWriter.swift` |
+| Year / Month / Day / Date Uncertain | `Tagging/TagGenerator.swift` (`GeneratedTags`, prompt) | `ArchiveCore` `Tags/DocumentTags.swift` (`parseYear`/`parseMonth`/`parseDay`) |
+| Decade `NNNNs` | `Views/ManualTaggingSheet.swift` + `Views/ManualSegmentTagView.swift` (Year date field → verbatim via `GeneratedTags.allTags`/`MacOSTagger`) | `ArchiveCore` `Tags/DocumentTags.swift` (`parseDecade`/`sortDate`/`displayDate`) |
+| **Quality `Q1`–`Q3`** (the rating facet; supersedes Priority, W19) | user-set in the Live Capture tag card (`Views/LiveCaptureView.swift`) + Process Files manual tagging (`Views/ManualTaggingSheet.swift`, `ManualSegmentTagView.swift`) via `GeneratedTags`/`MacOSTagger`; **companions emit `Q`** (`net/MacClient` ↔ `Net/CaptureServer` route — SHARED HOTSPOT, change all sides together); never LLM-emitted | `ArchiveCore` `Tags/DocumentTags.swift` (`parseQuality`; **legacy `P8`–`P10`→`Q1`–`Q3` alias on read**) + Reader `Core/TagWriter.swift` (set/clear). **Also set by Notes** (`NotesTagProjector` ← front-matter `quality`). |
+| **Notes date facets** (Year/Month/Day/Decade/Sent With) | (n/a) | **Shipped (W19.date / W37.dual-date).** Notes projects front-matter `date`/`date_precision` and `additional_dates` via `NotesTagProjector` / `NotesTagVocabulary` using `ArchiveCore` date helpers (`DocumentTags.parseYear`/`parseDecade`/`sortDateKey`, `TagEditing.monthToken`, `SentWithTag`). |
+| Read/Unread + `Unread`-last | `Tagging/MacOSTagger.swift` (`stampUnread`) | `ArchiveCore` `Tags/DocumentTags.swift` (`ReadState`), Reader `Core/TagWriter.swift` (`setReadState`) |
+| Subjects | `Tagging/TagGenerator.swift` | `ArchiveCore` `Tags/DocumentTags.swift` (`subjects`) |
+| Item type (`Box`/`Folder`) + the user's colour | `Tagging/TagGenerator.swift`, `OCR/OCRProcessor+Tagging.swift` (`structureTag`, `authoritativeColor`), `Tagging/ItemTypeColourSetting.swift`, `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | `ArchiveCore` `Tags/ItemType.swift` (`ItemType`, `FinderLabel`, `ItemTypeColors`) + `DocumentTags.itemType`; Reader `Core/ItemTypePreferences.swift`, `Core/TagWriter.swift`, `Views/TagEditorView.swift` (Item type) |
+| **Sent With** date (W37) | `Tagging/DocumentSegmenter.swift` (`enclosureOf`), `OCR/OCRProcessor+Tagging.swift` (cover date → `GeneratedTags.sentWith`), `Views/ManualTaggingSheet.swift` | `ArchiveCore` `Tags/ArchiveDate.swift` (`ArchiveDate`, `SentWithTag`, `DateRangeFilter`) + `DocumentTags.sentWith`; Reader `Core/LibraryFilter.swift` (year range), `Views/TagEditorView.swift` (⌘I sheet); Notes front-matter `additional_dates` → `NotesTagProjector` |
+| Chronological sort key | (n/a — Reader-derived) | `ArchiveCore` `Tags/DocumentTags.swift` (`sortDate`; own date, sent-with fallback) |
 | 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`, `PDFSourceDates`), `OCR/PDFGenerator+DateEvidence.swift` (evidence and item-field lines after the call), `Tagging/ItemFieldExtractor.swift` (the item fields) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`, structured per-page metadata and summaries). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |
 | Classification enum / values | `Models/ProviderModels.swift` (`DocumentClassification`), `OCR/PDFTextExtractor.swift` (shim maps string→enum) | `ArchiveCore` `PDFHeaderParser` returns raw `String?`; `Core/DocumentRuns.swift`, `Search/ContentIndex.swift` |
 

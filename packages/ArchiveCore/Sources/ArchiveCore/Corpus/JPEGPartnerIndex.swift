@@ -42,6 +42,16 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
         init(_ value: String) { bytes = Array(value.utf8) }
     }
 
+    /// Normalizes U+00A0 (no-break space) to ASCII space for original-to-PDF pairing (W49.adoption-nbsp-pairing).
+    public static func pairingKey(_ value: String) -> String {
+        value.replacingOccurrences(of: "\u{00A0}", with: " ")
+    }
+
+    private struct PairingKey: Hashable, Sendable {
+        let bytes: [UInt8]
+        init(_ value: String) { bytes = Array(JPEGPartnerIndex.pairingKey(value).utf8) }
+    }
+
     public let jpegRootPath: String
     public let isClean: Bool
     public let filesSeen: Int
@@ -50,19 +60,20 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
 
     /// Positions in `candidates`, in its order, by exact path, by leaf stem, and by the relative path less
     /// its extension under `root` (the JPEG root's comparison spelling when the table was built).
+    /// Stem and relative-stem lookups treat U+00A0 (no-break space) and ASCII space as the same character.
     private struct Lookup: Sendable {
         var root: String
         var byPath: [FileSystemKey: Int] = [:]
-        var byStem: [FileSystemKey: [Int]] = [:]
-        var byRelativeStem: [FileSystemKey: [Int]] = [:]
+        var byStem: [PairingKey: [Int]] = [:]
+        var byRelativeStem: [PairingKey: [Int]] = [:]
 
         init(candidates: [JPEGPartnerCandidate], jpegRootPath: String) {
             root = JPEGPartnerIndex.comparisonRootPath(URL(fileURLWithPath: jpegRootPath, isDirectory: true))
             for (i, candidate) in candidates.enumerated() {
                 if byPath[FileSystemKey(candidate.path)] == nil { byPath[FileSystemKey(candidate.path)] = i }
-                byStem[FileSystemKey(candidate.stem), default: []].append(i)
+                byStem[PairingKey(candidate.stem), default: []].append(i)
                 if let relative = JPEGPartnerIndex.relativePath(candidate.path, under: root) {
-                    byRelativeStem[FileSystemKey((relative as NSString).deletingPathExtension), default: []].append(i)
+                    byRelativeStem[PairingKey((relative as NSString).deletingPathExtension), default: []].append(i)
                 }
             }
         }
@@ -129,11 +140,12 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
         let jpegRoot = Self.comparisonRootPath(URL(fileURLWithPath: jpegRootPath, isDirectory: true))
         let exactMatches: [JPEGPartnerCandidate]
         if FileSystemKey(jpegRoot) == FileSystemKey(lookup.root) {
-            exactMatches = (lookup.byRelativeStem[FileSystemKey(pdfStem)] ?? []).map { candidates[$0] }
+            exactMatches = (lookup.byRelativeStem[PairingKey(pdfStem)] ?? []).map { candidates[$0] }
         } else {   // the root now resolves elsewhere than when the table was built: compare afresh
+            let targetKey = PairingKey(pdfStem)
             exactMatches = candidates.filter {
                 Self.relativePath($0.path, under: jpegRoot).map {
-                    FileSystemKey(($0 as NSString).deletingPathExtension) == FileSystemKey(pdfStem)
+                    PairingKey(($0 as NSString).deletingPathExtension) == targetKey
                 } ?? false
             }
         }
@@ -145,12 +157,13 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
         }
 
         let stem = (pdfStem as NSString).lastPathComponent
-        let matches = (lookup.byStem[FileSystemKey(stem)] ?? []).map { candidates[$0] }
+        let matches = (lookup.byStem[PairingKey(stem)] ?? []).map { candidates[$0] }
         guard !matches.isEmpty else { return .none }
 
         if let collectionContext {
+            let contextKey = PairingKey(collectionContext)
             let scoped = matches.filter {
-                FileSystemKey($0.collectionContext) == FileSystemKey(collectionContext)
+                PairingKey($0.collectionContext) == contextKey
             }
             if scoped.count == 1, let candidate = scoped.first {
                 return .match(Self.exactFileURL(candidate.path))

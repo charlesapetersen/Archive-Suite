@@ -108,6 +108,8 @@ enum AdoptionTestDriver {
             try jpeg(jpegs.appendingPathComponent("Box 1/Box 1 label.jpg"))
             try pdf(main.appendingPathComponent("Box 1/Letter.pdf"), tags: ["1957", "3 March", "Unread", "Q2", "Eisenhower"])
             try jpeg(jpegs.appendingPathComponent("Box 1/Letter.jpg"))
+            try pdf(main.appendingPathComponent("Box 1/00001 —\u{00A0}Greene.pdf"), tags: ["1958"])
+            try jpeg(jpegs.appendingPathComponent("Box 1/00001 — Greene.JPG"))
             try pdf(main.appendingPathComponent("Box 1/Moved.pdf"), tags: ["Read"], label: FinderLabel.blue.rawValue)
             try jpeg(jpegs.appendingPathComponent("Elsewhere/Moved.jpeg"))
             try pdf(main.appendingPathComponent("Box 1/Conflict.pdf"), tags: ["Folder"], label: FinderLabel.red.rawValue)
@@ -148,11 +150,16 @@ enum AdoptionTestDriver {
             check("1 manifest written", false); return
         }
         check("1 the originals tree beside Archival Photos is used", manifest.originalsRoot?.hasSuffix("Archival Photos JPEGS") == true)
-        check("1 every PDF is listed, tagged or not", manifest.entries.count == 14, "\(manifest.entries.map(\.path))")
+        check("1 every PDF is listed, tagged or not", manifest.entries.count == 15, "\(manifest.entries.map(\.path))")
         check("1 the walk was complete", manifest.complete)
         let letter = entry(manifest, "Box 1/Letter.pdf")
         check("1 a clean entry is accepted with its mirrored original",
               letter?.decision == .accept && letter?.original.rule == "mirrored" && letter?.keepOriginal == true)
+        let nbsp = entry(manifest, "Box 1/00001 —\u{00A0}Greene.pdf")
+        check("1 a PDF with U+00A0 pairs with its plain-space mirrored original (W49.adoption-nbsp-pairing)",
+              nbsp?.decision == .accept && nbsp?.original.rule == "mirrored"
+                && nbsp?.original.path == "Box 1/00001 — Greene.JPG" && nbsp?.keepOriginal == true,
+              "\(String(describing: nbsp?.original))")
         check("1 tag facts are proposed with their evidence",
               letter?.proposal.documentDate?.value == "1957-03" && letter?.proposal.readState?.value == "unread"
                 && letter?.proposal.quality?.value == 2 && letter?.proposal.subjects == ["Eisenhower"]

@@ -1,13 +1,12 @@
 #!/bin/bash
-# build-suite-dmg.sh — build BOTH Archive Suite apps (Release) and package them into ONE combined DMG
-# that guides the user to drag both apps into /Applications.
+# build-suite-dmg.sh — build all three Archive Suite apps (Release) and package them into ONE combined DMG
+# that guides the user to drag all three apps into /Applications.
 #
 # Usage:  release/build-suite-dmg.sh <version> [--no-build]
 #   <version>    e.g. 1.0.0  → produces /tmp/ArchiveSuite-1.0.0.dmg, volume "Archive Suite 1.0.0"
 #   --no-build   reuse the existing Release .app bundles instead of rebuilding (faster for re-packaging)
 #
-# The DMG is a build artifact — never commit it. Both apps are ad-hoc signed, not notarized
-# (first launch needs Control-click → Open; that note is baked into the background art).
+# The DMG is a build artifact — never commit it. All three apps are locally signed, not notarized.
 set -uo pipefail
 
 VER="${1:-}"

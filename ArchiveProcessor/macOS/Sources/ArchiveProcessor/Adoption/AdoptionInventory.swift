@@ -198,7 +198,8 @@ enum AdoptionInventory {
         case .match(let url):
             let found = relative(url, in: originals) ?? url.path
             let mirrored = (path as NSString).deletingPathExtension
-            let rule = (found as NSString).deletingPathExtension == mirrored ? "mirrored" : "stem"
+            let rule = JPEGPartnerIndex.pairingKey((found as NSString).deletingPathExtension)
+                == JPEGPartnerIndex.pairingKey(mirrored) ? "mirrored" : "stem"
             return .init(state: .matched, path: found, rule: rule)
         case .ambiguous(let urls):
             return .init(state: .ambiguous, candidates: urls.map { relative($0, in: originals) ?? $0.path }.sorted())

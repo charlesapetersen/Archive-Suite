@@ -172,4 +172,69 @@ struct JPEGPartnerIndexTests {
         // Loose on purpose (a guard against a return to per-candidate filesystem work, not a benchmark).
         #expect(Date().timeIntervalSince(start) < 1.0)
     }
+
+    @Test("W49.adoption-nbsp-pairing: U+00A0 and ASCII space pair in mirrored and stem tiers while real ambiguity stays ambiguous")
+    func nbspMatchesSpaceAndKeepsAmbiguity() throws {
+        let tree = try makeTree()
+        defer { try? FileManager.default.removeItem(at: tree.root) }
+
+        // 1. Mirrored tier: PDF with NBSP matches JPEG with plain space (Greene Papers pattern),
+        //    and plain-space PDF matches NBSP JPEG.
+        let greenePDF = tree.main.appendingPathComponent("Greene Papers/00001 —\u{00A0}Greene.pdf")
+        let greeneJPG = tree.jpegs.appendingPathComponent("Greene Papers/00001 — Greene.JPG")
+        let reversePDF = tree.main.appendingPathComponent("Greene Papers/00002 — Greene.pdf")
+        let reverseJPG = tree.jpegs.appendingPathComponent("Greene Papers/00002 —\u{00A0}Greene.JPG")
+        // Mirrored folder name differing only by NBSP also pairs as mirrored.
+        let folderPDF = tree.main.appendingPathComponent("Box\u{00A0}1/note.pdf")
+        let folderJPG = tree.jpegs.appendingPathComponent("Box 1/note.jpg")
+        // 2. Stem tier: relocated folder with NBSP vs plain space in stem.
+        let relocatedPDF = tree.main.appendingPathComponent("New Folder/00003 —\u{00A0}Relocated.pdf")
+        let relocatedJPG = tree.jpegs.appendingPathComponent("Old Folder/00003 — Relocated.jpeg")
+        // 3. Real ambiguity on mirrored tier: both plain-space and NBSP JPEGs exist beside each other.
+        let ambigMirrorPDF = tree.main.appendingPathComponent("Ambig/00004 —\u{00A0}Dual.pdf")
+        let ambigMirrorSpace = tree.jpegs.appendingPathComponent("Ambig/00004 — Dual.jpg")
+        let ambigMirrorNBSP = tree.jpegs.appendingPathComponent("Ambig/00004 —\u{00A0}Dual.jpg")
+        // 4. Real ambiguity on stem tier: two different folders hold space and NBSP variants.
+        let ambigStemPDF = tree.main.appendingPathComponent("Other/00005 —\u{00A0}Split.pdf")
+        let ambigStemA = tree.jpegs.appendingPathComponent("Col A/00005 — Split.jpg")
+        let ambigStemB = tree.jpegs.appendingPathComponent("Col B/00005 —\u{00A0}Split.jpg")
+
+        for url in [greenePDF, greeneJPG, reversePDF, reverseJPG, folderPDF, folderJPG,
+                    relocatedPDF, relocatedJPG, ambigMirrorPDF, ambigMirrorSpace, ambigMirrorNBSP,
+                    ambigStemPDF, ambigStemA, ambigStemB] {
+            try makeFile(url)
+        }
+
+        let partnerIndex = index(tree.jpegs)
+        func discovered(_ suffix: String) throws -> URL {
+            URL(fileURLWithPath: try #require(partnerIndex.candidates.first { $0.path.hasSuffix(suffix) }?.path))
+        }
+
+        #expect(partnerIndex.resolve(pdfURL: greenePDF, mainRoot: tree.main)
+                == .match(try discovered("Greene Papers/00001 — Greene.JPG")))
+        #expect(partnerIndex.resolve(pdfURL: reversePDF, mainRoot: tree.main)
+                == .match(try discovered("Greene Papers/00002 —\u{00A0}Greene.JPG")))
+        #expect(partnerIndex.resolve(pdfURL: folderPDF, mainRoot: tree.main)
+                == .match(try discovered("Box 1/note.jpg")))
+        #expect(partnerIndex.resolve(pdfURL: relocatedPDF, mainRoot: tree.main)
+                == .match(try discovered("Old Folder/00003 — Relocated.jpeg")))
+
+        if case .ambiguous(let urls) = partnerIndex.resolve(pdfURL: ambigMirrorPDF, mainRoot: tree.main) {
+            #expect(urls.count == 2)
+        } else {
+            Issue.record("expected mirrored ambiguity when both plain-space and NBSP originals exist")
+        }
+        if case .ambiguous(let urls) = partnerIndex.resolve(pdfURL: ambigStemPDF, mainRoot: tree.main) {
+            #expect(urls.count == 2)
+        } else {
+            Issue.record("expected stem ambiguity when plain-space and NBSP originals exist in different folders")
+        }
+        // Collection context with NBSP still narrows an ambiguous stem.
+        #expect(partnerIndex.resolve(pdfURL: ambigStemPDF, mainRoot: tree.main, collectionContext: "Col\u{00A0}B")
+                == .match(try discovered("Col B/00005 —\u{00A0}Split.jpg")))
+        // Exact-path lookup stays byte-exact (never swaps U+00A0 for ASCII space).
+        let exactGreenePath = try discovered("Greene Papers/00001 — Greene.JPG").path
+        #expect(partnerIndex.candidate(atPath: exactGreenePath) != nil)
+        #expect(partnerIndex.candidate(atPath: exactGreenePath.replacingOccurrences(of: "— ", with: "—\u{00A0}")) == nil)
+    }
 }
