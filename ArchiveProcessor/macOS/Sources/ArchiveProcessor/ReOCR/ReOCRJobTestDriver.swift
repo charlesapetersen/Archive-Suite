@@ -926,6 +926,29 @@ enum ReOCRJobTestDriver {
             let one = ReOCRFlaggedFinder.find(in: d, limit: 1)
             check("16 a limit is kept and reported", one.files.count == 1 && one.truncated)
             check("16 finding changes nothing", tags(fc) == ["Q2"] && tags(fa).contains("OCR Poor"))
+
+            // W49.storage-finder: beside a catalogue companion the record's OCR Poor decides, not the Finder tags.
+            let e = try folder("flagged-catalogue")
+            func companion(_ pdf: URL, ocrPoor: Bool?) throws {
+                let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+                let document = ProcessorCatalogueRecord.Document(id: UUID(), ownerFileID: identity.fileID,
+                                                                 fields: .init(), enclosedWith: nil)
+                var fields = ProcessorCatalogueRecord.FileFields()
+                fields.ocrPoor = ocrPoor.map { .init($0, origin: "user") }
+                let data = try ProcessorCatalogueRecord(identity: identity, sourcePages: [.init(roles: ["image", "text"])],
+                                                        document: document, fileFields: fields).encoded()
+                try data.write(to: pdf.deletingLastPathComponent()
+                    .appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: pdf.lastPathComponent)))
+            }
+            let untagged = e.appendingPathComponent("Untagged.pdf"), stale = e.appendingPathComponent("Stale.pdf")
+            let broken = e.appendingPathComponent("Broken.pdf")
+            for url in [untagged, stale, broken] { try FileManager.default.copyItem(at: fc, to: url) }
+            try tag(untagged, []); try tag(stale, ["OCR Poor"]); try tag(broken, ["OCR Poor"])
+            try companion(untagged, ocrPoor: true); try companion(stale, ocrPoor: false)
+            try Data("{".utf8).write(to: e.appendingPathComponent("Broken.pdf.archivesuite.json"))
+            let records = ReOCRFlaggedFinder.find(in: e)
+            check("16 a record's OCR Poor finds an untagged PDF; a stale tag or an unreadable record does not",
+                  records.files.map(\.lastPathComponent) == ["Untagged.pdf"] && records.scanned == 3, "\(records)")
         }
     }
 
