@@ -110,6 +110,7 @@ struct ContentView: View {
             InstitutionalComputeImportTestDriver.runIfRequested()       // $0 W41 an institutional-computing bulk run's text, no wire
             RunQuitResumeContract.runIfRequested()            // $0 W49 a quit waits for the pages in flight; resume reads the rest
             DeferredOutputContract.runIfRequested()           // $0 W49 a standard run writes each PDF once, after the reviews
+            OutputFileSafetyContract.runIfRequested()         // $0 W49 OutputFileSafety identity, relocation and working-PDF guards
             HeaderParityContract.runIfRequested()             // $0 W49 Process Files and Live Capture write the same page 2
             ResumeReviewGatesProbe.runIfRequested()           // $0 W49 which review gates a resumed paid batch raises
             OpenRouterTestDriver.runIfRequested()             // $0 W41 OpenRouter request pinning, no wire

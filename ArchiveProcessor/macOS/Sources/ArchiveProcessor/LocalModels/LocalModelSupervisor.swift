@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import os
 
 /// W49.proc-local-model-supervisor — the one owner of the models this app downloads and runs on the Mac. Everything
 /// that starts, keeps or stops such a model goes through it (`scripts/check-local-model-seam.sh` fails on a Python
@@ -263,6 +264,7 @@ final class LocalModelSupervisor {
     }
 
     private var activeInstallCanceller: LocalAgentClient.ProcessCanceller?
+    private var activeExternalCancel: (() -> Void)?
 
     private func run(_ binary: URL, _ arguments: [String], model: Model, timeout: TimeInterval,
                      failure: Failure) async throws {
@@ -358,6 +360,82 @@ final class LocalModelSupervisor {
         return try await body()
     }
 
+    /// Runs an external large-memory process (such as VisionOCRKit's `HandPlacer`, ~4.6–6.8 GB PyTorch) alone against
+    /// the supervisor's MLX worker (W49.proc-s059-verify / S-059): waits for any active read or stage to finish, stops
+    /// any resident MLX worker and waits for its process to exit, holds the supervisor's turn while `body` runs on a
+    /// background queue so no MLX worker loads beside it, and releases the turn only after `body` returns.
+    func withExternalModel<T: Sendable>(
+        named name: String,
+        _ body: @escaping @Sendable (@escaping @Sendable () -> Bool) throws -> T
+    ) async throws -> T {
+        let started = generation
+        while busy || removing || stage != nil {
+            guard started == generation else { throw Failure.stopped }
+            try await wait()
+        }
+        guard started == generation else { throw Failure.stopped }
+        busy = true
+        idle?.cancel()
+        idle = nil
+        defer { release() }
+        try await unload()
+        try Task.checkCancellation()
+        guard started == generation else { throw Failure.stopped }
+        note("external \(name)")
+        let cancelled = OSAllocatedUnfairLock(initialState: false)
+        let cancel: @Sendable () -> Void = { cancelled.withLock { $0 = true } }
+        let isCancelled: @Sendable () -> Bool = { cancelled.withLock { $0 } }
+        activeExternalCancel = cancel
+        defer {
+            activeExternalCancel = nil
+            note("external end \(name)")
+        }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        cont.resume(returning: try body(isCancelled))
+                    } catch {
+                        cont.resume(throwing: error)
+                    }
+                }
+            }
+        } onCancel: {
+            cancel()
+        }
+    }
+
+    /// Synchronous off-main bridge for `withExternalModel` (used by `PDFGenerator.handPlacement`, S-059).
+    /// Must never be called on the main thread (the supervisor is `@MainActor`).
+    nonisolated static func runExternalModelSync<T: Sendable>(
+        named name: String,
+        supervisor: LocalModelSupervisor? = nil,
+        isCancelled: @escaping @Sendable () -> Bool = { false },
+        _ body: @escaping @Sendable (@escaping @Sendable () -> Bool) throws -> T
+    ) throws -> T {
+        guard !Thread.isMainThread else { throw Failure.stopped }
+        if isCancelled() { throw CancellationError() }
+        let sema = DispatchSemaphore(value: 0)
+        let box = OSAllocatedUnfairLock<Result<T, Error>?>(initialState: nil)
+        let task = Task { @MainActor in
+            let result: Result<T, Error>
+            do {
+                let target = supervisor ?? LocalModelSupervisor.serving
+                let value = try await target.withExternalModel(named: name, body)
+                result = .success(value)
+            } catch {
+                result = .failure(error)
+            }
+            box.withLock { $0 = result }
+            sema.signal()
+        }
+        while sema.wait(timeout: .now() + .milliseconds(50)) == .timedOut {
+            if isCancelled() { task.cancel() }
+        }
+        let outcome = box.withLock { $0 } ?? .failure(CancellationError())
+        return try outcome.get()
+    }
+
     private func endStage() {
         guard let pinned = stage else { return }
         stage = pinned.depth > 1 ? (pinned.model, pinned.depth - 1, pinned.used) : nil
@@ -395,12 +473,15 @@ final class LocalModelSupervisor {
         generation += 1
         activeInstallCanceller?.cancel()
         activeInstallCanceller = nil
+        activeExternalCancel?()
+        activeExternalCancel = nil
         idle?.cancel()
         idle = nil
         if let child = resident {
             resident = nil
             retire(child)
         }
+        wakeAll()
     }
 
     /// A warning stops an idle model unless a stage is holding it; critical pressure stops it either way. Pressure that

@@ -75,7 +75,9 @@ struct ReOCRLayer: Sendable {
                        let made = write(aligned, frame: frame) { return made }
                 }
             case .placeHands:
-                if let hands = try? HandPlacer.place(image: image, reading: reading, isCancelled: { Task.isCancelled }),
+                if let hands = try? await LocalModelSupervisor.serving.withExternalModel(named: "hand-placer", { cancelled in
+                    try HandPlacer.place(image: image, reading: reading, isCancelled: cancelled)
+                }),
                    TextLayerRule.handPlacementRefusal(hands, reading: reading) == nil,
                    let made = write(hands.lines, frame: frame, checkReadingOrder: true) { return made }
             case .textPage:

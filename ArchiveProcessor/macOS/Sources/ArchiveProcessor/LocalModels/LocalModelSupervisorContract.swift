@@ -1,6 +1,9 @@
 #if DEBUG // a test contract, compiled out of Release
 import ArchiveCore
+import CoreGraphics
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 /// W49.proc-local-model-supervisor — the supervisor's arbitration, run by `LocalModelsTestDriver`
 /// (`scripts/test-local-models.sh`). A stand-in worker on the system Python plays each model: it serves the same
@@ -290,6 +293,120 @@ enum LocalModelSupervisorContract {
         _ = await busyRead.value
         check("10 pressure during a read leaves it to finish", loadedDuring)
         check("10 and stops the model when it does", s.residentModel == nil, "\(String(describing: s.residentModel))")
+
+        // 11. S-059 (W49.proc-s059-verify): an external large-memory process (HandPlacer) evicts any resident
+        //     Live Capture MLX worker before starting and blocks new MLX loads until placement finishes.
+        let aliveDir = root.appending(path: "alive")
+        let liveOwner = NSObject()
+        s.keepAliveLiveCapture = .seconds(300)
+        s.liveCaptureBegan(liveOwner)
+        defer { s.liveCaptureEnded(liveOwner) }
+        _ = await read(a)
+        check("11 precondition: Live Capture keeps model A resident", s.residentModel == a, "\(String(describing: s.residentModel))")
+
+        let entered = DispatchSemaphore(value: 0)
+        let queuedB = DispatchSemaphore(value: 0)
+        let competingB = Task { () -> Result<Reply?, Error> in
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                DispatchQueue.global().async {
+                    entered.wait()
+                    cont.resume()
+                }
+            }
+            let pending = Task { await read(b) }
+            try? await Task.sleep(for: .milliseconds(150))
+            queuedB.signal()
+            return await pending.value
+        }
+        let externalObservation: (aliveAtStart: Int, aliveAtEnd: Int) = await PDFGenerator.runWorker {
+            do {
+                return try LocalModelSupervisor.runExternalModelSync(named: "hand-placer", supervisor: s) { _ in
+                    let startCount = ((try? FileManager.default.contentsOfDirectory(atPath: aliveDir.path)) ?? []).count
+                    entered.signal()
+                    _ = queuedB.wait(timeout: .now() + .seconds(5))
+                    let endCount = ((try? FileManager.default.contentsOfDirectory(atPath: aliveDir.path)) ?? []).count
+                    return (startCount, endCount)
+                }
+            } catch {
+                entered.signal()
+                return (-1, -1)
+            }
+        }
+        let afterExternalB = reply(await competingB.value)
+        check("11 external model waits for resident Live Capture worker to exit before starting",
+              externalObservation.aliveAtStart == 0 && externalObservation.aliveAtEnd == 0,
+              "\(externalObservation)")
+        check("11 competing MLX model loads alone only after external model finishes",
+              afterExternalB?.repo == "model-b" && afterExternalB?.others == 0, "\(String(describing: afterExternalB))")
+        let tail = s.events.suffix(6)
+        let unloadIdx = tail.firstIndex(of: "unload A")
+        let extStartIdx = tail.firstIndex(of: "external hand-placer")
+        let extEndIdx = tail.firstIndex(of: "external end hand-placer")
+        let loadBIdx = tail.firstIndex(of: "load B")
+        check("11 supervisor order: unload A -> external -> external end -> load B",
+              unloadIdx != nil && extStartIdx != nil && extEndIdx != nil && loadBIdx != nil
+                && unloadIdx! < extStartIdx! && extStartIdx! < extEndIdx! && extEndIdx! < loadBIdx!,
+              "\(Array(tail))")
+
+        // 11b. End-to-end through PDFGenerator.generateOutput with a fake HandPlacer while model B is resident.
+        let fm = FileManager.default
+        let handsHome = root.appending(path: "hands-home")
+        let handsBin = handsHome.appending(path: "Hands/bin")
+        let handsModels = handsHome.appending(path: "Hands/models")
+        let fakePy = handsBin.appending(path: "python3")
+        let fakeScript = root.appending(path: "fake-place-hands.py")
+        let seenAlive = root.appending(path: "hands-saw-alive.txt")
+        let sampleJPG = root.appending(path: "hand.jpg")
+        let outPDF = root.appending(path: "hand.pdf")
+        do {
+            try fm.createDirectory(at: handsBin, withIntermediateDirectories: true)
+            try fm.createDirectory(at: handsModels, withIntermediateDirectories: true)
+            try Data("m".utf8).write(to: handsModels.appending(path: "McCATMuS_nfd_nofix_V1.mlmodel"))
+            try Data("# stub\n".utf8).write(to: fakeScript)
+            let sh = """
+            #!/bin/sh
+            n=$(ls -A "\(aliveDir.path)" 2>/dev/null | wc -l | tr -d ' ')
+            echo "$n" > "\(seenAlive.path)"
+            cat > "$5" <<'JSON'
+            {"lines":[{"text":"Dear Sir","box":[0.1,0.1,0.5,0.1]}],"confidence":0.95,"span":1,"detected":1,"reading_lines":1,"peak_rss":0}
+            JSON
+            """
+            try Data(sh.utf8).write(to: fakePy)
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fakePy.path)
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            if let ctx = CGContext(data: nil, width: 200, height: 120, bitsPerComponent: 8, bytesPerRow: 0,
+                                   space: colorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+               let cg = ctx.makeImage(),
+               let dest = CGImageDestinationCreateWithURL(sampleJPG as CFURL, UTType.jpeg.identifier as CFString, 1, nil) {
+                CGImageDestinationAddImage(dest, cg, nil)
+                CGImageDestinationFinalize(dest)
+            }
+            let savedHome = ProcessInfo.processInfo.environment["VISIONOCR_MODEL_HOME"]
+            let savedScript = ProcessInfo.processInfo.environment["VISIONOCR_HANDS_SCRIPT"]
+            setenv("VISIONOCR_MODEL_HOME", handsHome.path, 1)
+            setenv("VISIONOCR_HANDS_SCRIPT", fakeScript.path, 1)
+            let savedOverride = LocalModelSupervisor.testOverride
+            LocalModelSupervisor.testOverride = s
+            defer {
+                LocalModelSupervisor.testOverride = savedOverride
+                if let savedHome { setenv("VISIONOCR_MODEL_HOME", savedHome, 1) } else { unsetenv("VISIONOCR_MODEL_HOME") }
+                if let savedScript { setenv("VISIONOCR_HANDS_SCRIPT", savedScript, 1) } else { unsetenv("VISIONOCR_HANDS_SCRIPT") }
+            }
+            check("11b precondition: model B is resident before PDFGenerator hand placement",
+                  s.residentModel == b, "\(String(describing: s.residentModel))")
+            let result = OCRResult(text: "Dear Sir", classification: .documentStart, errorMessage: nil, errorCode: nil)
+            let output: PDFGenerator.Output? = await PDFGenerator.runWorker {
+                try? PDFGenerator().generateOutput(
+                    imageURL: sampleJPG, result: result, model: LLMModel.appleVisionModels[0], outputURL: outPDF,
+                    pageKind: .handwritten, textLayer: PDFGenerator.TextLayerOptions(placeHandOnImage: true))
+            }
+            let aliveSeen = (try? String(contentsOf: seenAlive, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines)
+            check("11b PDFGenerator evicts resident MLX worker before launching HandPlacer",
+                  aliveSeen == "0" && s.residentModel == nil && output?.layer.route == .handBllaCtc,
+                  "aliveSeen=\(aliveSeen ?? "nil") resident=\(String(describing: s.residentModel)) route=\(String(describing: output?.layer.route))")
+        } catch {
+            check("11b PDFGenerator hand placement fixture", false, error.localizedDescription)
+        }
         return out
     }
 }

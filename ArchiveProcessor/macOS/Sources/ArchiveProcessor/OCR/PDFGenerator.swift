@@ -509,7 +509,12 @@ struct PDFGenerator {
         guard let cg = image.decoded(), cg.width > 0 else {
             return .failure(HandFailure(reason: "the image could not be decoded for the handwriting placer"))
         }
-        do { return .success(try HandPlacer.place(image: cg, reading: reading, isCancelled: { Task.isCancelled })) } catch {
+        do {
+            let placed = try LocalModelSupervisor.runExternalModelSync(named: "hand-placer", isCancelled: { Task.isCancelled }) { cancelled in
+                try HandPlacer.place(image: cg, reading: reading, isCancelled: cancelled)
+            }
+            return .success(placed)
+        } catch {
             return .failure(HandFailure(reason: "handwriting: \(error.localizedDescription)"))
         }
     }

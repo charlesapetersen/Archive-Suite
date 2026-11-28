@@ -1469,9 +1469,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a memory trace of one Live Capture hand page with both on (under the heavy lock), or a test
   that the supervisor's worker is resident when `HandPlacer.place` starts.
 - **Would clear it:** the placer waits for, or evicts, the supervisor's worker by some path not seen.
-- **Status:** `open` — verification queued as `W49.proc-s059-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s059-verify`, 2026-11-27).
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 2, memory).
+  - 2026-11-27 W49.proc-s059-verify (Gemini) — confirmed both `PDFGenerator.handPlacement` and `ReOCRLayer.make` invoked `HandPlacer.place` directly without coordinating with `LocalModelSupervisor`, allowing PyTorch placement (4.6–6.8 GB) to run beside a resident Live Capture MLX worker (~9 GB). Added `LocalModelSupervisor.withExternalModel` and off-main bridge `LocalModelSupervisor.runExternalModelSync` (waits for active reads/stages, unloads any resident MLX worker and drains its exit before running the external model, holds the supervisor turn until placement finishes, and propagates cancellation/quit), and routed both `PDFGenerator.handPlacement` and `ReOCRLayer.make` through it. Pinned in `LocalModelSupervisorContract` checks 11 and 11b (`scripts/test-local-models.sh` + `check-local-model-seam.sh` ALL PASS).
 
 ### S-060 · A resumed paid batch can take phone quality ratings left from an earlier Live hand-off
 

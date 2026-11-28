@@ -31,8 +31,8 @@ enum OutputFileSafety {
         let companion = pdf.appendingPathExtension("archivesuite.json")
         guard !FileManager.default.fileExists(atPath: companion.path),
               (try? FileManager.default.destinationOfSymbolicLink(atPath: companion.path)) == nil else { return false }
-        let state = OCRProcessor.pendingCatalogueURL.deletingLastPathComponent().standardizedFileURL.pathComponents
-        let path = pdf.standardizedFileURL.pathComponents
+        let state = OCRProcessor.pendingCatalogueURL.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        let path = pdf.standardizedFileURL.resolvingSymlinksInPath().pathComponents
         guard path.count > state.count + 1, path.starts(with: state, by: { $0.utf8.elementsEqual($1.utf8) }) else {
             return false
         }
