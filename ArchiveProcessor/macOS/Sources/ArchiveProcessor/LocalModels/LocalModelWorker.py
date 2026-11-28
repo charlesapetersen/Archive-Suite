@@ -36,7 +36,7 @@ def snapshot(local_only=False):
 
     return snapshot_download(
         MODEL, revision=REVISION, token=False, local_files_only=local_only,
-        allow_patterns=["*.json", "*.model", "*.safetensors"],
+        allow_patterns=["*.jinja", "*.json", "*.model", "*.safetensors", "*.txt"],
     )
 
 

@@ -93,8 +93,10 @@ enum LocalModelsTestDriver {
         for (name, ok, detail) in await ManagedLocalOCRContract.run() { check(name, ok, detail) }
         if let path = ProcessInfo.processInfo.environment["LOCALMODELS_SCRATCH_OCR_ROOT"] {
             let store = ProcessInfo.processInfo.environment["LOCALMODELS_SCRATCH_OCR_STORE"].map { URL(fileURLWithPath: $0) }
+            let rawModel = ProcessInfo.processInfo.environment["LOCALMODELS_SCRATCH_OCR_MODEL"]
+            let selectedModel = ManagedOCRModel.allCases.first { $0.rawValue == rawModel || $0.shortID == rawModel } ?? .qwen3VL8B
             for (name, ok, detail) in await ManagedLocalOCRContract.realInstallAndRead(
-                scratch: URL(fileURLWithPath: path, isDirectory: true), store: store) {
+                scratch: URL(fileURLWithPath: path, isDirectory: true), store: store, model: selectedModel) {
                 if name.hasPrefix("NOTE") { lines.append(name) } else { check(name, ok, detail) }
             }
         }

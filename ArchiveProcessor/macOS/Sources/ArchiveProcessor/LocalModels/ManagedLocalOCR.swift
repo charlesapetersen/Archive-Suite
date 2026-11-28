@@ -25,8 +25,9 @@ enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
     }
 
     /// Revisions as `ocr_mac_local.py` and `rotation_routes.py` read them; peaks the whole process's on the 18 GB M3
-    /// Pro (`ocr-mac-local*.md`); downloads the snapshot's size (Qwen3.5 9B's from the Vision OCR lab's record,
-    /// `ArchiveOCRBench/data/vision-ocr-handwriting.json`; Qwen3-VL 8B's measured on this Mac, 5.4 GiB).
+    /// Pro (`ocr-mac-local*.md`, 99 full pages; in-app 4-line scratch proofs peaked at 7.95 GB for Qwen3.5 9B and
+    /// 7.71 GB for Qwen3-VL 8B); downloads measured on this Mac (Qwen3.5 9B: 5.98 GB / 5.57 GiB, W49.proc-managed-ocr-9b-check;
+    /// Qwen3-VL 8B: 5.8 GB / 5.4 GiB).
     var model: LocalModelSupervisor.Model {
         switch self {
         case .qwen35_9B:

@@ -1229,23 +1229,15 @@ Settings › Accounts › Local models on this Mac downloads **Qwen3.5 9B** (rec
 MLX at the revisions the bench read, and the Reader menu then offers them under "This Mac". `LocalModelSupervisor`
 installs and runs them like the label reader, one model loaded at a time; the app's client for a model on this Mac
 reads through the worker's chat endpoint (`withEndpoint`), so the local route's cap, loop stop, second reading,
-reasoning switch and escalation setting all apply unchanged. Measured through the app on the 18 GB M3 Pro
-(`test-local-models.sh` with `LOCALMODELS_SCRATCH_OCR_ROOT`): a fresh install into an empty folder took 43 s (uv,
-Python 3.12.13 and mlx-vlm 0.7.4 from the network; Qwen3-VL 8B's weights checked against the pinned revision from a
-hard-linked copy of the bench's snapshot), and a rendered four-line letter came back whole in 27 s, model load
-included, at a 7.71 GB peak. Open:
-- **Qwen3.5 9B has not been downloaded or read through the app.** The proof used Qwen3-VL 8B because its weights were
-  already on this Mac and the disk had 14 GB free; Qwen3.5 9B's 6 GB size is the Vision OCR lab's record and its
-  9.1 GB peak the bench's, outside the app (Gemma's in-app peak was 1 GB above its bench figure). (queued:
-  W49.proc-managed-ocr-9b-check)
+reasoning switch and escalation setting all apply unchanged. Measured through the app on the 18 GB M3 Pro (`test-local-models.sh` with `LOCALMODELS_SCRATCH_OCR_ROOT`):
+- **Qwen3.5 9B** (`W49.proc-managed-ocr-9b-check`, 2026-11-27): fresh network install into an empty folder took 364 s (uv, Python 3.12.13, mlx-vlm 0.7.4, and 5.98 GB / 5.57 GiB of weights pinned at `8b2b98c00a6b4d291155e4890773ca8f769aee53`, after fixing `LocalModelWorker.py` `snapshot_download` `allow_patterns` to include `*.jinja` / `*.txt` so `chat_template.jinja` downloads), and the rendered four-line letter came back whole in 26 s, model load included, at a 7.95 GB peak (under the 10 GB ceiling; bench 99-page peak remains 9.1 GB).
+- **Qwen3-VL 8B** (`W49.proc-managed-local-ocr`, 2026-11-26): fresh install into an empty folder took 43 s (runtime from the network; weights checked against the pinned revision from a hard-linked copy of the bench's snapshot), and the rendered four-line letter came back whole in 27 s, model load included, at a 7.71 GB peak (bench 99-page peak 8.4 GB).
+
+Open:
 - **The Mac item-field call's publication date still needs an mlx-vlm server.** Its page-image half (kind, byline) goes to
   the app's own Qwen3-VL 8B when installed, as the page-image date search does (W49.proc-managed-mac-image-calls); its
   Qwen3.5 4B text half, the only source of the publication date, goes to 127.0.0.1:8080 only, so with only the app's own
   models a document gets no publication date. (queued: W49.proc-managed-item-fields-text)
-- **Live Capture labels with a managed page reader** go to the Gemma label reader, so the supervisor stops the page
-  model and loads Gemma for each label and back (about 9.5 s of switching a label, `segbench-results/ct-gemma-swap.md`);
-  never both in memory. Whether to keep that, read labels with Vision and the parser during such a session, or batch
-  them is decided (owner, 2026-11-26 walkthrough: batch labels to Finish). (queued: W49.proc-gemma-external-switch)
 
 ## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
 

@@ -278,7 +278,8 @@ enum ManagedLocalOCRContract {
     /// The physical-Mac proof, under the heavy lock: a fresh install into an empty scratch root (uv, Python and mlx-vlm
     /// from the network; the weights from a scratch store `test-local-models.sh` was handed, or the network), then a
     /// rendered scratch page read through the app's client. Each line of the page must come back. Never the corpus.
-    static func realInstallAndRead(scratch: URL, store: URL?) async -> [(String, Bool, String)] {
+    static func realInstallAndRead(scratch: URL, store: URL?,
+                                   model m: ManagedOCRModel = .qwen3VL8B) async -> [(String, Bool, String)] {
         var out: [(String, Bool, String)] = []
         func check(_ name: String, _ ok: Bool, _ detail: String = "") { out.append(("W49 " + name, ok, detail)) }
         let root = scratch.resolvingSymlinksInPath()
@@ -288,7 +289,6 @@ enum ManagedLocalOCRContract {
             check("managed OCR proof: an empty scratch root under /tmp", false, root.path)
             return out
         }
-        let m = ManagedOCRModel.qwen3VL8B
         if let store {
             // A store of hard links to the pinned snapshot's files (made by the caller), moved in: the proof needs no
             // second 5.8 GB on this disk, and the download step still checks every file against the pinned revision.
@@ -334,19 +334,31 @@ enum ManagedLocalOCRContract {
         LocalModelSupervisor.testOverride = s
         defer { LocalModelSupervisor.testOverride = nil }
         let readStarted = ContinuousClock.now
-        let result = try? await PageReaders.reader(provider: .openai, model: config.asLLMModel(), apiKey: config.apiKey,
-                                                   thinkingLevel: nil, gateway: config, newspaperLayout: false)
-            .read(PageReaderInput(imageURL: page))
+        let result: PageReading<OCRResult>?
+        let readError: String?
+        do {
+            result = try await PageReaders.reader(provider: .openai, model: config.asLLMModel(), apiKey: config.apiKey,
+                                                  thinkingLevel: nil, gateway: config, newspaperLayout: false)
+                .read(PageReaderInput(imageURL: page))
+            readError = nil
+        } catch {
+            result = nil
+            readError = "\(error)"
+        }
         let readSeconds = (ContinuousClock.now - readStarted).components.seconds
         let text = result?.text ?? ""
         let missing = lines.filter { !text.localizedCaseInsensitiveContains($0) }
+        let errDetail = [readError, result?.detail.errorCode, result?.detail.errorMessage].compactMap { $0 }.joined(separator: " / ")
         check("managed OCR proof: the scratch page reads through the app's page reader", !text.isEmpty && missing.isEmpty,
-              "\(readSeconds) s; missing \(missing); text \(text.prefix(300))")
+              "\(readSeconds) s; missing \(missing); err=\(errDetail); text \(text.prefix(300))")
         s.stopAll()
         try? await Task.sleep(for: .seconds(4))
         let gb = Double(s.lastPeakBytes) / 1_073_741_824
-        out.append((String(format: "NOTE managed OCR install %d s, first read %d s (model load included), peak %.2f GB",
-                           Int(installSeconds), Int(readSeconds), gb), true, ""))
+        let dlBytes = s.downloadedBytes(m.model)
+        let dlGB = Double(dlBytes) / 1_000_000_000
+        let dlGiB = Double(dlBytes) / 1_073_741_824
+        out.append((String(format: "NOTE managed OCR (%@) install %d s, download %.2f GB (%.2f GiB), first read %d s (model load included), peak %.2f GB",
+                           m.shortID, Int(installSeconds), dlGB, dlGiB, Int(readSeconds), gb), true, ""))
         check("managed OCR proof: the worker peaks under the 10 GB ceiling", s.lastPeakBytes > 0
               && gb < LocalModelSupervisor.memoryCeilingGB, String(format: "%.2f GB", gb))
         return out
