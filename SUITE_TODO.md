@@ -852,8 +852,6 @@ Owner, 2026-11-13: eight points on the Reader, filed as given. The first is a bu
 
 ### Archive Notes — holistic pre-user-testing review (owner, 2026-11-25)
 
-- [ ] **W49.notes-model-split — Split monolithic `NotesModel.swift` and `EditorTextView.swift` into focused files [S-M]** (lane: notes) (uses: build) (blocked-on: W46.nice-to-have) — Owner, 2026-11-25 pre-user-testing review (1.1 maintainability refactor, no behavior change). Split `NotesModel.swift` (2,249 lines) and `EditorTextView.swift` (1,634 lines) into domain-scoped extension/coordinator files; verify clean build and full unit suite.
-
 
 
 ## ArchiveCore, Shared Packages & Suite Infrastructure — holistic pre-user-testing review (owner, 2026-11-25)

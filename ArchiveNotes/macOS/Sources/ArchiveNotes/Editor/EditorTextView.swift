@@ -2,6 +2,12 @@ import AppKit
 
 /// NSTextView subclass enforcing TextKit 2. Never access `layoutManager` — it silently
 /// downgrades to TextKit 1 and disables NSTextAttachmentViewProvider (future chips).
+///
+/// Domain-scoped behaviors live in sibling extension files (W49.notes-model-split):
+/// - `EditorTextView+ChipAccessibility.swift`: chip accessibility children, cursor actions, context menu
+/// - `EditorTextView+ListKeyboard.swift`: Tab / Shift-Tab / Return / Backspace list & heading rules
+/// - `EditorTextView+PasteAndImages.swift`: copy/paste/drag routing, inline images, raw mode
+/// - `EditorTextView+UITestSeam.swift`: `#if DEBUG` UI-test seams and accessibility probes
 final class EditorTextView: NSTextView {
     // SwiftUI's Undo/Redo menu can query and invoke the manager directly, bypassing NSTextView's
     // validation. Keep one history for this editor, including across a cancelled selection load.
@@ -13,306 +19,143 @@ final class EditorTextView: NSTextView {
     /// It must not be a SwiftUI button/state value: changing SwiftUI state re-enters
     /// `MarkdownEditorView.updateNSView` and could itself perform the `passageGeneration` re-style the
     /// W21.vmgui-c-fu test is meant to prove.
-    private lazy var passageChipStateProbe = PassageChipStateProbe(textView: self)
+    lazy var passageChipStateProbe = PassageChipStateProbe(textView: self)
 
     // Reads installed views and existing fragments only: no layout request or SwiftUI state mutation.
-    private lazy var chipGeometryProbe = ChipGeometryProbe(textView: self)
+    lazy var chipGeometryProbe = ChipGeometryProbe(textView: self)
 
     /// The list markers the last draw put on screen, `text@offset` each (W40.fix-notes-editor-lines). XCUITest
     /// reads the accessibility tree, not pixels, and a marker is drawn, not text.
-    private lazy var listMarkerProbe = ListMarkerProbe(textView: self)
+    lazy var listMarkerProbe = ListMarkerProbe(textView: self)
 
-    func uiTestInstalledChipGeometry() -> String? {
-        var states: [[String: Any]] = []
-        func visit(_ view: NSView) {
-            if let chip = view as? BlockHeaderChipView, let id = chip.uiTestSourceNoteID {
-                var visible = chip.convert(chip.bounds, to: self).intersection(self.visibleRect)
-                var ancestor: NSView? = chip
-                var belongsToEditor = false
-                while let current = ancestor {
-                    if current === self { belongsToEditor = true }
-                    visible = visible.intersection(current.convert(current.visibleRect, to: self))
-                    ancestor = current.superview
-                }
-                let frame = chip.convert(chip.bounds, to: self)
-                states.append(["id": id, "width": chip.bounds.width, "height": chip.bounds.height,
-                               "y": Double(frame.minY), "visibleY": Double(self.visibleRect.minY),
-                               "visibleH": Double(self.visibleRect.height), "sel": self.selectedRange().location,
-                               "inEditor": belongsToEditor, "hidden": chip.isHiddenOrHasHiddenAncestor,
-                               "parent": chip.superview.map { String(describing: type(of: $0)) } ?? "",
-                               "visible": chip.window === self.window && !chip.isHiddenOrHasHiddenAncestor && !visible.isEmpty])
-            }
-            view.subviews.forEach(visit)
-        }
-        if let root = window?.contentView { visit(root) }
-        states += uiTestHeaderSlots()
-        states.append(["inlineImages": uiTestInlineImages()])
-        // The editor's visible rect, to check a header slot's `slotY` against (W40.notes-w7-gui-checks).
-        var visibleEntry: [String: Any] = ["editorVisibleY": Double(visibleRect.minY),
-                                           "editorVisibleH": Double(visibleRect.height)]
-        // What TextKit draws there: the paragraph at the top of the visible rect and the viewport's character
-        // range (W40.fix-notes-jump-scroll-short, where the header slots' y disagreed with the screenshots).
-        if let layout = textLayoutManager, let content = layout.textContentManager {
-            let origin = content.documentRange.location
-            if let top = layout.textLayoutFragment(for: CGPoint(x: 0, y: visibleRect.minY - textContainerOrigin.y)) {
-                visibleEntry["editorTopChar"] = content.offset(from: origin, to: top.rangeInElement.location)
-                visibleEntry["editorTopFragY"] = Double(top.layoutFragmentFrame.minY + textContainerOrigin.y)
-            }
-            if let bottom = layout.textLayoutFragment(for: CGPoint(x: 0, y: visibleRect.maxY - 1 - textContainerOrigin.y)) {
-                visibleEntry["editorBottomChar"] = content.offset(from: origin, to: bottom.rangeInElement.location)
-            }
-            if let viewport = layout.textViewportLayoutController.viewportRange {
-                visibleEntry["viewportStart"] = content.offset(from: origin, to: viewport.location)
-                visibleEntry["viewportEnd"] = content.offset(from: origin, to: viewport.endLocation)
-            }
-        }
-        visibleEntry["blockScroll"] = blockScrollTrace
-        states.append(visibleEntry)
-        states.append(["relayout": relayoutLastPass, "rebuilds": relayoutRebuilds, "strandedFixes": strandedChipFixes,
-                       "layoutPasses": layoutStrandedPasses])
-        guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]) else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
+    /// The last few `scrollBlockToTop` outcomes, for the chip-geometry probe.
+    var blockScrollTrace: [String] = []
 
-    /// One entry per inline image in the TEXT (W9.e2-paste): its `assets/…` path, whether it shows a
-    /// placeholder instead of loaded bytes, and how many of its pixels are dark once drawn into a bitmap.
-    /// The dark count is the pixel truth a UITest cannot get from the accessibility tree: a page thumbnail
-    /// that really drew has dark text on it, and both placeholders and a blank render have almost none.
-    private func uiTestInlineImages() -> [[String: Any]] {
-        guard let storage = textStorage else { return [] }
-        var images: [[String: Any]] = []
-        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
-            guard let inline = value as? InlineImageAttachment else { return }
-            images.append(["ref": inline.relativePath, "loc": range.location,
-                           "placeholder": inline.placeholder != nil,
-                           "width": Double(inline.bounds.width), "height": Double(inline.bounds.height),
-                           "darkPixels": inline.placeholder == nil ? inline.image.map(Self.uiTestDarkPixelCount) ?? 0 : 0])
-        }
-        return images
-    }
-
-    /// Pixels darker than mid-grey after drawing `image` at its display size over white, capped at 400 pt.
-    private static func uiTestDarkPixelCount(_ image: NSImage) -> Int {
-        let scale = min(1, 400 / max(image.size.width, image.size.height, 1))
-        let width = max(1, Int(image.size.width * scale)), height = max(1, Int(image.size.height * scale))
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8,
-            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-            bytesPerRow: 0, bitsPerPixel: 0
-        ), let context = NSGraphicsContext(bitmapImageRep: rep) else { return 0 }
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = context
-        NSColor.white.setFill()
-        NSRect(x: 0, y: 0, width: width, height: height).fill()
-        image.draw(in: NSRect(x: 0, y: 0, width: width, height: height))
-        NSGraphicsContext.restoreGraphicsState()
-        // Raw bytes, not `colorAt(x:y:)`: this runs inside an AX getter on the main thread, and a colour object
-        // per pixel made one 440×570 thumbnail cost tens of milliseconds per probe read.
-        guard let bytes = rep.bitmapData else { return 0 }
-        let stride = rep.bytesPerRow, channels = rep.samplesPerPixel
-        var dark = 0
-        for y in 0..<height {
-            let row = bytes + y * stride
-            for x in 0..<width {
-                let pixel = row + x * channels
-                if 299 * Int(pixel[0]) + 587 * Int(pixel[1]) + 114 * Int(pixel[2]) < 127_500 { dark += 1 }
-            }
-        }
-        return dark
-    }
-
-    /// One entry per passage header in the TEXT, whether or not a view exists (W35.vm-mem-fu1 diagnostics):
-    /// `sourceID` (deliberately not `id`, which callers read as "a chip view exists"), character offset,
-    /// whether a layout fragment exists, its y, its provider count and how many have an installed view.
-    /// Reads existing fragments; asks for no layout.
-    private func uiTestHeaderSlots() -> [[String: Any]] {
-        guard let storage = textStorage, let layout = textLayoutManager, let content = layout.textContentManager
-        else { return [] }
-        var slots: [[String: Any]] = []
-        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
-            guard let header = value as? BlockHeaderAttachment else { return }
-            var slot: [String: Any] = ["sourceID": header.sourceBox.anchor.notePassageTarget?.id.uuidString.lowercased() ?? "",
-                                       "loc": range.location]
-            if let location = content.location(content.documentRange.location, offsetBy: range.location),
-               let fragment = layout.textLayoutFragment(for: location) {
-                let providers = fragment.textAttachmentViewProviders
-                slot["fragY"] = Double(fragment.layoutFragmentFrame.minY + textContainerOrigin.y)
-                slot["slotY"] = Double(fragment.frameForTextAttachment(at: location).minY
-                                       + fragment.layoutFragmentFrame.minY + textContainerOrigin.y)
-                // W40.fix-notes-chip-inline-layout — a chip laid out beside the text before it starts right of
-                // the line start and is narrower than the rest.
-                let slotFrame = fragment.frameForTextAttachment(at: location)
-                slot["slotX"] = Double(slotFrame.minX + fragment.layoutFragmentFrame.minX + textContainerOrigin.x)
-                slot["slotW"] = Double(slotFrame.width)
-                slot["providers"] = providers.count
-                slot["installed"] = providers.filter { $0.view?.superview != nil }.count
-            }
-            slots.append(slot)
-        }
-        return slots
-    }
-
-    private func appendDebugProbes(to children: inout [Any]) {
-        // Xcode's contrast audit never finishes while these two 1×1 probes are in the tree, and every audit
-        // after it in that launch then times out too (W40.e3, measured in the VM 2026-10-16: a 15 s timeout
-        // with them, 1.2 s without). The accessibility audit has no use for them, so it launches without them.
-        if UserDefaults.standard.bool(forKey: "ANUITestNoHiddenProbes") { return }
-        children.append(passageChipStateProbe)
-        children.append(chipGeometryProbe)
-        children.append(listMarkerProbe)
-    }
+    /// How many edits asked for an attachment relayout. Unit tests have no window, so they cannot see a view
+    /// load; this is how they prove which edits ask for one.
+    private(set) var attachmentRelayoutRequests = 0
+    /// For the geometry probe: how many chip rebuilds ran, and the latest relayout pass's attempt number
+    /// and short paragraph offsets.
+    private(set) var relayoutRebuilds = 0
+    private(set) var strandedChipFixes = 0
+    private(set) var layoutStrandedPasses = 0
+    var relayoutLastPass: [String: Any] = [:]
 #endif
 
-    // MARK: - Source chips without the pointer (W49.notes-chip-access)
+    /// Detached chip view retained when a keyboard/menu action fires for a chip scrolled out of the viewport.
+    var detachedChipView: BlockHeaderChipView?
 
-    /// The text view's own accessibility children leave out the views TextKit hosts for attachments, so VoiceOver
-    /// and XCUITest never reached a chip's buttons. The chips in the viewport are added here, each a group whose
-    /// children are its buttons.
-    override func accessibilityChildren() -> [Any]? {
-        // A chip view this editor rehosted as its own subview (`installStrandedChipViews`) may already be among
-        // AppKit's children; VoiceOver would then read it twice, so the chips are listed once, here.
-        var children = (super.accessibilityChildren() ?? []).filter { child in
-            var view = child as? NSView
-            while let current = view, current !== self {
-                if current is BlockHeaderChipView { return false }
-                view = current.superview
+    /// Font size for formatting actions triggered from keyboard overrides (Tab/Return/Backspace).
+    var configuredFontSize: CGFloat = 14
+
+    // MARK: - Paste / Drag handlers (wired by coordinator; used in `EditorTextView+PasteAndImages`)
+
+    /// The asset store used for persisting pasted/dragged images.
+    /// Set by the coordinator when wiring the editor.
+    weak var assetStore: EditorAssetStore?
+
+    /// Handler for pasting archive-link payloads as source blocks.
+    /// Set by the coordinator; returns true if handled.
+    var sourceBlockPasteHandler: (([SourceBlockPaster.PasteEntry]) -> Bool)?
+
+    /// Handler for pasting `zotero://select/…` links as Zotero source blocks (W40.fix-notes-zotero-paste).
+    /// Set by the coordinator; returns true if handled.
+    var zoteroPasteHandler: (([ZoteroRef]) -> Bool)?
+
+    /// W7-S2: copy the selection as a `com.archivenotes.passage` payload (note editor only). Set by the
+    /// coordinator; returns true when it wrote a passage (so the default RTF/plain copy is skipped).
+    var passageCopyHandler: (() -> Bool)?
+
+    /// W7-S2: paste a `com.archivenotes.passage` payload as note-passage block(s) (extract editor only).
+    /// Set by the coordinator; returns true when it inserted the passage.
+    var passagePasteHandler: (() -> Bool)?
+    var plainPasteFallbackHandler: (() -> Void)?
+
+    /// Template bodies have no asset-copy route into newly instantiated notes. Refuse an image
+    /// before AppKit can insert an unsaved attachment that would disappear on the next reload.
+    var rejectImagePaste = false
+
+    // MARK: - TextKit 2 layout & relayout state
+
+    /// Relayout chains still to finish. Each pass invalidates the whole document, and the viewport then places
+    /// its fragments by estimate around the scroll offset, so a scroll measured before the chain ends is lost.
+    private var relayoutChains = 0
+    private var settleWaiters: [@MainActor () -> Void] = []
+    /// Chip views `installStrandedChipViews` hosts in the text view itself, until TextKit takes them back.
+    private let rehostedChipViews = NSHashTable<NSView>.weakObjects()
+    private var installChipViewsAtNextLayout = false
+    private var strandedCheckQueued = false
+    private var layoutStrandedFixesInARow = 0
+    private static let maxLayoutStrandedFixes = 4
+    private weak var observedClipView: NSClipView?
+    /// Suppresses `storageDidProcessEditing` attachment relayouts during full loads and `insertStyled`.
+    private var suppressAttachmentRelayout = false
+    /// Where `shouldChangeText` found a kept empty-line kind that the change in flight ends; cleared in `didChangeText`.
+    private var staleNextLineKind: Int?
+
+    // MARK: - Init & lifecycle
+
+    init() {
+        // Build the TextKit 2 stack explicitly so we guarantee TK2 in all contexts
+        // (including unit tests where the default init may fall back to TK1).
+        let contentStorage = NSTextContentStorage()
+        let layoutManager = NSTextLayoutManager()
+        contentStorage.addTextLayoutManager(layoutManager)
+        contentStorage.primaryTextLayoutManager = layoutManager
+        let container = NSTextContainer()
+        layoutManager.textContainer = container
+        super.init(frame: .zero, textContainer: container)
+        assert(textLayoutManager != nil, "EditorTextView must use TextKit 2")
+        commonInit()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("Not supported") }
+
+    private func commonInit() {
+        isRichText = true           // W3-S2: rich text for styled mode
+        isAutomaticQuoteSubstitutionEnabled = false
+        isAutomaticDashSubstitutionEnabled = false
+        isAutomaticTextReplacementEnabled = false
+        isAutomaticSpellingCorrectionEnabled = false
+        allowsUndo = true
+        usesFindBar = true
+        isIncrementalSearchingEnabled = true
+        isEditable = true
+        isSelectable = true
+        drawsBackground = true
+        backgroundColor = .textBackgroundColor
+        textColor = .textColor
+        isHorizontallyResizable = false
+        isVerticallyResizable = true
+        autoresizingMask = [.width]
+        textContainerInset = NSSize(width: 12, height: 12)
+        if let tc = textContainer {
+            tc.widthTracksTextView = true
+            tc.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        }
+        NotificationCenter.default.addObserver(self, selector: #selector(storageDidProcessEditing(_:)),
+                                               name: NSTextStorage.didProcessEditingNotification,
+                                               object: textStorage)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else { return }
+        if let clip = enclosingScrollView?.contentView, clip !== observedClipView {
+            if let old = observedClipView {
+                NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: old)
             }
-            return true
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(clipBoundsDidChange(_:)),
+                                                   name: NSView.boundsDidChangeNotification, object: clip)
+            observedClipView = clip
         }
-        var seen = Set<ObjectIdentifier>()
-        for chip in installedChipViews() where seen.insert(ObjectIdentifier(chip)).inserted {
-            chip.setAccessibilityParent(self)
-            children.append(chip)
-        }
-#if DEBUG
-        appendDebugProbes(to: &children)
-#endif
-        return children
+        installChipViewsAtNextLayout = true
+        relayoutViewportSoon()
     }
 
-    /// The chip views currently on screen in this editor, in text order.
-    private func installedChipViews() -> [BlockHeaderChipView] {
-        guard let layout = textLayoutManager,
-              let viewport = layout.textViewportLayoutController.viewportRange else { return [] }
-        var chips: [BlockHeaderChipView] = []
-        layout.enumerateTextLayoutFragments(from: viewport.location, options: []) { fragment in
-            guard fragment.rangeInElement.location.compare(viewport.endLocation) == .orderedAscending else { return false }
-            for provider in fragment.textAttachmentViewProviders where provider.textAttachment is BlockHeaderAttachment {
-                if let chip = provider.view as? BlockHeaderChipView, chip.window === window, chip.superview != nil {
-                    chips.append(chip)
-                }
-            }
-            return true
-        }
-        return chips
-    }
-
-    /// The chip whose block holds `location`: the chip at it (the caret just before the chip), else the nearest
-    /// one before it, unless a block boundary — the separator the Styler puts between blocks, or the newline that
-    /// ends a block's text before the next chip — lies between them. Text with no chip above it has none.
-    static func chipAttachment(at location: Int, in text: NSAttributedString) -> (attachment: BlockHeaderAttachment, location: Int)? {
-        guard text.length > 0 else { return nil }
-        let start = min(max(location, 0), text.length - 1)
-        if let chip = text.attribute(.attachment, at: start, effectiveRange: nil) as? BlockHeaderAttachment {
-            return (chip, start)
-        }
-        var found: (BlockHeaderAttachment, Int)?
-        text.enumerateAttributes(in: NSRange(location: 0, length: start), options: .reverse) { attributes, range, stop in
-            if let chip = attributes[.attachment] as? BlockHeaderAttachment {
-                found = (chip, range.location)
-                stop.pointee = true
-            } else if attributes[.noteBlockSeparator] as? Bool == true || attributes[.noteChipLineEnd] as? Bool == true {
-                stop.pointee = true
-            }
-        }
-        return found.map { (attachment: $0.0, location: $0.1) }
-    }
-
-    /// The chip whose block holds the caret (the start of the selection).
-    func chipAtCursor() -> (attachment: BlockHeaderAttachment, location: Int)? {
-        guard let storage = textStorage else { return nil }
-        return Self.chipAttachment(at: selectedRange().location, in: storage)
-    }
-
-    /// Runs `action` on the chip under the caret; false (and a beep from the caller) when there is none, or it
-    /// does not offer that action.
-    @discardableResult
-    func performChipActionAtCursor(_ action: BlockHeaderChipAction) -> Bool {
-        guard let (attachment, location) = chipAtCursor() else { return false }
-        return performChipAction(action, on: attachment, at: location)
-    }
-
-    @discardableResult
-    private func performChipAction(_ action: BlockHeaderChipAction, on attachment: BlockHeaderAttachment,
-                                   at location: Int) -> Bool {
-        guard BlockHeaderChipAction.available(for: attachment.sourceBox).contains(action) else { return false }
-        if let chip = installedChipView(for: attachment, at: location) {
-            chip.perform(action)
-            return true
-        }
-        // Scrolled out of the viewport: a detached chip view with the same callbacks does the work, and is kept
-        // until the next one so an action that finishes later (Add to Zotero) can still report.
-        let detached = BlockHeaderChipView(attachment: attachment)
-        detachedChipView = detached
-        detached.perform(action, presenter: enclosingScrollView ?? self)
-        return true
-    }
-
-    private var detachedChipView: BlockHeaderChipView?
-
-    private func installedChipView(for attachment: BlockHeaderAttachment, at location: Int) -> BlockHeaderChipView? {
-        guard let layout = textLayoutManager, let content = layout.textContentManager,
-              let textLocation = content.location(content.documentRange.location, offsetBy: location),
-              let fragment = layout.textLayoutFragment(for: textLocation) else { return nil }
-        return fragment.textAttachmentViewProviders
-            .first { $0.textAttachment === attachment }
-            .flatMap { $0.view as? BlockHeaderChipView }
-            .flatMap { $0.window === window && $0.superview != nil ? $0 : nil }
-    }
-
-    /// The editor's context menu leads with the actions of the chip clicked on, or for a menu opened without the
-    /// pointer (VoiceOver), of the chip under the caret.
-    override func menu(for event: NSEvent) -> NSMenu? {
-        // Read before super, which moves the selection to the event's location — for a menu opened without the
-        // pointer, wherever that happens to be.
-        let isMouse = [.rightMouseDown, .leftMouseDown, .otherMouseDown].contains(event.type)
-        let location = isMouse
-            ? characterIndexForInsertion(at: convert(event.locationInWindow, from: nil))
-            : selectedRange().location
-        let base = super.menu(for: event)
-        guard let storage = textStorage,
-              let (attachment, chipLocation) = Self.chipAttachment(at: location, in: storage) else { return base }
-        let actions = BlockHeaderChipAction.available(for: attachment.sourceBox)
-        guard !actions.isEmpty else { return base }
-        // A copy: NSTextView hands out one shared default menu, and chip items left in it would show on every
-        // later menu, chip or not.
-        let menu = (base?.copy() as? NSMenu) ?? NSMenu()
-        if menu.numberOfItems > 0 { menu.insertItem(.separator(), at: 0) }
-        for action in actions.reversed() {
-            let item = NSMenuItem(title: action.menuTitle, action: #selector(chipMenuItemChosen(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = action.rawValue
-            item.representedObject = ChipMenuTarget(attachment: attachment, location: chipLocation)
-            menu.insertItem(item, at: 0)
-        }
-        return menu
-    }
-
-    private final class ChipMenuTarget: NSObject {
-        weak var attachment: BlockHeaderAttachment?
-        let location: Int
-        init(attachment: BlockHeaderAttachment, location: Int) {
-            self.attachment = attachment
-            self.location = location
-        }
-    }
-
-    @objc private func chipMenuItemChosen(_ sender: NSMenuItem) {
-        guard let action = BlockHeaderChipAction(rawValue: sender.tag),
-              let target = sender.representedObject as? ChipMenuTarget,
-              let attachment = target.attachment else { return }
-        performChipAction(action, on: attachment, at: target.location)
-    }
+    // MARK: - Document load, scroll & TextKit 2 chip view hosting
 
     /// Notify the TextKit 2 content manager when replacing the styled document.
     func replaceStyledDocument(with attributed: NSAttributedString) {
@@ -401,10 +244,6 @@ final class EditorTextView: NSTextView {
         blockScrollTrace = Array((blockScrollTrace + [outcome]).suffix(4))
 #endif
     }
-#if DEBUG
-    /// The last few `scrollBlockToTop` outcomes, for the chip-geometry probe.
-    private var blockScrollTrace: [String] = []
-#endif
 
     func performContentEditingTransaction(_ edit: () -> Void) {
         if let manager = textLayoutManager?.textContentManager {
@@ -439,42 +278,6 @@ final class EditorTextView: NSTextView {
             guard let self else { return }
             self.scrollRangeToVisible(self.selectedRange())
         }
-    }
-
-    /// Font size for formatting actions triggered from keyboard overrides (Tab/Return/Backspace).
-    var configuredFontSize: CGFloat = 14
-
-    init() {
-        // Build the TextKit 2 stack explicitly so we guarantee TK2 in all contexts
-        // (including unit tests where the default init may fall back to TK1).
-        let contentStorage = NSTextContentStorage()
-        let layoutManager = NSTextLayoutManager()
-        contentStorage.addTextLayoutManager(layoutManager)
-        contentStorage.primaryTextLayoutManager = layoutManager
-        let container = NSTextContainer()
-        layoutManager.textContainer = container
-        super.init(frame: .zero, textContainer: container)
-        assert(textLayoutManager != nil, "EditorTextView must use TextKit 2")
-        commonInit()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("Not supported") }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        guard window != nil else { return }
-        if let clip = enclosingScrollView?.contentView, clip !== observedClipView {
-            if let old = observedClipView {
-                NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: old)
-            }
-            clip.postsBoundsChangedNotifications = true
-            NotificationCenter.default.addObserver(self, selector: #selector(clipBoundsDidChange(_:)),
-                                                   name: NSView.boundsDidChangeNotification, object: clip)
-            observedClipView = clip
-        }
-        installChipViewsAtNextLayout = true
-        relayoutViewportSoon()
     }
 
     /// Re-lay the viewport on the next main-queue turn. TextKit 2 installs attachment views (chips, inline
@@ -518,11 +321,6 @@ final class EditorTextView: NSTextView {
             then?()
         }
     }
-
-    /// Relayout chains still to finish. Each pass invalidates the whole document, and the viewport then places
-    /// its fragments by estimate around the scroll offset, so a scroll measured before the chain ends is lost.
-    private var relayoutChains = 0
-    private var settleWaiters: [@MainActor () -> Void] = []
 
     /// Run `body` once no relayout chain is pending: at the end of the last one, or on the next turn.
     func whenLayoutSettles(_ body: @escaping @MainActor () -> Void) {
@@ -618,9 +416,6 @@ final class EditorTextView: NSTextView {
         return changed
     }
 
-    /// Chip views `installStrandedChipViews` hosts in the text view itself, until TextKit takes them back.
-    private let rehostedChipViews = NSHashTable<NSView>.weakObjects()
-
     private func removeRehostedChipViews() {
         for view in rehostedChipViews.allObjects where view.superview === self { view.removeFromSuperview() }
         rehostedChipViews.removeAllObjects()
@@ -651,7 +446,6 @@ final class EditorTextView: NSTextView {
         }
         scheduleStrandedCheck(fromLayout: true)
     }
-    private var installChipViewsAtNextLayout = false
 
     /// TextKit 2 makes a fragment's attachment view providers when it first draws the fragment, so a chip's view
     /// can exist only after a frame that showed its paragraph without it. Drawing each viewport fragment that holds
@@ -696,10 +490,6 @@ final class EditorTextView: NSTextView {
             self.layoutStrandedFixesInARow = changed ? self.layoutStrandedFixesInARow + 1 : 0
         }
     }
-    private var strandedCheckQueued = false
-    private var layoutStrandedFixesInARow = 0
-    private static let maxLayoutStrandedFixes = 4
-    private weak var observedClipView: NSClipView?
 
     /// The character ranges of viewport layout fragments holding more chips (`BlockHeaderAttachment`, the
     /// only view-backed attachment) than installed chip views. Counting the text, not the providers, is the
@@ -732,8 +522,6 @@ final class EditorTextView: NSTextView {
     /// unit bundle, undo restores the chip WITHOUT calling `didChangeText`. A keystroke in a paragraph with
     /// no attachment does not qualify; one in a paragraph that shares a line with an attachment can, since
     /// the storage widens the edited range to the paragraph (measured). Attribute-only changes are skipped.
-    private var suppressAttachmentRelayout = false
-
     @objc private func storageDidProcessEditing(_ note: Notification) {
         layoutStrandedFixesInARow = 0   // an edit, or a document replace, earns layout passes again
         invalidateListMarkers()
@@ -763,44 +551,7 @@ final class EditorTextView: NSTextView {
         }
     }
 
-#if DEBUG
-    /// How many edits asked for an attachment relayout. Unit tests have no window, so they cannot see a view
-    /// load; this is how they prove which edits ask for one.
-    private(set) var attachmentRelayoutRequests = 0
-    /// For the geometry probe: how many chip rebuilds ran, and the latest relayout pass's attempt number
-    /// and short paragraph offsets.
-    private(set) var relayoutRebuilds = 0
-    private(set) var strandedChipFixes = 0
-    private(set) var layoutStrandedPasses = 0
-    private var relayoutLastPass: [String: Any] = [:]
-#endif
-
-    private func commonInit() {
-        isRichText = true           // W3-S2: rich text for styled mode
-        isAutomaticQuoteSubstitutionEnabled = false
-        isAutomaticDashSubstitutionEnabled = false
-        isAutomaticTextReplacementEnabled = false
-        isAutomaticSpellingCorrectionEnabled = false
-        allowsUndo = true
-        usesFindBar = true
-        isIncrementalSearchingEnabled = true
-        isEditable = true
-        isSelectable = true
-        drawsBackground = true
-        backgroundColor = .textBackgroundColor
-        textColor = .textColor
-        isHorizontallyResizable = false
-        isVerticallyResizable = true
-        autoresizingMask = [.width]
-        textContainerInset = NSSize(width: 12, height: 12)
-        if let tc = textContainer {
-            tc.widthTracksTextView = true
-            tc.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
-        }
-        NotificationCenter.default.addObserver(self, selector: #selector(storageDidProcessEditing(_:)),
-                                               name: NSTextStorage.didProcessEditingNotification,
-                                               object: textStorage)
-    }
+    // MARK: - Typing attributes & list markers (W40.fix-notes-editor-lines)
 
     /// `.noteBlockSource` and `.noteImageRelPath` describe ONE attachment character each — they are
     /// IDENTITIES, not styling, and must never continue as the operator types (`MarkdownBridge.swift`
@@ -850,8 +601,6 @@ final class EditorTextView: NSTextView {
             invalidateListMarkers()   // an empty last line's marker follows the typing kind
         }
     }
-
-    // MARK: - List markers (W40.fix-notes-editor-lines)
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -963,9 +712,6 @@ final class EditorTextView: NSTextView {
         return true
     }
 
-    /// Where `shouldChangeText` found a kept empty-line kind that the change in flight ends; cleared in `didChangeText`.
-    private var staleNextLineKind: Int?
-
     override func didChangeText() {
         if let location = staleNextLineKind, let storage = textStorage, location < storage.length {
             staleNextLineKind = nil
@@ -973,636 +719,7 @@ final class EditorTextView: NSTextView {
         }
         super.didChangeText()
     }
-
-    // MARK: - List keyboard behavior (Tab / Return / Backspace)
-
-    override func insertTab(_ sender: Any?) {
-        guard isEditable else { return }
-        guard let storage = textStorage,
-              case .listItem? = EditorFormatting.blockKind(
-                at: (storage.string as NSString).paragraphRange(for: selectedRange()), in: self) else {
-            super.insertTab(sender)
-            return
-        }
-        EditorFormatting.indentList(self, fontSize: configuredFontSize)
-    }
-
-    override func insertBacktab(_ sender: Any?) {
-        guard isEditable else { return }
-        guard let storage = textStorage,
-              case .listItem? = EditorFormatting.blockKind(
-                at: (storage.string as NSString).paragraphRange(for: selectedRange()), in: self) else {
-            super.insertBacktab(sender)
-            return
-        }
-        EditorFormatting.outdentList(self, fontSize: configuredFontSize)
-    }
-
-    override func insertNewline(_ sender: Any?) {
-        guard isEditable else { return }
-        guard let storage = textStorage, storage.length > 0 else {
-            super.insertNewline(sender)
-            return
-        }
-        let sel = selectedRange()
-        guard sel.location <= storage.length else {
-            super.insertNewline(sender)
-            return
-        }
-        let paraRange = (string as NSString).paragraphRange(for: sel)
-        let kind = EditorFormatting.blockKind(at: paraRange, in: self)
-        if case .heading? = kind {
-            // A Return at the end of a heading starts a line of text, as in any editor; one inside it splits it.
-            let text = string as NSString
-            var contentEnd = NSMaxRange(paraRange)
-            while contentEnd > paraRange.location, [0x0A, 0x0D].contains(text.character(at: contentEnd - 1)) { contentEnd -= 1 }
-            let atEnd = sel.length == 0 && sel.location >= contentEnd
-            let atStart = sel.length == 0 && sel.location == paraRange.location && contentEnd > paraRange.location
-            super.insertNewline(sender)
-            if atEnd { EditorFormatting.setPlain(self, fontSize: configuredFontSize) }
-            // At its start, the empty line left above the heading is text, not an empty heading (`# `).
-            if atStart {
-                EditorFormatting.restyleParagraph(self, at: paraRange.location, kind: .plain, fontSize: configuredFontSize)
-            }
-            return
-        }
-        guard case .listItem(let ordered, let depth, let ordinal)? = kind else {
-            super.insertNewline(sender)
-            return
-        }
-
-        // If the current list item is empty, outdent / remove list
-        let paraText = (string as NSString).substring(with: paraRange)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if paraText.isEmpty {
-            EditorFormatting.outdentList(self, fontSize: configuredFontSize)
-            return
-        }
-
-        // Insert newline and apply list item kind to the new paragraph
-        super.insertNewline(sender)
-        let newSel = selectedRange()
-        guard newSel.location <= (string as NSString).length else { return }
-        let newParaRange = (string as NSString).paragraphRange(for: newSel)
-        let newOrdinal = ordered ? ordinal + 1 : 1
-        let newKind = BlockKind.listItem(ordered: ordered, depth: depth, ordinal: newOrdinal)
-
-        EditorFormatting.changeAttributes(self, in: newParaRange) { storage in
-            storage.addAttribute(.noteBlockKind, value: newKind, range: newParaRange)
-            storage.addAttribute(.paragraphStyle, value: MarkdownStyler.listParagraphStyle(depth: depth),
-                                 range: newParaRange)
-        }
-        // A new empty item at the end is kept as one, as an empty item in the middle is (W49.notes-keep-blank-lines).
-        EditorFormatting.keepEmptyLastLineKind(self, kind: newKind)
-    }
-
-    override func deleteBackward(_ sender: Any?) {
-        guard isEditable else { return }
-        guard let storage = textStorage, storage.length > 0 else {
-            super.deleteBackward(sender)
-            return
-        }
-        let sel = selectedRange()
-        // Only intercept at paragraph start with no selection
-        guard sel.length == 0, sel.location > 0 else {
-            super.deleteBackward(sender)
-            return
-        }
-        let paraRange = (string as NSString).paragraphRange(for: sel)
-        guard sel.location == paraRange.location else {
-            super.deleteBackward(sender)
-            return
-        }
-        guard let kind = EditorFormatting.blockKind(at: paraRange, in: self) else {
-            super.deleteBackward(sender)
-            return
-        }
-        switch kind {
-        case .listItem:
-            EditorFormatting.outdentList(self, fontSize: configuredFontSize)
-        case .blockquote, .heading:
-            EditorFormatting.setPlain(self, fontSize: configuredFontSize)
-        default:
-            // Joining this line to the one above: the joined line takes that line's kind, as it now shows. Left
-            // as it was, text joined to a heading or a list item kept its own kind and was written as a block of
-            // its own, so the line break came back on the next reselect (W40.fix-notes-editor-lines).
-            let above = EditorFormatting.blockKind(
-                at: (string as NSString).paragraphRange(for: NSRange(location: sel.location - 1, length: 0)), in: self)
-            super.deleteBackward(sender)
-            let joined = selectedRange()
-            // Only a real join: with an empty line above (a blank line deleted), the line keeps its own kind.
-            guard let above, above != kind, joined.length == 0, joined.location == sel.location - 1,
-                  joined.location < storage.length,
-                  (string as NSString).paragraphRange(for: joined).location < joined.location else { return }
-            EditorFormatting.restyleParagraph(self, at: joined.location, kind: above, fontSize: configuredFontSize)
-        }
-    }
-
-    // MARK: - Paste / Drag (inline images + text)
-
-    /// The asset store used for persisting pasted/dragged images.
-    /// Set by the coordinator when wiring the editor.
-    weak var assetStore: EditorAssetStore?
-
-    /// Handler for pasting archive-link payloads as source blocks.
-    /// Set by the coordinator; returns true if handled.
-    var sourceBlockPasteHandler: (([SourceBlockPaster.PasteEntry]) -> Bool)?
-
-    /// Handler for pasting `zotero://select/…` links as Zotero source blocks (W40.fix-notes-zotero-paste).
-    /// Set by the coordinator; returns true if handled.
-    var zoteroPasteHandler: (([ZoteroRef]) -> Bool)?
-
-    /// W7-S2: copy the selection as a `com.archivenotes.passage` payload (note editor only). Set by the
-    /// coordinator; returns true when it wrote a passage (so the default RTF/plain copy is skipped).
-    var passageCopyHandler: (() -> Bool)?
-
-    /// W7-S2: paste a `com.archivenotes.passage` payload as note-passage block(s) (extract editor only).
-    /// Set by the coordinator; returns true when it inserted the passage.
-    var passagePasteHandler: (() -> Bool)?
-    var plainPasteFallbackHandler: (() -> Void)?
-
-    /// Image UTIs we accept on the pasteboard.
-    private static let imageTypes: Set<NSPasteboard.PasteboardType> = [
-        .png, .tiff,
-        NSPasteboard.PasteboardType("public.jpeg"),
-        NSPasteboard.PasteboardType("public.heic")
-    ]
-
-    override func copy(_ sender: Any?) {
-        // W7-S2: a note selection copies as a com.archivenotes.passage payload (+ RTF + plain); an
-        // extract paste then restores full provenance. Anything else uses the default RTF/plain copy.
-        if passageCopyHandler?() == true { return }
-        super.copy(sender)
-    }
-
-    /// Template bodies have no asset-copy route into newly instantiated notes. Refuse an image
-    /// before AppKit can insert an unsaved attachment that would disappear on the next reload.
-    var rejectImagePaste = false
-
-    private func isUnsupportedImage(_ pb: NSPasteboard) -> Bool {
-        guard rejectImagePaste else { return false }
-        if let types = pb.types, !Self.imageTypes.isDisjoint(with: types) { return true }
-        if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL],
-           let url = urls.first, Self.isImageURL(url) { return true }
-        return false
-    }
-
-    override func paste(_ sender: Any?) {
-        guard isEditable else { return }
-        let pb = NSPasteboard.general
-        if isUnsupportedImage(pb) { NSSound.beep(); return }
-        if tryPasteImage(from: pb) { return }
-        // W7-S2: in an extract editor, a passage payload pastes as note-passage block(s) (provenance
-        // preserved). The handler declines outside an extract editor / without a passage payload.
-        if tryPastePassage(from: pb) { return }
-        if tryPasteSourceBlocks(from: pb) { return }
-        if tryPasteZoteroLinks(from: pb) { return }
-        // For text: prefer plain string to avoid importing unmodeled rich styling
-        if let str = pb.string(forType: .string), !str.isEmpty {
-            insertPlainText(str)
-            if PassagePasteboard.hasPassage(pb) || !SourceBlockPaster.readPasteboard(from: pb).isEmpty
-                || !ZoteroClipboardDetect.pastedLinks(in: str).isEmpty {
-                plainPasteFallbackHandler?()
-            }
-            return
-        }
-        // Template mode has no asset destination. An attachment-only RTFD or other rich
-        // payload must never reach AppKit's fallback: it could appear in the editor and vanish
-        // on Markdown serialization. Text was already handled above.
-        if rejectImagePaste { NSSound.beep(); return }
-        super.paste(sender)
-    }
-
-    /// Delegate a passage-payload paste to the coordinator (extract editor only). No-op when the
-    /// pasteboard carries no `com.archivenotes.passage` representation.
-    @discardableResult
-    private func tryPastePassage(from pb: NSPasteboard) -> Bool {
-        guard PassagePasteboard.hasPassage(pb), let handler = passagePasteHandler else { return false }
-        return handler()
-    }
-
-    /// Check the pasteboard for archive-link payloads and delegate to the source-block handler.
-    @discardableResult
-    private func tryPasteSourceBlocks(from pb: NSPasteboard) -> Bool {
-        guard let handler = sourceBlockPasteHandler else { return false }
-        let entries = SourceBlockPaster.readPasteboard(from: pb)
-        guard !entries.isEmpty else { return false }
-        return handler(entries)
-    }
-
-    /// A paste made only of Zotero links becomes Zotero source blocks, as Note ▸ Attach Zotero Link… makes.
-    @discardableResult
-    private func tryPasteZoteroLinks(from pb: NSPasteboard) -> Bool {
-        guard let handler = zoteroPasteHandler, let text = pb.string(forType: .string) else { return false }
-        let refs = ZoteroClipboardDetect.pastedLinks(in: text)
-        guard !refs.isEmpty else { return false }
-        return handler(refs)
-    }
-
-    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
-        guard isEditable else { return false }
-        let pb = sender.draggingPasteboard
-        if rejectImagePaste {
-            if isUnsupportedImage(pb) { return false }
-            guard let text = pb.string(forType: .string), !text.isEmpty else { return false }
-            insertPlainText(text)
-            return true
-        }
-        if tryPasteImage(from: pb) { return true }
-        return super.performDragOperation(sender)
-    }
-
-    /// Save a pasted or dropped image through assetStore and insert its reference.
-    /// Raw mode inserts Markdown source. Styled mode inserts an inline attachment.
-    @discardableResult
-    private func tryPasteImage(from pb: NSPasteboard) -> Bool {
-        // Refuse before reserving a filename or writing bytes, including the direct UITest seam.
-        guard isEditable, let store = assetStore else { return false }
-
-        // Try reading image data from the pasteboard
-        let imageData: Data?
-        if let data = pb.data(forType: .png) {
-            imageData = data
-        } else if let data = pb.data(forType: .tiff) {
-            // Convert TIFF to PNG for storage
-            imageData = Self.tiffToPNG(data)
-        } else if let urls = pb.readObjects(forClasses: [NSURL.self]) as? [URL],
-                  let url = urls.first,
-                  Self.isImageURL(url),
-                  let data = try? Data(contentsOf: url) {
-            imageData = Self.ensurePNG(data)
-        } else {
-            imageData = nil
-        }
-
-        guard let data = imageData else { return false }
-
-        let preferredName = Self.pastedImageName()
-
-        do {
-            let relPath = try store.addAsset(data, preferredName: preferredName)
-            if !isRichText {
-                insertPlainText(InlineImageMarkdown.emit(alt: "", path: relPath))
-                return true
-            }
-            let thumbnail = InlineImageAttachment.downsampledThumbnail(from: data)
-            let attachment = InlineImageAttachment(
-                relativePath: relPath, altText: "", thumbnail: thumbnail
-            )
-            let attachStr = NSMutableAttributedString(attachment: attachment)
-            attachStr.addAttribute(.noteImageRelPath, value: relPath,
-                                   range: NSRange(location: 0, length: attachStr.length))
-            // Stamp block kind from the current paragraph
-            if let storage = textStorage, storage.length > 0 {
-                let loc = min(selectedRange().location, storage.length - 1)
-                if let kind = storage.attribute(.noteBlockKind, at: loc,
-                                                effectiveRange: nil) {
-                    attachStr.addAttribute(.noteBlockKind, value: kind,
-                                           range: NSRange(location: 0, length: attachStr.length))
-                }
-            }
-
-            undoManager?.beginUndoGrouping()
-            insertText(attachStr, replacementRange: selectedRange())
-            undoManager?.endUndoGrouping()
-            return true
-        } catch {
-            return false
-        }
-    }
-
-    /// Threshold (in characters) above which a styled paste uses deferred Markdown conversion.
-    static let largePasteThreshold = 10_000
-
-    /// Insert plain text at the caret, stripping any rich formatting.
-    /// For large pastes in styled mode, schedules Markdown conversion after the paste callback.
-    /// The conversion still runs on the main actor and may pause the UI for a very large paste.
-    func insertPlainText(_ text: String) {
-        guard isEditable else { return }
-        if isRichText, text.count > Self.largePasteThreshold {
-            insertLargeTextAsync(text)
-            return
-        }
-        let font: NSFont = isRichText
-            ? .systemFont(ofSize: configuredFontSize)
-            : .monospacedSystemFont(ofSize: configuredFontSize, weight: .regular)
-        var attrs: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: NSColor.textColor
-        ]
-        if isRichText {
-            attrs[.noteBlockKind] = BlockKind.plain
-        }
-        let str = NSAttributedString(string: text, attributes: attrs)
-        undoManager?.beginUndoGrouping()
-        insertText(str, replacementRange: selectedRange())
-        undoManager?.endUndoGrouping()
-    }
-
-    /// Defer a large paste's parse and insertion to a later main-actor turn.
-    private func insertLargeTextAsync(_ text: String) {
-        let fontSize = configuredFontSize
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            let parsed = MarkdownBridge.parse(markdown: text, fontSize: fontSize)
-            self.undoManager?.beginUndoGrouping()
-            // Read the selection now, not before the hop: an edit in between would make it stale.
-            self.insertStyled(parsed, replacementRange: self.selectedRange())
-            self.undoManager?.endUndoGrouping()
-        }
-    }
-
-    // MARK: - Image helpers
-
-    private static func isImageURL(_ url: URL) -> Bool {
-        let ext = url.pathExtension.lowercased()
-        return ["png", "jpg", "jpeg", "tiff", "tif", "heic", "heif", "bmp", "gif"].contains(ext)
-    }
-
-    private static func tiffToPNG(_ tiffData: Data) -> Data? {
-        guard let rep = NSBitmapImageRep(data: tiffData) else { return nil }
-        return rep.representation(using: .png, properties: [:])
-    }
-
-    private static func ensurePNG(_ data: Data) -> Data? {
-        // If already PNG (header bytes), return as-is
-        if data.count >= 8, data.prefix(4) == Data([0x89, 0x50, 0x4E, 0x47]) {
-            return data
-        }
-        // Otherwise try to convert via NSBitmapImageRep
-        guard let rep = NSBitmapImageRep(data: data) else { return nil }
-        return rep.representation(using: .png, properties: [:])
-    }
-
-    /// `pasted-<yyyyMMdd-HHmmss-SSS>-<4 hex>.png` (W49.notes-paste-name). Each window's `ItemAssetStore`
-    /// keeps its own reserved names, so two windows on one note pasting in the same second used to pick
-    /// the same name, and the second write was refused (a Missing placeholder). The milliseconds and the
-    /// random part make that clash vanishingly unlikely; the per-store `-N` disambiguator still covers
-    /// same-window repeats. Only `[A-Za-z0-9-]`, so the Markdown destination stays bare.
-    static func pastedImageName(at date: Date = Date(),
-                                random: UInt16 = UInt16.random(in: .min ... .max)) -> String {
-        let df = DateFormatter()
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.dateFormat = "yyyyMMdd-HHmmss-SSS"
-        return "pasted-\(df.string(from: date))-\(String(format: "%04x", random)).png"
-    }
-
-    // MARK: - Raw mode
-
-    /// Toggle between styled mode and raw monospaced mode.
-    func applyRawMode(_ isRaw: Bool, fontSize: CGFloat) {
-        if isRaw {
-            isRichText = false
-            let font: NSFont = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-            self.font = font
-            typingAttributes = [.font: font, .foregroundColor: NSColor.textColor]
-        } else {
-            isRichText = true
-            let font: NSFont = .systemFont(ofSize: fontSize)
-            typingAttributes = [
-                .font: font,
-                .foregroundColor: NSColor.textColor,
-                .noteBlockKind: BlockKind.plain
-            ]
-        }
-    }
-
-    // MARK: - DEBUG test seam (W8-S7 §3.3)
-
-#if DEBUG
-    // Driving this TextKit-2 styled NSTextView through XCUITest is a documented weak spot — focusing the
-    // field editor and typing styled text is flaky. These DEBUG-only hooks let a UITest commit text and
-    // set a selection deterministically WITHOUT relying on field-editor focus. They go through the
-    // sanctioned `shouldChangeText`/`didChangeText` editing path so the delegate's `textDidChange` (→
-    // debounced write-back to the bound `.md`) fires exactly as for a keystroke, and work regardless of
-    // first-responder state. Compiled out of Release; the coordinator parses Markdown into the attributed
-    // string it hands here (so styling + serialize-back match the real load path).
-
-    /// Replace the entire document with `attributed` via the standard editing path (registers undo,
-    /// notifies the delegate).
-    func uiTestReplace(with attributed: NSAttributedString) {
-        let full = NSRange(location: 0, length: (string as NSString).length)
-        guard shouldChangeText(in: full, replacementString: attributed.string) else { return }
-        textStorage?.replaceCharacters(in: full, with: attributed)
-        didChangeText()
-    }
-
-    /// Insert `attributed` over the current selection (grouped for undo) and leave the caret after it.
-    func uiTestInsert(_ attributed: NSAttributedString) {
-        let range = selectedRange()
-        guard shouldChangeText(in: range, replacementString: attributed.string) else { return }
-        undoManager?.beginUndoGrouping()
-        textStorage?.replaceCharacters(in: range, with: attributed)
-        didChangeText()
-        undoManager?.endUndoGrouping()
-        setSelectedRange(NSRange(location: range.location + attributed.length, length: 0))
-    }
-
-    /// Set the selection to a range clamped into the current text (out-of-range never crashes) — used by
-    /// the extract-from-selection GUI check (G9).
-    func uiTestSetSelection(location: Int, length: Int) {
-        setSelectedRange(uiTestClampedRange(location: location, length: length))
-        // Focus the editor too, so a following ⌘Z / ⇧⌘Z / Delete keystroke reaches it through the real
-        // menu and key path (W9.cand2-fu1) instead of the strip's selection field the seam was typed into.
-        window?.makeFirstResponder(self)
-    }
-
-    /// Clamp a requested `(location, length)` into `[0, textLength]`. Pure — unit-tested directly.
-    func uiTestClampedRange(location: Int, length: Int) -> NSRange {
-        let total = (string as NSString).length
-        let loc = min(max(location, 0), total)
-        let len = min(max(length, 0), total - loc)
-        return NSRange(location: loc, length: len)
-    }
-
-    /// Drive the REAL image-paste path (`tryPasteImage`) from the general pasteboard, bypassing ⌘V and
-    /// field-editor focus (same rationale as the text seams: XCUITest can't reliably focus this styled
-    /// NSTextView and route a paste to it). The UITest seeds `NSPasteboard.general` with PNG bytes
-    /// cross-process, then triggers this; the production asset-write → attachment-insert → serialize path
-    /// runs verbatim (nothing here is stubbed). Returns whether an image was handled. Used by the
-    /// paste-image GUI check (G4). The ⌘V user-gesture routing itself is owner-eye (like G2's typing).
-    @discardableResult
-    func uiTestPasteImage() -> Bool {
-        return tryPasteImage(from: NSPasteboard.general)
-    }
-
-#if DEBUG
-    /// JSON snapshot of every rendered note-passage chip's source id, resolved label, and missing state.
-    /// This reads the current text storage because `MarkdownEditorView.updateNSView` replaces that storage
-    /// when `passageGeneration` changes; a model-only probe could pass without the reactive re-style. The
-    /// DEBUG-only W21.vmgui-c-fu test consumes this after deleting a cited scratch note in the other window.
-    func uiTestPassageChipStates() -> String {
-        guard let storage = textStorage else { return "unavailable:noTextStorage" }
-        var states: [[String: Any]] = []
-        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) {
-            value, range, _ in
-            guard let chip = value as? BlockHeaderAttachment,
-                  let target = chip.sourceBox.anchor.notePassageTarget else { return }
-            states.append([
-                "id": target.id.uuidString.lowercased(),
-                "location": range.location,
-                "label": chip.passageLiveLabel ?? chip.sourceBox.anchor.display ?? "",
-                "missing": chip.passageSourceMissing
-            ])
-        }
-        guard let data = try? JSONSerialization.data(withJSONObject: states, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "unavailable:encoding"
-        }
-        return json
-    }
-
-    /// Cache the storage snapshot at the same point the renderer applies it. The AX child only returns this
-    /// `String`; querying it cannot cause a SwiftUI update or a late re-style (W21.vmgui-c-fu).
-    func refreshUITestPassageChipStateSnapshot() {
-        passageChipStateProbe.snapshot = uiTestPassageChipStates()
-    }
-#endif
-
-    /// Fire the "Jump to Source" action of the FIRST note-passage block chip in the document — via the
-    /// SAME `onJump` callback the chip button's `jumpClicked` invokes, with the SAME `SourceAnchor`.
-    /// Only the button-CLICK gesture is bypassed: the chip is a TextKit-2 attachment-view-provider
-    /// subview XCUITest can't hit-test (the literal click is owner-eye, like G2's typing), so the
-    /// jump-to-source GUI check (G10) drives the anchor's callback directly. Returns whether a
-    /// note-passage chip was found + fired. Compiled out of Release.
-    @discardableResult
-    func uiTestJumpFirstPassage() -> Bool {
-        guard let storage = textStorage else { return false }
-        var fired = false
-        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
-            guard let chip = value as? BlockHeaderAttachment,
-                  chip.sourceBox.anchor.notePassageTarget != nil else { return }
-            chip.onJump?(chip.sourceBox.anchor)
-            fired = true
-            stop.pointee = true
-        }
-        return fired
-    }
-
-    /// Fire the "Reveal in Reader" action of the FIRST reader-page source-block chip — via the SAME
-    /// `onReveal` callback the chip button's `revealClicked` invokes, with the SAME `SourceAnchor`
-    /// (which routes to `openExternalURL` → the `WorkspaceOpenSpy` in a UITest run). Matches a reader
-    /// source chip (`link != nil`) but never a note-passage chip (`notePassageTarget == nil`). Only the
-    /// button CLICK is bypassed: the chip is a TextKit-2 attachment-view-provider subview XCUITest can't
-    /// hit-test (the literal click is owner-eye, like G2), so the reveal GUI check (G6) drives the
-    /// anchor's callback directly. Returns whether a reveal-able source chip was found + fired.
-    @discardableResult
-    func uiTestRevealFirstSource() -> Bool {
-        guard let storage = textStorage else { return false }
-        var fired = false
-        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
-            guard let chip = value as? BlockHeaderAttachment,
-                  chip.sourceBox.anchor.link != nil,
-                  chip.sourceBox.anchor.notePassageTarget == nil else { return }
-            chip.onReveal?(chip.sourceBox.anchor)
-            fired = true
-            stop.pointee = true
-        }
-        return fired
-    }
-
-    /// Open the preview popover of the FIRST reader-page source-block chip through the chip's own
-    /// `onPreview` callback (W9.e2-paste), anchored on the editor's scroll view. Like `uiTestRevealFirstSource`,
-    /// only the un-hit-testable chip-button click is bypassed; the popover, its root-grant button and the
-    /// re-resolve it runs are the production ones. Returns whether a previewable chip was found.
-    @discardableResult
-    func uiTestPreviewFirstSource() -> Bool {
-        guard let storage = textStorage else { return false }
-        var fired = false
-        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
-            guard let chip = value as? BlockHeaderAttachment,
-                  chip.sourceBox.anchor.link != nil,
-                  chip.sourceBox.anchor.notePassageTarget == nil,
-                  chip.sourceBox.anchor.zoteroSelect == nil,
-                  let preview = chip.onPreview else { return }
-            // Anchored on the scroll view, whose bounds are what is on screen: the text view's own bounds run
-            // past the visible pane, so a popover on its edge could open off-window.
-            preview(chip.sourceBox.anchor, enclosingScrollView ?? self)
-            fired = true
-            stop.pointee = true
-        }
-        return fired
-    }
-
-    /// Fire the "Open in Zotero" action of the FIRST Zotero source-block chip, running the SAME open
-    /// path `openZoteroClicked` does (`openExternalURL` → the `WorkspaceOpenSpy` in a UITest run). Only
-    /// the button CLICK is bypassed (owner-eye, like G2). Returns whether a Zotero chip was found +
-    /// fired. Used by the Zotero-chip GUI check (G11).
-    @discardableResult
-    func uiTestOpenFirstZotero() -> Bool {
-        guard let storage = textStorage else { return false }
-        var fired = false
-        storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
-            guard let chip = value as? BlockHeaderAttachment,
-                  let url = chip.sourceBox.zoteroOpenURL else { return }
-            openExternalURL(url)
-            fired = true
-            stop.pointee = true
-        }
-        return fired
-    }
-#endif
 }
-
-#if DEBUG
-private final class ListMarkerProbe: NSAccessibilityElement {
-    // Set on the main thread by `EditorTextView.drawListMarkers`; the getter returns the formed String only.
-    nonisolated(unsafe) private weak var textView: EditorTextView?
-    nonisolated(unsafe) var snapshot = ""
-    init(textView: EditorTextView) { self.textView = textView; super.init() }
-    override func isAccessibilityElement() -> Bool { true }
-    override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
-    override func accessibilityLabel() -> String? { "Drawn list markers" }
-    override func accessibilityIdentifier() -> String? { "an.editor.test.listMarkers" }
-    override func accessibilityParent() -> Any? { textView }
-    override func accessibilityFrameInParentSpace() -> NSRect { NSRect(x: 1, y: 1, width: 1, height: 1) }
-    override func accessibilityValue() -> Any? { snapshot }
-}
-
-/// An accessibility-only child of `EditorTextView`, retained by its owning view for as long as the editor
-/// exists. Its value is a renderer-time snapshot of the text storage, with no click handler, binding, or
-/// SwiftUI state update. The one-point frame is inside the editor only to give XCUITest a real visible AX
-/// frame; it has no backing visual view and is omitted from Release.
-private final class ChipGeometryProbe: NSAccessibilityElement {
-    nonisolated(unsafe) private weak var textView: EditorTextView?
-    init(textView: EditorTextView) { self.textView = textView; super.init() }
-    override func isAccessibilityElement() -> Bool { true }
-    override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
-    override func accessibilityLabel() -> String? { "Installed chip geometry" }
-    override func accessibilityIdentifier() -> String? { "an.editor.test.chipGeometry" }
-    override func accessibilityParent() -> Any? { textView }
-    override func accessibilityFrameInParentSpace() -> NSRect { NSRect(x: 1, y: 1, width: 1, height: 1) }
-    override func accessibilityValue() -> Any? {
-        guard Thread.isMainThread else { return nil }
-        let editor = textView
-        return MainActor.assumeIsolated { editor?.uiTestInstalledChipGeometry() }
-    }
-}
-
-private final class PassageChipStateProbe: NSAccessibilityElement {
-    // AX getters are synchronous Obj-C entry points. The parent and snapshot are set on the main thread by
-    // `EditorTextView`; the getter only returns the already-formed String and never touches AppKit storage.
-    nonisolated(unsafe) private weak var textView: EditorTextView?
-    nonisolated(unsafe) var snapshot = "[]"
-
-    init(textView: EditorTextView) {
-        self.textView = textView
-        super.init()
-    }
-
-    override func isAccessibilityElement() -> Bool { true }
-    override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
-    override func accessibilityLabel() -> String? { "Rendered passage chip state" }
-    override func accessibilityIdentifier() -> String? { "an.editor.test.passageChips" }
-    override func accessibilityParent() -> Any? { textView }
-    override func accessibilityFrameInParentSpace() -> NSRect {
-        NSRect(x: 1, y: 1, width: 1, height: 1)
-    }
-    override func accessibilityValue() -> Any? {
-        return snapshot
-    }
-}
-#endif
 
 /// A disabled editor keeps its undo history but cannot expose or execute it until editable again.
 @MainActor
