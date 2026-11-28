@@ -88,6 +88,14 @@ struct SessionProcessingConfig: Sendable {
     var textGateway: GatewayConfig? { config.visionText == nil ? config.gateway : nil }
     var textLocalAgent: LocalAgentConfig? { config.visionText == nil ? config.localAgent : nil }
 
+    /// W49.proc-gemma-external-switch (owner, 2026-11-26): true when Live Capture reads pages on a local page-OCR
+    /// model (app-managed MLX or an external local server), so per-label Gemma calls would swap models mid-capture.
+    /// Labels get instant Apple Vision + parser proposals during capture and batch Gemma reads once at Finish,
+    /// keeping Vision + parser fallback if Gemma fails.
+    var batchesLabelsToFinish: Bool {
+        config.provider != .appleVision && config.gateway?.isLocalModel == true
+    }
+
     /// The one declaration of what each sizing/concurrency setting is allowed to be.
     ///
     /// Before W16.cfg6-fu3 these three ranges were literals repeated across the reader (`normalizedImageMB`,

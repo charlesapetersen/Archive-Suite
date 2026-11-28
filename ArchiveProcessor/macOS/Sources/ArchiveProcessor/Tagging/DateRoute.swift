@@ -842,6 +842,19 @@ enum DateRoute {
                allowStampFallback: allowStampFallback)
     }
 
+    /// W49.proc-live-redate-chosen-collection: re-evaluates an explicit `.text` route date locally under another
+    /// collection's numeric date order (`dayFirst`) with no API call. Image/stamp/estimate decisions stay as read
+    /// so Finish never buys an unasked model call.
+    static func redatedForNumericOrder(_ decision: Decision, text: String, dayFirst: Bool) -> Decision {
+        guard decision.evidenceClass == .text else { return decision }
+        var updated = Self.$dayFirst.withValue(dayFirst) {
+            decide(text: text, near: [], trace: decision.trace, image: decision.image, imageNote: decision.imageNote)
+        }
+        updated.route = decision.route
+        updated.measured = decision.measured
+        return updated
+    }
+
     static func decide(text: String, near: [Neighbour], trace tr: Trace, image: ImageReading?,
                        imageNote: String, allowStampFallback: Bool = true) -> Decision {
         let cands = candidates(text)

@@ -500,6 +500,16 @@ final class LiveCaptureProcessor: ObservableObject {
     /// session's output folder at its first finalize and kept for the session, as a Process Files run freezes them.
     /// Reset with the config and on Clear.
     private var entitySettings: [String: ResolvedSetting]?
+    /// W49.proc-live-redate-chosen-collection — the session's locked numeric date order (`numericDatesDayFirst`),
+    /// frozen on first settings read (or restored from the staging manifest) and kept across mid-session config
+    /// reloads/relaunch until Clear, so one Live session never dates documents with two different numeric orders.
+    private var lockedDayFirst: Bool?
+    /// W49.proc-gemma-external-switch (owner, 2026-11-26) — staged box/folder marker groups whose Gemma label read
+    /// was deferred to Finish so local page-OCR sessions make at most one model switch per batch.
+    private(set) var deferredGemmaLabelGroups: Set<String> = []
+    /// Segments previously re-dated for a chosen collection during an earlier Finish attempt (so a retry into a
+    /// different collection cleanly restores the destination's date order).
+    private var chosenRedatedGroups: Set<String> = []
     private var stagingDir: URL?
     /// A rejected manifest must not be replaced by normal resume/retry/finalize persistence.
     private var stagingManifestBlocked = false
@@ -810,6 +820,10 @@ final class LiveCaptureProcessor: ObservableObject {
             return true
         }
         for r in manifest.retained { retained[r.groupId] = r }   // enables the rotation review after resume
+        if let savedDayFirst = manifest.sessionDayFirst { lockedDayFirst = savedDayFirst }
+        if let savedDeferred = manifest.deferredGemmaLabelGroups {
+            deferredGemmaLabelGroups = Set(savedDeferred)
+        }
         let restored = manifest.staged.map { record in
             guard record.pagesComplete != false,
                   (CaptureGroupType(rawValue: record.type) ?? .document) == .document,
@@ -1379,13 +1393,19 @@ final class LiveCaptureProcessor: ObservableObject {
 
         // W47.ct-processor-capture — a box or folder label read into container fields, for its card. Awaited here,
         // inside the segment's own processing, so a Finish waits for it like any other segment work.
+        // W49.proc-gemma-external-switch (owner, 2026-11-26): when Live Capture runs on a local page-OCR model
+        // (app-managed or external server), read Vision + parser immediately (`useModel: false`) and batch Gemma to
+        // Finish so there is at most one model switch per batch.
         var containerRead: (fields: ContainerFieldSet, fallback: ContainerLabelCapture.Fallback?)?
         if let itemType = group.type.itemType, ContainerLabelCapture.enabled, let photo = group.photos.first {
+            let deferGemma = config.batchesLabelsToFinish
             let r = await ContainerLabelCapture.readLabel(type: itemType, text: texts.first ?? "", photo: photo.url,
                                                           rotation: results.first?.rotationDegrees ?? 0,
-                                                          gateway: config.textGateway)
+                                                          gateway: config.textGateway,
+                                                          useModel: !deferGemma)
             if r.gatewayCalled, clearGeneration == startedGeneration { labelCharges[groupId, default: 0] += r.dollars }
             guard clearGeneration == startedGeneration else { return }
+            if deferGemma { deferredGemmaLabelGroups.insert(groupId) }
             containerRead = (r.fields, r.fallback)
         }
 
@@ -1658,11 +1678,27 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// The resolved settings the names policy and the dating route read, loaded once per session config.
+    /// W49.proc-live-redate-chosen-collection: pins `numericDatesDayFirst` across mid-session config reloads/relaunch
+    /// so a single Live session never dates documents with two numeric orders.
     private func liveSettings(_ config: SessionProcessingConfig) -> [String: ResolvedSetting] {
         if entitySettings == nil {
-            entitySettings = SettingsLayerStore.shared.snapshot(outputDirectory: config.outputDirectory, runID: UUID()).values
+            var values = SettingsLayerStore.shared.snapshot(outputDirectory: config.outputDirectory, runID: UUID()).values
+            let key = SettingsKey.numericDatesDayFirst.rawValue
+            if let lockedDayFirst {
+                let layer = values[key]?.value.bool == lockedDayFirst ? values[key]?.layer : nil
+                values[key] = ResolvedSetting(value: .bool(lockedDayFirst), layer: layer)
+            } else {
+                lockedDayFirst = DateRoute.dayFirstSetting(values)
+            }
+            entitySettings = values
         }
         return entitySettings ?? [:]
+    }
+
+    /// The session's effective numeric date order (`numericDatesDayFirst`), locked on first resolution.
+    var effectiveDayFirst: Bool {
+        if let lockedDayFirst { return lockedDayFirst }
+        return DateRoute.dayFirstSetting(config.map(liveSettings))
     }
 
     /// W46.ent-feature-live — the document's names for its sidecar's `entities` object, on the policy Process Files
@@ -1722,13 +1758,14 @@ final class LiveCaptureProcessor: ObservableObject {
     /// folder marker before the document in capture order, where it is a folder whose card the user saved with a date
     /// (source `user`). A box ends the folder run (§Runs), so a box, or no marker, dates nothing. At Finish the run
     /// starts at the folder photo's filed PDF, a name not known while the session runs, so the evidence names the folder.
-    private func liveFolderDate(for groupId: String) -> ContainerFolderDate? {
+    private func liveFolderDate(for groupId: String, dayFirst: Bool? = nil) -> ContainerFolderDate? {
         guard let doc = session.groups.first(where: { $0.id == groupId }), doc.type == .document,
               let marker = session.groups.filter({ $0.type != .document && $0.order < doc.order })
                 .max(by: { $0.order < $1.order }),
               marker.type == .folder, let fields = session.containerFields[marker.id] else { return nil }
-        // The collection's numeric date order, from the session's settings (no session config: month first).
-        return ContainerFolderDate.$dayFirst.withValue(DateRoute.dayFirstSetting(config.map(liveSettings))) {
+        // The collection's numeric date order, from the session's settings unless overridden for a chosen collection.
+        let order = dayFirst ?? DateRoute.dayFirstSetting(config.map(liveSettings))
+        return ContainerFolderDate.$dayFirst.withValue(order) {
             ContainerFolderDate.confirmed(at: "", in: [ContainerRun(start: "", level: .folder, fields: fields)])
         }
     }
@@ -1774,11 +1811,17 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     @discardableResult
-    private func updateRetainedDate(_ seg: inout RetainedSegment, from routeDating: DateRoute.Decision) -> Bool {
+    private func updateRetainedDate(_ seg: inout RetainedSegment, from routeDating: DateRoute.Decision,
+                                    dayFirst: Bool? = nil) -> Bool {
         guard let preDating = seg.preDatingTags,
               let group = session.groups.first(where: { $0.id == seg.groupId }) else { return false }
-        var want = routeDating
-        if let folder = liveFolderDate(for: seg.groupId) { want.inherit(fromFolder: folder) }
+        var effectiveRoute = routeDating
+        if let dayFirst {
+            let ownText = seg.texts.prefix(DateRoute.docPages).joined(separator: "\n\n")
+            effectiveRoute = DateRoute.redatedForNumericOrder(routeDating, text: ownText, dayFirst: dayFirst)
+        }
+        var want = effectiveRoute
+        if let folder = liveFolderDate(for: seg.groupId, dayFirst: dayFirst) { want.inherit(fromFolder: folder) }
         // A marker filed by an earlier Finish can leave the session without ending the folder run.
         // Keep that date unless the document has its own date or the corrected image shows a dated stamp.
         if seg.dating?.evidenceClass == .folder,
@@ -2235,23 +2278,32 @@ final class LiveCaptureProcessor: ObservableObject {
         var staged: [StagedSegment]
         var retained: [RetainedSegment]
         var clearToken: String? = nil
+        var sessionDayFirst: Bool? = nil
+        var deferredGemmaLabelGroups: [String]? = nil
         let fingerprint: String
 
-        init(staged: [StagedSegment], retained: [RetainedSegment], clearToken: String? = nil) {
+        init(staged: [StagedSegment], retained: [RetainedSegment], clearToken: String? = nil,
+             sessionDayFirst: Bool? = nil, deferredGemmaLabelGroups: [String]? = nil) {
             self.schemaVersion = Self.currentSchemaVersion
             self.staged = staged
             self.retained = retained
             self.clearToken = clearToken
+            self.sessionDayFirst = sessionDayFirst
+            self.deferredGemmaLabelGroups = deferredGemmaLabelGroups
             // An encoding failure must leave a record that fails closed on reload, never a valid digest for
             // placeholder bytes. The outer persist then also declines to write if those same values cannot
             // encode, but this keeps the integrity rule total.
             self.fingerprint = Self.fingerprint(schemaVersion: schemaVersion, staged: staged,
-                                                retained: retained, clearToken: clearToken) ?? ""
+                                                retained: retained, clearToken: clearToken,
+                                                sessionDayFirst: sessionDayFirst,
+                                                deferredGemmaLabelGroups: deferredGemmaLabelGroups) ?? ""
         }
 
         var hasValidFingerprint: Bool {
             guard let expected = Self.fingerprint(schemaVersion: schemaVersion, staged: staged,
-                                                  retained: retained, clearToken: clearToken) else {
+                                                  retained: retained, clearToken: clearToken,
+                                                  sessionDayFirst: sessionDayFirst,
+                                                  deferredGemmaLabelGroups: deferredGemmaLabelGroups) else {
                 return false
             }
             return fingerprint == expected
@@ -2262,15 +2314,20 @@ final class LiveCaptureProcessor: ObservableObject {
             let staged: [StagedSegment]
             let retained: [RetainedSegment]
             let clearToken: String?
+            let sessionDayFirst: Bool?
+            let deferredGemmaLabelGroups: [String]?
         }
 
         private static func fingerprint(
-            schemaVersion: Int, staged: [StagedSegment], retained: [RetainedSegment], clearToken: String?
+            schemaVersion: Int, staged: [StagedSegment], retained: [RetainedSegment], clearToken: String?,
+            sessionDayFirst: Bool?, deferredGemmaLabelGroups: [String]?
         ) -> String? {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
             let payload = FingerprintPayload(schemaVersion: schemaVersion, staged: staged,
-                                             retained: retained, clearToken: clearToken)
+                                             retained: retained, clearToken: clearToken,
+                                             sessionDayFirst: sessionDayFirst,
+                                             deferredGemmaLabelGroups: deferredGemmaLabelGroups)
             guard let data = try? encoder.encode(payload) else { return nil }
             return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         }
@@ -2291,7 +2348,9 @@ final class LiveCaptureProcessor: ObservableObject {
         // Dictionaries do not promise a stable iteration order. The fingerprint identifies durable data,
         // not whichever order retained records happened to be visited in this process.
         let retainedRecords = retainedValues.sorted { $0.groupId < $1.groupId }
-        let manifest = StagingManifest(staged: records, retained: retainedRecords, clearToken: clearToken)
+        let deferredLabels = deferredGemmaLabelGroups.isEmpty ? nil : deferredGemmaLabelGroups.sorted()
+        let manifest = StagingManifest(staged: records, retained: retainedRecords, clearToken: clearToken,
+                                       sessionDayFirst: lockedDayFirst, deferredGemmaLabelGroups: deferredLabels)
         do {
             // A full Finish trashed the directory and the session went on (W40.fix-processor-after-finish-not-
             // processed). A backstop: `finalizeSegment` re-creates it before every write that reaches here, and
@@ -2587,34 +2646,41 @@ final class LiveCaptureProcessor: ObservableObject {
             if page.pageIndex < DateRoute.imagePages { changedDatingImages.insert(page.groupId) }
         }
         rotationReviewPages = []
-        if stagingDir != nil { redateFromFolders(into: &changedGroups) }   // recorded only where it is also written
-        // Only regenerate segments whose source photos ALL still exist on disk. Regenerating from a
-        // missing source (e.g. the operator hit "Clear" before Finish, deleting the originals) would
-        // overwrite good staged output with an image-less/broken file — so keep the existing output.
+        let hasDeferredLabels = !deferredGemmaLabelGroups.isEmpty && ContainerLabelCapture.enabled
+        if stagingDir != nil, !hasDeferredLabels { redateFromFolders(into: &changedGroups) }
         let fm = FileManager.default
-        let segsToRegen = changedGroups
+        let initialRegen = changedGroups
             .compactMap { retained[$0] }
             .filter { seg in seg.pages.allSatisfy { fm.fileExists(atPath: $0.sourceURL.path) } }
-        guard !segsToRegen.isEmpty, let stagingDir else { beginFinalize(); return }
-        // W3.cap-r4 — the collection is read live, never replayed from the retained record. The value that
-        // COUNTS is re-read after the detached write, on the way into `staged` (below) — the same
-        // last-possible-moment discipline `finalizeSegment` uses, because that write suspends and an
-        // out-of-order Box can re-pin a segment while it runs. This snapshot only keeps the record the write
-        // returns from carrying a placeholder in the meantime; it cannot reach `staged` or disk, and the
-        // `??` branch is unreachable (the map is built from this very array).
-        let regenKeys: [String: String] = Dictionary(
-            uniqueKeysWithValues: segsToRegen.map { ($0.groupId, liveCollectionKey(for: $0.groupId)) })
-        let refreshGroups = Set(segsToRegen.compactMap { seg -> String? in
-            guard changedDatingImages.contains(seg.groupId), let decision = seg.routeDating,
-                  DateRoute.canRefreshLiveImage(decision) else { return nil }
-            return seg.groupId
-        })
+        guard !initialRegen.isEmpty || hasDeferredLabels, let stagingDir else { beginFinalize(); return }
         let datingGateway = DateRoute.measuredRoute(gateway: config?.textGateway, usesLocalAgent: config?.textLocalAgent != nil)
             ? config?.textGateway : nil
         let paid = config.map { paidRequests($0) }
+        let startedGeneration = clearGeneration
         isFinalizing = true
         Task { [weak self] in
             guard let self else { return }
+            if hasDeferredLabels {
+                await self.runDeferredGemmaLabelBatch()
+                guard self.clearGeneration == startedGeneration else { self.isFinalizing = false; return }
+                self.redateFromFolders(into: &changedGroups)
+            }
+            let segsToRegen = changedGroups
+                .compactMap { self.retained[$0] }
+                .filter { seg in seg.pages.allSatisfy { FileManager.default.fileExists(atPath: $0.sourceURL.path) } }
+            guard !segsToRegen.isEmpty else {
+                self.persistManifest()
+                self.isFinalizing = false
+                self.beginFinalize()
+                return
+            }
+            let regenKeys: [String: String] = Dictionary(
+                uniqueKeysWithValues: segsToRegen.map { ($0.groupId, self.liveCollectionKey(for: $0.groupId)) })
+            let refreshGroups = Set(segsToRegen.compactMap { seg -> String? in
+                guard changedDatingImages.contains(seg.groupId), let decision = seg.routeDating,
+                      DateRoute.canRefreshLiveImage(decision) else { return nil }
+                return seg.groupId
+            })
             var writeInputs = segsToRegen
             if let gateway = datingGateway {
                 for i in writeInputs.indices where refreshGroups.contains(writeInputs[i].groupId) {
@@ -2701,6 +2767,50 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
+    /// W49.proc-gemma-external-switch (owner, 2026-11-26): runs Gemma once in a single batch at Finish for all
+    /// staged box/folder labels whose model read was deferred during local page-OCR capture. Keeps existing
+    /// Vision + parser fallback proposals if Gemma fails, and preserves any user-edited marker fields.
+    func runDeferredGemmaLabelBatch() async {
+        guard !deferredGemmaLabelGroups.isEmpty else { return }
+        let fm = FileManager.default
+        let pending = staged
+            .filter { deferredGemmaLabelGroups.contains($0.groupId) && !session.filedGroupIds.contains($0.groupId) }
+            .sorted { $0.order < $1.order }
+        guard !pending.isEmpty else { deferredGemmaLabelGroups.removeAll(); return }
+        let gateway = config?.textGateway
+        let startedGeneration = clearGeneration
+        let runBatch: @MainActor () async -> Void = {
+            for seg in pending {
+                guard self.clearGeneration == startedGeneration else { return }
+                guard let itemType = CaptureGroupType(rawValue: seg.type)?.itemType else {
+                    self.deferredGemmaLabelGroups.remove(seg.groupId)
+                    continue
+                }
+                let retainedSeg = self.retained[seg.groupId]
+                let photoURL = retainedSeg?.pages.first?.sourceURL
+                    ?? self.session.groups.first(where: { $0.id == seg.groupId })?.photos.first?.url
+                guard let photoURL, fm.fileExists(atPath: photoURL.path) else {
+                    self.deferredGemmaLabelGroups.remove(seg.groupId)
+                    continue
+                }
+                let rotation = retainedSeg?.pages.first?.result.rotationDegrees ?? 0
+                let text = retainedSeg?.texts.first ?? ""
+                let r = await ContainerLabelCapture.readLabel(type: itemType, text: text, photo: photoURL,
+                                                              rotation: rotation, gateway: gateway, useModel: true)
+                guard self.clearGeneration == startedGeneration else { return }
+                if r.gatewayCalled { self.labelCharges[seg.groupId, default: 0] += r.dollars }
+                self.session.mergeDeferredLabelRead(groupId: seg.groupId, read: r.fields,
+                                                    modelAnswered: r.modelAnswered, fallback: r.fallback)
+                self.deferredGemmaLabelGroups.remove(seg.groupId)
+            }
+        }
+        if gateway == nil || gateway?.isLocalModel == true {
+            try? await LocalModelSupervisor.serving.withStage(ManagedGemma.model, runBatch)
+        } else {
+            await runBatch()
+        }
+    }
+
     /// Build collection drafts (candidate names + fuzzy-matched existing folders) and show the sheet.
     /// The output folder to file collections into, read LIVE from Settings at finalize time (not the
     /// session's locked config). The output folder is only used at the final move, so honoring a change
@@ -2736,7 +2846,8 @@ final class LiveCaptureProcessor: ObservableObject {
     /// W46.settings-layers: record this session in every collection folder finalize actually filed into, with the
     /// layers as that folder resolves them and the session's processing settings. A record never blocks finalize.
     /// W47.ct-label-cost: returns the summary's line for the filed markers' label reads through the gateway, else nil.
-    private func recordSessionInCollections(_ plans: [MovePlan], filed: Set<String>) -> String? {
+    private func recordSessionInCollections(_ plans: [MovePlan], filed: Set<String>,
+                                            store: SettingsLayerStore = .shared) -> String? {
         let runConfig = sessionRunConfig ?? config?.config
         // Two drafts may file into one existing folder: one record per folder, counting every filed document in it.
         var order: [URL] = []
@@ -2759,7 +2870,6 @@ final class LiveCaptureProcessor: ObservableObject {
                 labelCharges[seg.groupId] = nil
             }
         }
-        let store = SettingsLayerStore.shared
         let sessionSettings = config.map(liveSettings)
         for folder in order {
             let key = folder.standardizedFileURL.path
@@ -2788,9 +2898,23 @@ final class LiveCaptureProcessor: ObservableObject {
         var snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), run: run)
         let key = SettingsKey.numericDatesDayFirst.rawValue
         if let session, snapshot.values[key]?.layer != .collection {
-            snapshot.values[key] = session[key] ?? ResolvedSetting(value: .bool(DateRoute.dayFirstSetting(session)), layer: nil)
+            let dayFirst = DateRoute.dayFirstSetting(session)
+            // Do not copy `.collection` provenance from the output root onto a new subfolder that has no collection
+            // layer of its own (W49.proc-live-redate-chosen-collection).
+            let inheritedLayer = session[key]?.layer == .collection ? nil : session[key]?.layer
+            snapshot.values[key] = ResolvedSetting(value: .bool(dayFirst), layer: inheritedLayer)
         }
         return snapshot
+    }
+
+    /// W49.proc-live-redate-chosen-collection: returns an existing collection folder's own `numericDatesDayFirst`
+    /// setting when that collection explicitly defines it in its own settings layer (so Finish can re-date documents
+    /// filed into it to match what the Reader reads first). Returns nil when the folder inherits from root/general.
+    static func chosenCollectionDayFirst(folder: URL, store: SettingsLayerStore = .shared) -> Bool? {
+        let key = SettingsKey.numericDatesDayFirst.rawValue
+        let snapshot = store.snapshot(outputDirectory: folder, runID: UUID())
+        guard snapshot.values[key]?.layer == .collection else { return nil }
+        return snapshot.values[key]?.value.bool ?? false
     }
 
     /// A filed marker's label call through the gateway, nil when it made none: its counted charge, or after a relaunch
@@ -2827,7 +2951,7 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// Move staged outputs into their (new or existing) collection folders, continuing numbering.
-    func finalize(_ decided: [CollectionDraft]) {
+    func finalize(_ decided: [CollectionDraft], settingsStore: SettingsLayerStore = .shared) {
         guard !stagingManifestBlocked, config != nil, let stagingDir, !isFinalizing else { return }
         isFinalizing = true
         let outputDir = currentOutputDirectory   // live output folder (matches the "Add to" list built above)
@@ -2838,6 +2962,89 @@ final class LiveCaptureProcessor: ObservableObject {
             let folder = d.chosenExisting ?? outputDir.appendingPathComponent(name, isDirectory: true)
             return MovePlan(folder: folder, name: name, appending: d.chosenExisting != nil, segments: segs)
         }
+        // W49.proc-live-redate-chosen-collection: if an existing collection chosen in the naming sheet sets the
+        // opposite `numericDatesDayFirst`, re-date its folder-dated and order-dependent text-dated documents locally
+        // (no API call) and regenerate their staged outputs before pinning destinations and moving them.
+        let chosenRegen = collectChosenCollectionRedates(for: requestedPlans, store: settingsStore)
+        if !chosenRegen.isEmpty {
+            let regenKeys = Dictionary(uniqueKeysWithValues: chosenRegen.map { ($0.groupId, liveCollectionKey(for: $0.groupId)) })
+            let startedGeneration = clearGeneration
+            Task { [weak self] in
+                let regenerated: [StagedSegment] = await Task.detached { () -> [StagedSegment] in
+                    chosenRegen.map { seg in
+                        Self.writeSegmentFiles(groupId: seg.groupId, type: seg.type,
+                                               collectionKey: regenKeys[seg.groupId] ?? "__unfiled__",
+                                               order: seg.order, pages: seg.pages, baseTags: seg.baseTags,
+                                               doMerge: seg.doMerge, model: seg.model, gatewayName: seg.gatewayName,
+                                               localAgentDisplayName: seg.localAgentDisplayName,
+                                               localAgentModelName: seg.localAgentModelName,
+                                               stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
+                                               entities: seg.entities, dating: seg.dating,
+                                               itemFields: seg.itemFields,
+                                               texts: seg.texts, boxLabelText: seg.boxLabelText,
+                                               outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
+                                               exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,
+                                               taggingMode: seg.taggingMode,
+                                               stampUnread: seg.stampUnread, textLayer: seg.textLayer ?? .standard,
+                                               dateIsUserSet: seg.dateIsUserSet ?? false,
+                                               subjectsAreUserSet: seg.subjectsAreUserSet ?? false,
+                                               keepPreservationCopies: seg.keepPreservationCopies ?? false)
+                    }
+                }.value
+                guard let self else { return }
+                guard self.clearGeneration == startedGeneration else { self.isFinalizing = false; return }
+                let regenInputs = Dictionary(uniqueKeysWithValues: chosenRegen.map { ($0.groupId, $0) })
+                for outcome in regenerated {
+                    guard let idx = self.staged.firstIndex(where: { $0.groupId == outcome.groupId }) else { continue }
+                    var fresh = outcome
+                    fresh.collectionKey = self.liveCollectionKey(for: outcome.groupId)
+                    fresh.taggingFailure = self.staged[idx].taggingFailure
+                    self.staged[idx] = fresh
+                    if let input = regenInputs[outcome.groupId] {
+                        self.retained[outcome.groupId] = input
+                        self.chosenRedatedGroups.insert(outcome.groupId)
+                        self.labelStagedRecord(outcome.groupId, type: input.type, outcome: fresh,
+                                               results: input.pages.map(\.result))
+                    }
+                }
+                let updatedByGroup = Dictionary(uniqueKeysWithValues: self.staged.map { ($0.groupId, $0) })
+                let updatedPlans = requestedPlans.map { plan in
+                    MovePlan(folder: plan.folder, name: plan.name, appending: plan.appending,
+                             segments: plan.segments.map { updatedByGroup[$0.groupId] ?? $0 })
+                }
+                self.finishFinalize(requestedPlans: updatedPlans, stagingDir: stagingDir,
+                                    outputDir: outputDir, settingsStore: settingsStore)
+            }
+            return
+        }
+        finishFinalize(requestedPlans: requestedPlans, stagingDir: stagingDir,
+                       outputDir: outputDir, settingsStore: settingsStore)
+    }
+
+    /// Re-dates unpinned staged segments whose chosen existing collection overrides `numericDatesDayFirst`
+    /// (or restores the destination's order after an earlier failed Finish into an overriding collection).
+    /// Returns mutated copies for off-main regeneration without modifying `retained` until regeneration succeeds.
+    private func collectChosenCollectionRedates(for plans: [MovePlan],
+                                                store: SettingsLayerStore = .shared) -> [RetainedSegment] {
+        let fm = FileManager.default
+        let sessionDayFirst = effectiveDayFirst
+        var changed: [RetainedSegment] = []
+        for plan in plans {
+            let overrideDayFirst = plan.appending ? Self.chosenCollectionDayFirst(folder: plan.folder, store: store) : nil
+            let targetDayFirst = overrideDayFirst ?? sessionDayFirst
+            for stagedSeg in plan.segments where stagedSeg.catalogueDestination == nil {
+                guard targetDayFirst != sessionDayFirst || chosenRedatedGroups.contains(stagedSeg.groupId) else { continue }
+                guard var seg = retained[stagedSeg.groupId], let routeDating = seg.routeDating,
+                      seg.pages.allSatisfy({ fm.fileExists(atPath: $0.sourceURL.path) }),
+                      updateRetainedDate(&seg, from: routeDating, dayFirst: targetDayFirst) else { continue }
+                changed.append(seg)
+            }
+        }
+        return changed
+    }
+
+    private func finishFinalize(requestedPlans: [MovePlan], stagingDir: URL, outputDir: URL,
+                                settingsStore: SettingsLayerStore) {
         let plans: [MovePlan]
         do {
             // The archive the output folder belongs to decides; outside one, the general setting (W49.storage-finder-reader-mirror).
@@ -2911,7 +3118,7 @@ final class LiveCaptureProcessor: ObservableObject {
                     + " ⚠️ The filed-group ledger could not be saved. Original photos and staged recovery data remain in the Backup Folder; check disk space or permissions before finishing again."
                 return
             }
-            let labelSpendNote = self.recordSessionInCollections(plans, filed: filedGroups)
+            let labelSpendNote = self.recordSessionInCollections(plans, filed: filedGroups, store: settingsStore)
             let placeholderByGroup = Dictionary(
                 self.staged.compactMap { seg -> (String, [URL])? in
                     guard let held = seg.placeholderSources, !held.isEmpty else { return nil }
@@ -3220,6 +3427,9 @@ final class LiveCaptureProcessor: ObservableObject {
         pendingFinish = false
         finishWaitingForRelayScan = false
         entitySettings = nil
+        lockedDayFirst = nil
+        deferredGemmaLabelGroups.removeAll()
+        chosenRedatedGroups.removeAll()
         // W3.cap-r3-fu9 — the per-item sheet targets are session state too, and they are now an INPUT to the
         // finish gate (`perItemSheetUp`), so a survivor is not merely a sheet over an empty pane: a target
         // left set names a group that no longer exists and would hold the NEXT session's Finish indefinitely.
@@ -3659,7 +3869,10 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Test-only ($0, W46.ent-feature-live): the names settings the session would resolve from its output folder, set
     /// directly so a driver writes no collection file (call it after arming, which resets them); and the names a
     /// finalized segment retained for regeneration.
-    func _entityTestSetSettings(_ values: [String: ResolvedSetting]) { entitySettings = values }
+    func _entityTestSetSettings(_ values: [String: ResolvedSetting]) {
+        entitySettings = values
+        lockedDayFirst = DateRoute.dayFirstSetting(values)
+    }
     func _entityTestRetainedEntities(_ groupId: String) -> EntityResult? { retained[groupId]?.entities }
     func _entityTestRetainedJSONTags(_ groupId: String) -> GeneratedTags? { retained[groupId]?.jsonTags }
     /// Test-only ($0, W46.date-route-other-paths): the dating decision a finalized segment retained for regeneration.

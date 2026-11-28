@@ -439,6 +439,7 @@ enum LocalModelsTestDriver {
               && wire.hosts == ["remote-gateway.invalid"], "\(asked.asked) \(wire.hosts)")
         await ContainerLabelGemma.forget()
         await labelCostChecks(wire: wire, image: image, remote: remote, answer: answer)
+        await liveBatchedLabelChecks(wire: wire, image: image, local: onMac, remote: remote, answer: answer)
         await labelRotationChecks(in: image.deletingLastPathComponent())
     }
 
@@ -948,6 +949,94 @@ enum LocalModelsTestDriver {
         let legacy = #"{"baseURL":"u","modelID":"m","displayName":"d"}"#
         let decoded = try? JSONDecoder().decode(GatewayConfig.self, from: Data(legacy.utf8))
         check("5 a saved run without the field decodes as remote", decoded != nil && decoded?.isLocalModel == false)
+    }
+
+    /// 12. W49.proc-gemma-external-switch (owner, 2026-11-26): Live Capture with a local page-OCR model
+    ///     batches box/folder Gemma label reads to Finish (one switch per batch), gives instant Vision + parser
+    ///     proposals during capture, preserves user edits, and keeps Vision + parser fallback if Gemma fails.
+    private static func liveBatchedLabelChecks(wire: Wire, image: URL, local: GatewayConfig,
+                                               remote: GatewayConfig, answer: String) async {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory.appendingPathComponent("APLocalBatchLabels-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: tmp) }
+        let staging = tmp.appendingPathComponent("staging", isDirectory: true)
+        try? fm.createDirectory(at: staging, withIntermediateDirectories: true)
+
+        func makeCfg(provider: LLMProvider, gateway: GatewayConfig?) -> SessionProcessingConfig {
+            SessionProcessingConfig(
+                provider: provider, model: provider.models[0], thinkingLevel: .low, apiKey: "",
+                taggingMode: .none, rotationMode: .off, mergeDocuments: false, outputDirectory: tmp,
+                customOCRPrompt: "", imageScale: 1.0, standardImageMB: 2.0, ocrWorkerCount: 1,
+                enableSegmentJSON: false, tagVocabulary: [], gateway: gateway, outputImageFile: false,
+                pdfImageMB: 2.0, exportedImageMB: 2.0, textColumns: 1,
+                localAgent: nil, visionTextLLM: nil, keepPreservationCopies: false)
+        }
+        let managedLocal = GatewayConfig(baseURL: ManagedOCRModel.baseURL, modelID: ManagedOCRModel.qwen3VL8B.rawValue,
+                                         displayName: "Qwen3-VL 8B", localModel: true,
+                                         managedModel: ManagedOCRModel.qwen3VL8B.rawValue)
+        check("12 batchesLabelsToFinish is true for external local server and app-managed local OCR",
+              makeCfg(provider: .gemini, gateway: local).batchesLabelsToFinish
+                && makeCfg(provider: .gemini, gateway: managedLocal).batchesLabelsToFinish)
+        check("12 batchesLabelsToFinish is false for remote gateway and Apple Vision",
+              !makeCfg(provider: .gemini, gateway: remote).batchesLabelsToFinish
+                && !makeCfg(provider: .appleVision, gateway: nil).batchesLabelsToFinish
+                && !makeCfg(provider: .appleVision, gateway: local).batchesLabelsToFinish)
+
+        let savedList = ContainerLabelGemma.listModels
+        ContainerLabelGemma.listModels = { _ in [ContainerLabelGemma.ids[.mlxVLM]!] }
+        await ContainerLabelGemma.forget()
+        defer {
+            ContainerLabelGemma.listModels = savedList
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+        }
+
+        let gemmaOK = try! JSONSerialization.data(withJSONObject: [
+            "choices": [["finish_reason": "stop", "message": ["content": answer]]]
+        ])
+        let gemmaOKString = String(data: gemmaOK, encoding: .utf8)!
+        wire.reset([ContainerLabelGemma.ids[.mlxVLM]!: gemmaOKString])
+
+        let session = CaptureSession()
+        session._recoveryTestBeginLive(config: makeCfg(provider: .gemini, gateway: local), stagingDir: staging)
+        session.liveProcessor._testFinalizeTasks = []
+        LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: "BOX NO. 17\nHOOVER", classification: nil,
+                                                              errorMessage: nil, errorCode: nil)
+        let imgData = (try? Data(contentsOf: image)) ?? Data()
+        _ = session.ingest(jpeg: imgData, groupId: "B1", seq: 1, type: .box, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+        _ = session.ingest(jpeg: imgData, groupId: "F1", seq: 2, type: .folder, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+        await session.liveProcessor._testAwaitFinalizes()
+
+        check("12 during capture: 0 Gemma requests made; both markers queued for Finish",
+              wire.requests.isEmpty && session.liveProcessor.deferredGemmaLabelGroups == ["B1", "F1"],
+              "requests=\(wire.requests.count) deferred=\(session.liveProcessor.deferredGemmaLabelGroups)")
+        check("12 during capture: Vision/parser proposals still populate before Finish",
+              session.containerFields["B1"]?[.container]?.value == "Box 17",
+              "\(String(describing: session.containerFields["B1"]))")
+
+        // User edits container number on B1 during capture; Finish batch must preserve that `.user` value while
+        // adding Gemma's repository/collectionTitle. F1 gets a Gemma failure and must keep its parser fallback.
+        var b1User = session.containerFields["B1"] ?? ContainerFieldSet()
+        b1User[.container] = ContainerValue("Box 99", source: .user)
+        _ = session.applyContainerFields(groupId: "B1", fields: b1User)
+        var f1Before = session.containerFields["F1"] ?? ContainerFieldSet()
+        f1Before[.folder] = ContainerValue("Folder 4", source: .label, reader: ContainerLabelReader.visionReader)
+        session.setContainerRead(groupId: "F1", read: f1Before, fallback: nil)
+
+        wire.reset([ContainerLabelGemma.ids[.mlxVLM]!: gemmaOKString],
+                   queued: [gemmaOKString, "STATUS 500 {\"error\": \"down\"}"])
+        await session.liveProcessor.runDeferredGemmaLabelBatch()
+
+        check("12 Finish batch calls Gemma for each deferred marker and clears the queue",
+              wire.requests.count >= 2 && session.liveProcessor.deferredGemmaLabelGroups.isEmpty,
+              "requests=\(wire.requests.count) deferred=\(session.liveProcessor.deferredGemmaLabelGroups)")
+        check("12 Finish batch merges Gemma proposals on B1 while preserving the user's edit",
+              session.containerFields["B1"]?[.container]?.value == "Box 99"
+                && session.containerFields["B1"]?[.container]?.source == .user
+                && session.containerFields["B1"]?[.repository]?.reader == ContainerLabelReader.localModelReader,
+              "\(String(describing: session.containerFields["B1"]))")
+        check("12 when Gemma fails on F1, existing Vision/parser fallback proposals stay intact",
+              session.containerFields["F1"]?[.folder]?.value == "Folder 4",
+              "\(String(describing: session.containerFields["F1"]))")
     }
 
     private static func jsonBody(_ request: URLRequest) -> [String: Any]? {

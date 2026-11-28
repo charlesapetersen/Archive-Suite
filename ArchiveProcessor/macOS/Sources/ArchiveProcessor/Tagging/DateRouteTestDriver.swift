@@ -1335,6 +1335,13 @@ enum DateRouteTestDriver {
         let dayFirst = recorded("Day", session: dayFirstValues)
         check("2 numeric order: a Live record in a new collection keeps the session's day first; the Reader reads 6/2/61 as February",
               alone.values[key]?.value.bool == false && dayFirst == (true, true, 2), "\(dayFirst)")
+        // W49.proc-live-redate-chosen-collection: a new folder does not inherit `.collection` provenance from the output root.
+        let newFolderSnap = LiveCaptureProcessor.liveRunSnapshot(
+            store: store, folder: root.appendingPathComponent("NewFromRoot", isDirectory: true),
+            run: nil, session: [key: ResolvedSetting(value: .bool(true), layer: .collection)])
+        check("2 numeric order: a new collection's Live record drops the root's .collection provenance while keeping day first",
+              newFolderSnap.values[key]?.value.bool == true && newFolderSnap.values[key]?.layer == nil,
+              "\(String(describing: newFolderSnap.values[key]))")
         // The general layer says day first, the session's root says month first (its own collection layer).
         let monthValues = [key: ResolvedSetting(value: .bool(false), layer: .collection)]
         let general = store.setGeneral(.numericDatesDayFirst, .bool(true), source: .setByUser(Date()))
@@ -1626,6 +1633,95 @@ enum DateRouteTestDriver {
                   wire.images.last == [60]
                       && wire.trace.count + wire.images.count + wire.itemFields + wire.tagging == finishCalls + 1
               })
+
+        // W49.proc-live-redate-chosen-collection: filing a month-first Live session into an existing collection whose
+        // own settings document sets day-first re-dates both folder-dated (`6/2/61`) and order-dependent text-dated
+        // (`6/2/61`) documents locally before the move, with zero extra API calls; mid-session config adoption keeps
+        // the session's locked date order.
+        let chosenStore = SettingsLayerStore(directory: tmp.appendingPathComponent("chosen-store", isDirectory: true))
+        let chosenRoot = tmp.appendingPathComponent("chosen-out", isDirectory: true)
+        let chosenExisting = chosenRoot.appendingPathComponent("British Files", isDirectory: true)
+        let staging3 = tmp.appendingPathComponent("APStaging-chosen", isDirectory: true)
+        try? fm.createDirectory(at: chosenExisting, withIntermediateDirectories: true)
+        try? fm.createDirectory(at: staging3, withIntermediateDirectories: true)
+        chosenStore.updateCollection(in: chosenExisting) {
+            $0.collection.set(.numericDatesDayFirst, .bool(true), source: .setByUser(Date()))
+        }
+        var chosenCfg = cfg
+        chosenCfg.outputDirectory = chosenRoot
+        let chosenSession = CaptureSession()
+        chosenSession._recoveryTestBeginLive(config: chosenCfg, stagingDir: staging3)
+        chosenSession.liveProcessor._entityTestSetSettings([SettingsKey.numericDatesDayFirst.rawValue: ResolvedSetting(value: .bool(false), layer: .general)])
+        chosenSession.liveProcessor._testFinalizeTasks = []
+        // Mid-session adoptSettingsSnapshot preserves the session's locked month-first order.
+        chosenSession.liveProcessor.adoptSettingsSnapshot(chosenCfg)
+        check("6 Live chosen-collection: mid-session settings reload keeps locked session date order",
+              chosenSession.liveProcessor.effectiveDayFirst == false)
+
+        wire.lock.withLock {
+            wire.traceReply["DOCN"] = #"{"year": 1961, "lo": 1961, "hi": 1961, "date_uncertain": false, "evidence": {"neighbour": "self", "quote": "6/2/61"}}"#
+            wire.taggingReply["DOCN"] = anyYear
+        }
+        func cCapture(_ gid: String, _ type: CaptureGroupType, _ text: String) async -> Bool {
+            seq += 1
+            let page = tmp.appendingPathComponent("chosen-\(gid).jpg")
+            writeJPEG(page, width: 400 + seq)
+            LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: text, classification: nil, errorMessage: nil, errorCode: nil)
+            _ = chosenSession.ingest(jpeg: (try? Data(contentsOf: page)) ?? Data(), groupId: gid, seq: seq, type: type,
+                                     quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+            if type == .document { chosenSession.liveProcessor.segmentResolved(groupId: gid) }
+            await chosenSession.liveProcessor._testAwaitFinalizes()
+            let ok = chosenSession.liveProcessor.staged.contains { $0.groupId == gid }
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            return ok
+        }
+        let cF = await cCapture("CF1", .folder, "FOLDER 6/2/61")
+        let cSaved = chosenSession.applyContainerFields(groupId: "CF1", fields: ContainerFieldSet([.date: ContainerValue("6/2/61", source: .user)]))
+        let cDocFolder = await cCapture("CD1", .document, "DOCC Undated note in folder")
+        let cDocText = await cCapture("CD2", .document, "DOCN London\n6/2/61\nDear Sir:")
+        let preChosenCD1 = chosenSession.liveProcessor._datingTestRetained("CD1")
+        let preChosenCD2 = chosenSession.liveProcessor._datingTestRetained("CD2")
+        check("6 Live chosen-collection: month-first session initially dates 6/2/61 as June (folder 1961-06 and text 1961-06-02)",
+              cF && cSaved && cDocFolder && cDocText
+                && preChosenCD1?.year == 1961 && preChosenCD1?.month == 6 && preChosenCD1?.day == nil
+                && preChosenCD2?.year == 1961 && preChosenCD2?.month == 6 && preChosenCD2?.day == 2,
+              "cd1=\(String(describing: preChosenCD1?.month))/\(String(describing: preChosenCD1?.day)) cd2=\(String(describing: preChosenCD2?.month))/\(String(describing: preChosenCD2?.day))")
+
+        let callsBeforeFinalize = wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields + wire.tagging }
+        let savedTestOut = ProcessInfo.processInfo.environment["LIVECAPTURE_TESTOUT"]
+        setenv("LIVECAPTURE_TESTOUT", chosenRoot.path, 1)
+        defer {
+            if let savedTestOut { setenv("LIVECAPTURE_TESTOUT", savedTestOut, 1) } else { unsetenv("LIVECAPTURE_TESTOUT") }
+        }
+        let draft = LiveCaptureProcessor.CollectionDraft(
+            id: "__unfiled__", finalName: "British Files", existingFolders: [chosenExisting],
+            suggestedFolders: [chosenExisting], chosenExisting: chosenExisting, segmentCount: 3, photoCount: 3)
+        chosenSession.liveProcessor.finalize([draft], settingsStore: chosenStore)
+        let filedOK = await settle { !chosenSession.liveProcessor.isFinalizing && chosenSession.liveProcessor.staged.isEmpty }
+        let callsAfterFinalize = wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields + wire.tagging }
+        let filedCompanions = ((try? fm.contentsOfDirectory(at: chosenExisting, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.lastPathComponent.hasSuffix(".archivesuite.json") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let filedDates = filedCompanions.compactMap { url -> String? in
+            guard let data = try? Data(contentsOf: url), let rec = try? CatalogueRecord(json: data),
+                  case .value(let dv)? = rec.documents.first?.fields?.documentDate?.current else { return nil }
+            return dv.date.wireValue
+        }
+        check("6 Live chosen-collection: Finish re-dates folder (1961-02) and text (1961-02-06) before filing, with 0 API calls",
+              filedOK && callsAfterFinalize == callsBeforeFinalize && filedDates == ["1961-02", "1961-02-06"],
+              "filedOK=\(filedOK) calls=\(callsAfterFinalize - callsBeforeFinalize) dates=\(filedDates)")
+
+        let newSubfolder = chosenRoot.appendingPathComponent("New Subfolder", isDirectory: true)
+        try? fm.createDirectory(at: newSubfolder, withIntermediateDirectories: true)
+        let rootCollectionSession: [String: ResolvedSetting] = [
+            SettingsKey.numericDatesDayFirst.rawValue: ResolvedSetting(value: .bool(true), layer: .collection)
+        ]
+        let newFolderSnap = LiveCaptureProcessor.liveRunSnapshot(
+            store: chosenStore, folder: newSubfolder, run: nil, session: rootCollectionSession)
+        check("6 Live chosen-collection: new subfolder inherits root's day-first value without '.collection' provenance",
+              newFolderSnap.values[SettingsKey.numericDatesDayFirst.rawValue]?.value.bool == true
+                && newFolderSnap.values[SettingsKey.numericDatesDayFirst.rawValue]?.layer == nil,
+              "\(String(describing: newFolderSnap.values[SettingsKey.numericDatesDayFirst.rawValue]))")
     }
 }
 #endif

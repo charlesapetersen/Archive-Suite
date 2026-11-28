@@ -1209,6 +1209,27 @@ final class CaptureSession: ObservableObject {
         headlessResolvePendingTags()   // headless E2E only (env-gated): a marker's card resolves like a tag card
     }
 
+    /// W49.proc-gemma-external-switch: merges a Finish-batched Gemma label read into a staged (possibly already
+    /// card-resolved) marker. Preserves every `.user`-sourced value the operator entered during capture; if Gemma
+    /// did not answer (`modelAnswered == false`), keeps the existing Vision + parser fallback proposals intact.
+    func mergeDeferredLabelRead(groupId: String, read: ContainerFieldSet, modelAnswered: Bool,
+                                fallback: ContainerLabelCapture.Fallback?) {
+        guard !filedGroupIds.contains(groupId) else { return }
+        guard modelAnswered else {
+            if containerFallbacks[groupId] == nil, let fallback {
+                containerFallbacks[groupId] = fallback
+                _ = writeManifest()
+            }
+            return
+        }
+        var merged = containerFields[groupId] ?? ContainerFieldSet()
+        merged.values = merged.values.filter { $0.value.source == .user }
+        for (field, value) in read.values where merged[field] == nil { merged[field] = value }
+        containerFallbacks[groupId] = fallback
+        containerFields[groupId] = merged
+        _ = writeManifest()
+    }
+
     /// The marker card's Save: its values become the operator's (source `user`, keeping each proposal's reader where
     /// the value is unchanged). Same durability contract as `applyMacTags`.
     @discardableResult
