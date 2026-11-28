@@ -646,7 +646,7 @@ The items below carry implementation and acceptance. Every stage starts on scrat
 | 5 · Reader | `W49.storage-reader`, followed by `W49.reader-root-movable` for moved-root behavior and cache reuse |
 | 6 · Consumer parity and transfer | `W49.storage-notes-zotero` and `W49.storage-export`, followed by `W49.storage-drop-dead-copies` |
 | 7 · Optional projections | `W49.storage-finder` and `W49.storage-spotlight` keep the decisions separate. |
-| 8 · Adoption, pilot and rollback | `W49.corpus-adoption-tool` implements scratch conversion after Processor filing. `W49.storage-pilot` verifies the integrated flow and rollback after the remaining stages. |
+| 8 · Adoption, pilot and rollback | `W49.corpus-adoption-tool` implements scratch conversion after Processor filing. `W49.storage-pilot` verified the integrated flow and rollback (2026-11-27, `ops/verify/storage-pilot.sh`) after the remaining stages. |
 
 Cloud editing stays with `W49.reader-cloud-drives` at its existing priority. Real archive writes require
 separate approval.

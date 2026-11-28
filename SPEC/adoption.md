@@ -103,7 +103,8 @@ the manifest.
 
 ## Left to later work
 
-`W49.storage-pilot` runs the tool on representative scratch copies with the rest of the catalogue rollout. The
+`W49.storage-pilot` ran the tool on representative scratch copies with the rest of the catalogue rollout
+(`ops/verify/storage-pilot.sh`, rerunnable at $0). The
 owner then reviews that pilot (`W49.corpus-adoption-owner-review`), including which old spellings the tag grammar
 reads as subjects and whether a label photo without an original may be read from its PDF.
 A general folder-map or

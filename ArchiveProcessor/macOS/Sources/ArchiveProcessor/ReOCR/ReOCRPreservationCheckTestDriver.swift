@@ -189,6 +189,34 @@ enum ReOCRPreservationCheckTestDriver {
         fails("3 a changed page count fails", with([2: dict("<< /Type /Pages /Kids [3 0 R] /Count 1 >>")]), "page count")
         fails("3 a replaced page not listed fails", good, "page 2", replacing: [])
         fails("3 a page out of range fails", good, "not in the file", replacing: [1, 5])
+
+        // 4. Quartz reads `636.05]` and `636.05 ]` as different doubles; qpdf writes the second form
+        // (W49.storage-pilot: 15 of 55 pre-app archive PDFs refused for an unchanged box).
+        func boxed(_ box: String) -> (Data, Int) {
+            file([
+                1: dict("<< /Type /Catalog /Pages 2 0 R >>"),
+                2: dict("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+                3: dict("<< /Type /Page /Parent 2 0 R /MediaBox \(box) /Contents 4 0 R >>"),
+                4: stream("", Data("0 0 m 100 100 l S".utf8)),
+            ])
+        }
+        let tight = boxed("[0 0.00900 424.45 636.05]").0, spaced = boxed("[ 0 0.00900 424.45 636.05 ]").0
+        let quartz = [tight, spaced].map { ReOCRPreservationCheck.document($0)?.page(at: 1)?.getBoxRect(.mediaBox).maxY }
+        // Informational: the case below proves the fix only while Quartz still reads them differently.
+        lines.append("INFO 4 Quartz reads the two spellings of one box as \(quartz[0] != quartz[1] ? "different" : "the same") doubles: \(quartz)")
+        let respelled = ReOCRPreservationCheck.problems(original: tight, candidate: spaced, replacing: [],
+                                                        requiresOriginalPrefix: false)
+        check("4 the same box written with spaces is unchanged", respelled.isEmpty, "\(respelled)")
+        let moved = ReOCRPreservationCheck.problems(original: tight, candidate: boxed("[0 0.00900 424.45 636.06]").0,
+                                                    replacing: [], requiresOriginalPrefix: false)
+        check("4 a box moved by a hundredth of a point still fails", moved.contains { $0.contains("MediaBox") }, "\(moved)")
+        let box = CGRect(x: 0, y: 0.009, width: 424.45, height: 636.05)
+        check("4 sameRect refuses a box moved by a millionth of a point",
+              !ReOCRPreservationCheck.sameRect(box, box.offsetBy(dx: 0, dy: 1e-6)))
+        check("4 sameReal accepts last-bit noise and refuses infinities",
+              ReOCRPreservationCheck.sameReal(636.04999999999995, 636.05000000000007)
+                  && !ReOCRPreservationCheck.sameReal(.infinity, 5) && !ReOCRPreservationCheck.sameReal(.infinity, -.infinity)
+                  && !ReOCRPreservationCheck.sameReal(.nan, .nan))
     }
 
     private static func finish() {

@@ -94,7 +94,7 @@ enum ReOCRPreservationCheck {
                 out.append(diff)
             }
             for box in [CGPDFBox.mediaBox, .cropBox, .bleedBox, .trimBox, .artBox]
-            where a.getBoxRect(box) != b.getBoxRect(box) {
+            where !sameRect(a.getBoxRect(box), b.getBoxRect(box)) {
                 out.append("page \(i + 1): its \(box) changed")
             }
             if a.rotationAngle != b.rotationAngle { out.append("page \(i + 1): its rotation changed") }
@@ -123,12 +123,26 @@ enum ReOCRPreservationCheck {
         if let diff = compare.dictionaries(da, db, path: path, skip: Set(GraphCompare.inheritable)) { return diff }
         if let diff = compare.effective(da, db, path: path) { return diff }
         for box in [CGPDFBox.mediaBox, .cropBox, .bleedBox, .trimBox, .artBox]
-        where want.getBoxRect(box) != got.getBoxRect(box) {
+        where !sameRect(want.getBoxRect(box), got.getBoxRect(box)) {
             return "\(path): its \(box) differs"
         }
         if want.rotationAngle != got.rotationAngle { return "\(path): its rotation differs" }
         if render(want) != render(got) { return "\(path): it renders differently" }
         return nil
+    }
+
+    /// Whether two reals Quartz read are the same written number. Quartz reads one number to different doubles
+    /// depending on the byte after it: `636.05]` and `636.05 ]` differ in the last bits, and qpdf writes arrays with
+    /// spaces, so an unchanged box in a real archive PDF read as changed (W49.storage-pilot: 15 of 55). Values that
+    /// agree to one part in 10^9 are that number; any edit a writer makes changes far more, and pixels are still compared.
+    static func sameReal(_ x: CGFloat, _ y: CGFloat) -> Bool {
+        guard x.isFinite, y.isFinite else { return x == y }   // an infinite bound would accept any number
+        return x == y || abs(x - y) <= 1e-9 * max(1, abs(x), abs(y))
+    }
+
+    static func sameRect(_ a: CGRect, _ b: CGRect) -> Bool {
+        sameReal(a.origin.x, b.origin.x) && sameReal(a.origin.y, b.origin.y)
+            && sameReal(a.width, b.width) && sameReal(a.height, b.height)
     }
 
     /// The one value a revision may give the information dictionary's `/Producer` (see `problems`).
@@ -236,7 +250,7 @@ enum ReOCRPreservationCheck {
             case .real:
                 var x: CGPDFReal = 0, y: CGPDFReal = 0
                 _ = CGPDFObjectGetValue(a, .real, &x); _ = CGPDFObjectGetValue(b, .real, &y)
-                return x == y ? nil : "\(path): changed"
+                return ReOCRPreservationCheck.sameReal(x, y) ? nil : "\(path): changed"
             case .name:
                 var x: UnsafePointer<CChar>?, y: UnsafePointer<CChar>?
                 _ = CGPDFObjectGetValue(a, .name, &x); _ = CGPDFObjectGetValue(b, .name, &y)

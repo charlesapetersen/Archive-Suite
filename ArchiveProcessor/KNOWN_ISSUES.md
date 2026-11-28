@@ -546,6 +546,12 @@ When label reading needs Gemma, the Processor checks the existing local servers 
 - **A marker whose own PDF failed to move** and is filed by a later Finish gets the next number after the documents
   already filed, so its run starts after them (the numbering, not the label read). (accepted: a failure path only; the numbers stay unique).
 
+## ⚠️ LIMITATION (W49.storage-pilot, 2026-11-27): what the adoption pilot found in the pre-app archive
+- **An original named with a plain space where its PDF has a no-break space is not paired.** 1,445 of the archive's
+  91,191 PDFs carry U+00A0 in their name where the mirrored JPEG has a space (every sampled Greene Papers file), so
+  adoption reports `original-missing`, keeps no original, and the labels step reads such a folder's labels as unread.
+  (queued: W49.adoption-nbsp-pairing).
+
 ## ⚠️ LIMITATION (W47.ct-backfill, 2026-11-19): Tools ▸ Read Box and Folder Labels
 - **Markers are found by tag or colour only.** This menu command does not run the label classifier, so a box or
   folder photo with neither a `Box`/`Folder` tag nor the colour given for older material is read as a document here.
