@@ -319,9 +319,9 @@ in run history and Live Capture's spend estimate (W49.proc-fix-s044).
 `DefaultsKeys.enableSegmentJSON` now defaults to false, so a new output has no `.json` sidecar unless the user turns on
 "Export segment JSON metadata". The catalogue record keeps the dates, names, item fields and rating that tagging runs
 find either way (Process Files always files through a catalogue run; Live Capture's entity and item-field calls never
-read the setting). What only the sidecar held:
+read the setting, except the on-Mac mentions of an untagged document, below). What only the sidecar held:
 - **The low-confidence name mentions of an OCR-only or copy-source run** (`recordLocalNameMentions`) are written to the
-  sidecar alone, so with the default they are not kept. The catalogue record has no field for role-less names (SPEC/catalogue-fields.md, "mentions alone"). (asked: W49.proc-local-names-catalogue-owner-ok)
+  sidecar alone, so with the default they are not kept. The catalogue record has no field for role-less names (SPEC/catalogue-fields.md, "mentions alone"). With export off, neither Process Files nor Live Capture runs the on-Mac name finder for these runs, since nothing would keep its result (W49.proc-local-names-catalogue). (accepted: owner, 2026-11-27 walkthrough, W49.proc-local-names-catalogue-owner-ok option b — OCR-only runs keep no separate name list; names stay findable through Reader's full-text search)
 - **Notes' Copy / Add to Zotero read a source's names from its sidecar** (`ZoteroSource.gather`). Fixed 2026-11-27:
   they, the year suggestion and the Reader's export in catalogue mode now read the PDF's catalogue record
   (`CatalogueSourceFacts`, SPEC/containers.md §Zotero "Catalogue sources"). (accepted: fixed history,

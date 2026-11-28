@@ -688,6 +688,11 @@ enum EntityFeatureTestDriver {
         reloadedOffline.liveProcessor._recoveryTestLoadManifest(stagingDir: staging, config: cfg)
         check("6 Live: the manifest retains the local route's confidence on reload",
               retained?.decision.localMode == .mentions && reloadedOffline.liveProcessor._entityTestRetainedEntities("H") == retained)
+        // Sidecars off: nothing keeps role-less mentions (owner, 2026-11-27), so the finder does not run.
+        let (offlineOff, _, _) = await session("offline-nosidecars", sidecars: false, settings: low, mode: .none)
+        check("6 Live, sidecars off: no offline mentions found or retained, no sidecar",
+              offlineOff.liveProcessor._entityTestRetainedEntities("H") == nil && sidecar(offlineOff, "H").isEmpty
+              && wire.tagging == 0 && wire.entity.isEmpty)
     }
 }
 

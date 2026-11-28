@@ -1676,6 +1676,9 @@ final class LiveCaptureProcessor: ObservableObject {
         guard group.type == .document else { return nil }
         var inputs = liveEntityInputs(results: results, config: config)
         if config.taggingMode == .none || config.taggingMode == .copySource {
+            // Role-less mentions are kept only in the sidecar; the catalogue record has no field for them (owner,
+            // 2026-11-27, W49.proc-local-names-catalogue). With export off nothing would keep them, so don't look.
+            guard config.enableSegmentJSON else { return nil }
             return await EntityRunPolicy.localMentions(text: segment.combinedText, inputs: inputs)
         }
         guard config.taggingMode == .automatic, (mac?.subjects ?? []).isEmpty,
