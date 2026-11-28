@@ -5,7 +5,10 @@
 # (scripts/fake_gateway.py) on 127.0.0.1 — $0, no network, nothing outside a fresh mktemp directory.
 #
 #   off: no filed PDF has a Finder tag or label; each has its catalogue companion, which holds the read state.
-#   on:  (ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS=1, a Debug-only switch) every filed PDF carries Unread as today.
+#   on:  (ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS=1, a Debug-only switch) every filed PDF carries Unread as today,
+#        and its ownership record (xattr com.archivesuite.finder-mirror) claims every tag as the suite's.
+#   archive: the output folder is a Reader archive whose settings document turns mirroring on, with the general
+#        setting off: the archive's choice wins (W49.storage-finder-reader-mirror).
 # Prints ALL PASS on success.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"
 set -uo pipefail
@@ -59,7 +62,7 @@ run_case() {   # name outdir env...
 # Every filed PDF (one with a catalogue companion beside it), its Finder tags, label and the companion's read state.
 check() {   # root expect(off|on)
     python3 - "$1" "$2" <<'EOF'
-import json, os, sys
+import json, os, subprocess, sys
 sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))
 from finder_tags import read_tags
 root, expect = sys.argv[1], sys.argv[2]
@@ -92,6 +95,13 @@ for d, _, fs in sorted(os.walk(root)):
             bad.append(f'{f}: carries Finder tags or a label with mirroring off')
         if expect == 'on' and 'Unread' not in (names or []):
             bad.append(f'{f}: no Unread tag with mirroring on')
+        got = subprocess.run(['xattr', '-p', 'com.archivesuite.finder-mirror', p], capture_output=True, text=True)
+        ledger = json.loads(got.stdout) if got.returncode == 0 else None
+        print(f'       ownership record: {ledger}')
+        if expect == 'off' and ledger is not None:
+            bad.append(f'{f}: carries an ownership record with mirroring off')
+        if expect == 'on' and (ledger is None or sorted(ledger.get('owned', [])) != sorted(names or [])):
+            bad.append(f'{f}: the ownership record does not claim exactly its tags ({ledger})')
 if filed == 0:
     bad.append('no filed PDF with a companion')
 if images == 0:
@@ -107,6 +117,12 @@ run_case off "$WORK/off"
 check "$WORK/off" off | tee "$WORK/off.txt"; grep -q '^PASS' "$WORK/off.txt" || fail=1
 run_case on "$WORK/on" ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS=1
 check "$WORK/on" on | tee "$WORK/on.txt"; grep -q '^PASS' "$WORK/on.txt" || fail=1
+mkdir -p "$WORK/archive/.archivesuite"
+printf '{"createdAt":"2026-11-27T00:00:00Z","guid":"%s","kind":"reader","name":"Scratch"}' \
+    "$(uuidgen | tr 'A-Z' 'a-z')" > "$WORK/archive/.archive-suite-root.json"
+printf '{"mirrorFinderTags":true,"schemaVersion":1}' > "$WORK/archive/.archivesuite/archive-settings.json"
+run_case archive "$WORK/archive"
+check "$WORK/archive" on | tee "$WORK/archive.txt"; grep -q '^PASS' "$WORK/archive.txt" || fail=1
 python3 - "$WORK/in" <<'EOF' || fail=1
 import os, sys
 sys.path.insert(0, os.path.join(os.getcwd(), 'scripts'))

@@ -179,38 +179,43 @@ public enum FinderMirror {
     /// The tag list, label and ledger after projecting `projection` onto a file that carries `current`.
     /// Removes owned tokens the projection no longer wants (and, for Re-publish, `alsoRemove`), adds projected
     /// tokens the file lacks, and keeps everything else. A projected token already on the file stays unowned.
-    /// A colour label the file already has and the suite did not set is left, unless `republishing`.
+    /// A colour label the file already has and the suite did not set is always left; Re-publish replaces a label only
+    /// when the suite had set it. A wanted token already on the file in another case keeps its ownership.
     public static func plan(current: [String], label: Int?, ledger: Ledger?, projection: Projection,
                             alsoRemove: [String] = [], republishing: Bool = false)
         -> (tags: [String], label: Int?, ledger: Ledger) {
+        let suiteLabel = ledger?.ownedLabel
         let labelIsOurs = normalizedLabel(label) == 0
-            || ledger?.ownedLabel.map { normalizedLabel($0) == normalizedLabel(label) } == true
-        let setsLabel = (labelIsOurs || republishing) ? projection.label : nil
+            || suiteLabel.map { normalizedLabel($0) == normalizedLabel(label) } == true
+            || (republishing && suiteLabel != nil)
+        let setsLabel = labelIsOurs ? projection.label : nil
+        let clearsLabel = labelIsOurs && projection.label == nil && suiteLabel != nil && normalizedLabel(label) != 0
         let wanted = projection.tokens + (setsLabel.map { [$0.tokenName] } ?? [])
-        var owned = ledger?.owned ?? []
         var tags = current
-        for token in owned + alsoRemove where !wanted.contains(where: { isSameTag($0, token) }) {
+        var owned: [String] = []
+        for token in ledger?.owned ?? [] {
+            guard let index = tags.firstIndex(of: token) else { continue }
+            if wanted.contains(where: { isSameTag($0, token) }) { owned.append(token) } else { tags.remove(at: index) }
+        }
+        for token in alsoRemove where !wanted.contains(where: { isSameTag($0, token) }) {
             if let index = tags.firstIndex(of: token) { tags.remove(at: index) }
         }
-        if republishing, setsLabel != nil, let old = FinderLabel(labelNumber: label), old != setsLabel,
+        if labelIsOurs, setsLabel != nil || clearsLabel, let old = FinderLabel(labelNumber: label), old != setsLabel,
            let index = tags.firstIndex(of: old.tokenName) {
             tags.remove(at: index)
+            owned.removeAll { $0 == old.tokenName }
         }
-        owned = owned.filter { token in wanted.contains(token) && tags.contains(token) }
         for token in wanted where !tags.contains(where: { isSameTag($0, token) }) {
             tags.append(token)
             owned.append(token)
         }
         var newLabel = label
-        var ownedLabel = ledger?.ownedLabel
+        var ownedLabel: Int?
         if let setsLabel {
             newLabel = setsLabel.rawValue
             ownedLabel = setsLabel.rawValue
-        } else if projection.label == nil, let mine = ownedLabel, normalizedLabel(mine) == normalizedLabel(label) {
+        } else if clearsLabel {
             newLabel = nil
-            ownedLabel = nil
-        } else {
-            ownedLabel = nil
         }
         return (tags, newLabel, Ledger(owned: owned, ownedLabel: ownedLabel, baseline: tags, baselineLabel: newLabel))
     }
@@ -245,8 +250,11 @@ public enum FinderMirror {
                 refusal = .diverged(divergence)
                 return nil
             }
+            // Re-publish removes the facet tokens that appeared, but a colour name only when the suite had set the label:
+            // a colour the user chose in Finder over no colour of the suite's is theirs.
+            let appeared = (divergence?.added ?? []).filter { !FinderLabel.isColourName($0) || ledger?.ownedLabel != nil }
             let planned = plan(current: current, label: label, ledger: ledger, projection: projection,
-                               alsoRemove: republishing ? divergence?.added ?? [] : [], republishing: republishing)
+                               alsoRemove: republishing ? appeared : [], republishing: republishing)
             return .write(tags: planned.tags, label: planned.label, ledger: planned.ledger)
         }
         return refusal ?? .published(result)
@@ -289,13 +297,16 @@ public enum FinderMirror {
             guard case .none = state else { return nil }
             var tags = current
             var owned: [String] = []
-            for token in removal.removed where !tags.contains(token) {
+            let restoresLabel = removal.removedLabel != nil && normalizedLabel(label) == 0
+            let colourToken = removal.removedLabel.flatMap { FinderLabel(labelNumber: $0) }?.tokenName
+            for token in removal.removed where !tags.contains(where: { isSameTag($0, token) }) {
+                if token == colourToken && !restoresLabel { continue }
                 tags.append(token)
                 owned.append(token)
             }
             var newLabel = label
             var ownedLabel: Int?
-            if let colour = removal.removedLabel, normalizedLabel(label) == 0 {
+            if restoresLabel, let colour = removal.removedLabel {
                 newLabel = colour
                 ownedLabel = colour
             }
@@ -304,13 +315,17 @@ public enum FinderMirror {
         }
     }
 
-    /// Record every tag on a freshly produced file as the suite's own. For the Processor's working copy just
-    /// before a mirrored filing: every tag on it is one the Processor wrote. Tags are not changed.
-    public static func claimAll(_ url: URL) throws {
-        _ = try CoordinatedTagWriter.writeMirror(url) { current, label, _ in
-            .write(tags: current, label: label,
-                   ledger: Ledger(owned: current, ownedLabel: normalizedLabel(label) == 0 ? nil : label,
-                                  baseline: current, baselineLabel: label))
+    /// Record the tags on a freshly produced file as the suite's own, except `excluding` (with multiplicity): for the
+    /// Processor's working copy just before a mirrored filing, whose tags it wrote itself, less any its sources already
+    /// carried. A file with an unknown ownership record is left alone. Tags are not changed.
+    public static func claim(_ url: URL, excluding: [String]) throws {
+        _ = try CoordinatedTagWriter.writeMirror(url) { current, label, state in
+            if case .unknown = state { return nil }
+            let owned = multisetDifference(current, minus: excluding)
+            return .write(tags: current, label: label,
+                          ledger: Ledger(owned: owned, ownedLabel: FinderLabel(labelNumber: label)
+                                            .flatMap { owned.contains($0.tokenName) ? $0.rawValue : nil },
+                                         baseline: current, baselineLabel: label))
         }
     }
 }

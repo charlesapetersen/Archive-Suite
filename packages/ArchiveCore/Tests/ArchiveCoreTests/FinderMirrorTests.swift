@@ -177,16 +177,74 @@ final class FinderMirrorTests: XCTestCase {
         XCTAssertNotNil(FinderMirror.readLedger(url).ledger)
     }
 
-    func testClaimAllOwnsAFreshOutputsTags() throws {
-        let url = try makeFile(tags: ["1958", "Q2"])
-        try FinderMirror.claimAll(url)
+    func testClaimOwnsAFreshOutputsTagsButNotItsSourcesOwn() throws {
+        let url = try makeFile(tags: ["1958", "Q2", "Source Tag A"])
+        try FinderMirror.claim(url, excluding: ["Source Tag A"])
         XCTAssertEqual(FinderMirror.readLedger(url).ledger?.owned, ["1958", "Q2"])
-        XCTAssertEqual(try tags(url), ["1958", "Q2"])
+        XCTAssertEqual(try tags(url), ["1958", "Q2", "Source Tag A"])
+    }
+
+    func testRepublishLeavesAHandSetColourAlone() throws {
+        let url = try makeFile(tags: ["Purple"], label: FinderLabel.purple.rawValue)
+        _ = try FinderMirror.publish(url, projection: projection(try record(colour: "red")))
+        XCTAssertEqual(try label(url), FinderLabel.purple.rawValue, "a label the suite did not set is left")
+        try setTags(url, try tags(url).filter { $0 != "Day 12" })
+        guard case .published = try FinderMirror.publish(url, projection: projection(try record(colour: "red")),
+                                                         republishing: true) else { return XCTFail() }
+        XCTAssertEqual(try label(url), FinderLabel.purple.rawValue)
+        XCTAssertTrue(try tags(url).contains("Purple"))
+        XCTAssertFalse(try tags(url).contains("Red"))
+        XCTAssertTrue(try tags(url).contains("Day 12"))
+    }
+
+    func testRepublishKeepsAColourChosenInFinderWhenTheSuiteSetNone() throws {
+        let url = try makeFile()
+        _ = try FinderMirror.publish(url, projection: projection(try record()))
+        try setTags(url, try tags(url).filter { $0 != "Q2" } + ["Blue"])
+        try (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(FinderLabel.blue.rawValue, forKey: .labelNumberKey)
+        guard case .published = try FinderMirror.publish(url, projection: projection(try record()),
+                                                         republishing: true) else { return XCTFail() }
+        XCTAssertTrue(try tags(url).contains("Blue"))
+        XCTAssertEqual(try label(url), FinderLabel.blue.rawValue)
+        XCTAssertTrue(try tags(url).contains("Q2"))
+    }
+
+    func testRepublishPutsBackTheSuitesOwnColour() throws {
+        let url = try makeFile()
+        _ = try FinderMirror.publish(url, projection: projection(try record(colour: "red")))
+        try setTags(url, try tags(url).filter { $0 != "Red" } + ["Blue"])
+        try (URL(fileURLWithPath: url.path) as NSURL).setResourceValue(FinderLabel.blue.rawValue, forKey: .labelNumberKey)
+        let outcome = try FinderMirror.publish(url, projection: projection(try record(colour: "red")))
+        guard case .diverged(let divergence) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertTrue(divergence.labelChanged)
+        _ = try FinderMirror.publish(url, projection: projection(try record(colour: "red")), republishing: true)
+        XCTAssertEqual(try label(url), FinderLabel.red.rawValue)
+        XCTAssertTrue(try tags(url).contains("Red"))
+        XCTAssertFalse(try tags(url).contains("Blue"))
+    }
+
+    func testOwnershipSurvivesASubjectThatOnlyChangesCase() throws {
+        let url = try makeFile()
+        _ = try FinderMirror.publish(url, projection: projection(try record(subjects: ["Lincoln"])))
+        _ = try FinderMirror.publish(url, projection: projection(try record(subjects: ["lincoln"])))
+        XCTAssertTrue(try XCTUnwrap(FinderMirror.readLedger(url).ledger).owned.contains("Lincoln"))
+        _ = try FinderMirror.removeSuiteTags(url)
+        XCTAssertFalse(try tags(url).contains { $0.caseInsensitiveCompare("lincoln") == .orderedSame })
+    }
+
+    func testARecordThatCannotBeSavedLeavesTheTagsAsTheyWere() throws {
+        let url = try makeFile(tags: ["ToPrint"])
+        // An ownership record over the 64 KB a reader accepts fails its own re-read after writing.
+        let subjects = (0..<1400).map { "Subject number \($0) padding text" }
+        XCTAssertThrowsError(try FinderMirror.publish(url, projection: projection(try record(subjects: subjects)))) { error in
+            XCTAssertTrue("\(error)".contains("nothing was changed"), "\(error)")
+        }
+        XCTAssertEqual(try tags(url), ["ToPrint"])
     }
 
     func testAFilingThatLeavesTagsBehindLeavesTheLedgerBehindToo() throws {
         let source = try makeFile(tags: ["Q2"])
-        try FinderMirror.claimAll(source)
+        try FinderMirror.claim(source, excluding: [])
         for carries in [false, true] {
             let target = tempDir.appendingPathComponent("copy-\(carries).pdf")
             let input = open(source.path, O_RDONLY)
@@ -216,6 +274,16 @@ final class FinderMirrorTests: XCTestCase {
         XCTAssertFalse(ArchiveSettings.mirrorsFinderTags(inFolder: output, outsideArchive: true))
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent(".archivesuite").path)
         XCTAssertEqual(leftovers, ["archive-settings.json"])
+    }
+
+    func testAnArchiveThatCannotBeToldDoesNotMirror() throws {
+        let root = tempDir.appendingPathComponent("Sealed", isDirectory: true)
+        let output = root.appendingPathComponent("Box", isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        let marker = root.appendingPathComponent(RootMarker.filename)
+        try Data("{}".utf8).write(to: marker)
+        XCTAssertEqual(ArchiveSettings.membership(of: output), .unknown)
+        XCTAssertFalse(ArchiveSettings.mirrorsFinderTags(inFolder: output, outsideArchive: true))
     }
 
     func testArchiveSettingsNeverWriteThroughALinkOrOverANewerDocument() throws {

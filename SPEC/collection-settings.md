@@ -120,7 +120,8 @@ catalogue fields to Finder tags, `SPEC/tag-format.md` §"The suite's Finder mirr
 
 - **Who reads it.** The Reader, for the root it shows. The Processor, for the folder it files into: the nearest folder
   at or above it with a Reader root marker is the archive; its document decides, and an archive with no document
-  (or one that cannot be read) does not mirror. Outside any archive the general `mirrorFinderTags` decides.
+  (or one that cannot be read, or a marker on the way that cannot be read) does not mirror. Outside any archive the
+  general `mirrorFinderTags` decides.
 - **Who writes it.** The Reader, when the user turns mirroring on or off for the open archive. The write follows the
   collection document's rules below: an existing root only, `.archivesuite` created one level, never through a link
   or over a file that is not ordinary, a temporary file renamed in place, and a newer document left alone.

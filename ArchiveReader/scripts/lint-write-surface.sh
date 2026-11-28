@@ -249,6 +249,10 @@ ALLOW=(
   # lock as the tag write, after the tags verify; re-read after writing. It never touches file bytes.
   "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}return data.withUnsafeBytes { setxattr(rawPath, FinderMirror.ledgerAttribute, \$0.baseAddress, data.count, 0, 0) }"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}return removexattr(rawPath, FinderMirror.ledgerAttribute, 0)"
+  # …and when that record cannot be saved after the tags were written, the same block puts the tags back as they were
+  # (`TagXattr.writeRawEntries` with the before-entries, then this label restore) and re-reads them, so the tags and
+  # their ownership record never part.
+  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}(try? (target as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)) != nil,"
   # W49.storage-finder-reader-mirror: the archive's settings document (SPEC/collection-settings.md §"The archive's
   # settings"), at the root's hidden `.archivesuite` folder only. `mkdirat` makes only that folder; every later step
   # goes through its O_NOFOLLOW descriptor. The temporary is created O_EXCL, removed only if the rename did not

@@ -620,12 +620,13 @@ sets it, the Processor's filing follows it, and outside any archive the Processo
 - **Ownership record.** The extended attribute `com.archivesuite.finder-mirror` on the PDF holds UTF-8 JSON
   `{"v":1,"owned":[…],"ownedLabel":N,"baseline":[…],"baselineLabel":N}`: the tokens (with multiplicity) and label
   the suite introduced, and the whole tag list and label right after its last write. It is written inside the same
-  coordination and per-path lock as the tags, after they verify. A projected token already on the file stays
+  coordination and per-path lock as the tags, after they verify; if it cannot be saved, the tags are put back as they
+  were and the write fails, so the tags and their record never part. A projected token already on the file stays
   unowned; a hand-made tag is never owned. It travels with the tags: a filing that leaves the Finder tags behind
   (`CataloguePairFiler.copyFile`) leaves it behind too. A record that is unreadable or has a larger `v` is unknown:
   nothing counts as owned and it is replaced only by a deliberate Re-publish.
 - **Writing a change.** A projection removes owned tokens the record no longer gives, adds projected tokens the
-  file lacks, and keeps every other tag. A label the suite did not set is left. The record is never changed from
+  file lacks, and keeps every other tag. A label the suite did not set is left, by Re-publish too. The record is never changed from
   tags, and enabling the mirror never reads tags into it.
 - **A Finder edit (2b).** The tags *diverge* when, against the baseline, an owned token or a facet token is gone,
   a facet token appeared (anything `DocumentTags.parse` claims as other than a subject, a colour name, `OCR Poor`,
@@ -637,8 +638,9 @@ sets it, the Processor's filing follows it, and outside any archive the Processo
   owned tokens still present and the label if it is still the suite's, then drops the record; a file with no
   readable record keeps every tag. Undo puts back each removed token the file lacks (and the label if it has none)
   and records them as owned again.
-- **The Processor.** A mirrored filing claims every tag on its own fresh working copy as owned
-  (`FinderMirror.claimAll`) just before the copy, since the Processor wrote all of them.
+- **The Processor.** A mirrored filing claims the tags on its own working copy as owned just before the copy
+  (`FinderMirror.claim`), less any tag its sources already carried (a pre-OCRed PDF keeps its own); when a source's
+  tags cannot be read, nothing is claimed. A file whose ownership record is unknown is not claimed.
 
 ---
 

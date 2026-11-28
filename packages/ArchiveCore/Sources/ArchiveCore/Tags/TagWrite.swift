@@ -399,7 +399,19 @@ public enum CoordinatedTagWriter {
                 // unchanged; consumers switch to this in W15.tu2.
                 let occurrenceInverse = tagOccurrenceInverse(before: before, after: after,
                                                              beforeLabel: beforeLabel, afterLabel: afterLabel)
-                try afterVerify?(target)
+                if let afterVerify {
+                    do {
+                        try afterVerify(target)
+                    } catch {
+                        // The tags and the record of who wrote them must not part: put the tags back as they were
+                        // (names and colours, then the label), so the failed write changed nothing.
+                        guard let beforeRaw, (try? TagXattr.writeRawEntries(beforeRaw, to: target)) != nil,
+                              (try? (target as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)) != nil,
+                              let (restored, restoredLabel) = try? readPair(target), multisetEqual(restored, before),
+                              normalizedLabel(restoredLabel) == normalizedLabel(beforeLabel) else { throw error }
+                        throw TagWriteError.verificationFailed("nothing was changed: the record of what the suite wrote could not be saved (\(error.localizedDescription))")
+                    }
+                }
                 box.result = TagWriteResult(url: url, before: before, after: after,
                                             beforeLabel: beforeLabel, afterLabel: afterLabel,
                                             inverse: inverse, occurrenceInverse: occurrenceInverse)

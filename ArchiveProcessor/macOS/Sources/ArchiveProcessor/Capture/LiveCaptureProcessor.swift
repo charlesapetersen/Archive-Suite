@@ -2837,8 +2837,11 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         let plans: [MovePlan]
         do {
+            // The archive the output folder belongs to decides; outside one, the general setting (W49.storage-finder-reader-mirror).
+            let mirrors = ProcessorCatalogueFiling.mirrorsFinderTags(inFolder: outputDir,
+                                                                     general: config?.mirrorFinderTags == true)
             plans = try Self.pinCatalogueDestinations(requestedPlans, alreadyStaged: staged, outputRoot: outputDir,
-                                                      carriesFinderTags: config?.mirrorFinderTags == true)
+                                                      carriesFinderTags: mirrors)
         } catch {
             // W40.fix-livecapture-fail-phase-warning — both early returns here file nothing, so each summary
             // carries the "⚠️" `summaryReportsProblem` reads; without it the pane drew the green check over the

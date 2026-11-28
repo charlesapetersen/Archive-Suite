@@ -62,21 +62,34 @@ public struct ArchiveSettings: Equatable, Sendable {
         return ArchiveSettings(mirrorFinderTags: object["mirrorFinderTags"] as? Bool ?? false, updatedAt: updated)
     }
 
-    /// The archive root a folder belongs to: the nearest folder at or above it carrying a Reader `RootMarker`.
-    /// Nil when there is none up to the volume's root. Read-only; a marker that cannot be read stops the walk
-    /// as "unknown" (nil) rather than skipping past it.
-    public static func archiveRoot(containing folder: URL) -> URL? {
+    /// Where a folder stands: inside an archive (the nearest folder at or above it carrying a Reader `RootMarker`),
+    /// outside any, or unknown because a marker on the way could not be read.
+    public enum Membership: Equatable, Sendable {
+        case archive(URL)
+        case outside
+        case unknown
+    }
+
+    /// Read-only; the walk stops at the volume's root.
+    public static func membership(of folder: URL) -> Membership {
         var directory = folder.standardizedFileURL
-        while true {
+        for _ in 0..<64 {
             switch Result(catching: { try RootMarker.read(at: directory) }) {
-            case .success(let marker?) where marker.kind == .reader: return directory
+            case .success(let marker?) where marker.kind == .reader: return .archive(directory)
             case .success: break
-            case .failure: return nil
+            case .failure: return .unknown
             }
-            let parent = directory.deletingLastPathComponent()
-            if parent.path == directory.path || isVolumeRoot(directory) { return nil }
+            let parent = directory.deletingLastPathComponent().standardizedFileURL
+            if parent.path == directory.path || directory.path == "/" || isVolumeRoot(directory) { return .outside }
             directory = parent
         }
+        return .unknown
+    }
+
+    /// The archive root a folder belongs to, or nil when it is outside any archive or that cannot be told.
+    public static func archiveRoot(containing folder: URL) -> URL? {
+        if case .archive(let root) = membership(of: folder) { return root }
+        return nil
     }
 
     private static func isVolumeRoot(_ url: URL) -> Bool {
@@ -85,10 +98,13 @@ public struct ArchiveSettings: Equatable, Sendable {
 
     /// Whether filed output in `folder` mirrors its fields to Finder tags: the archive's own choice when the
     /// folder is inside an archive (its document, else off), else `outsideArchive` (the Processor's general
-    /// setting). An archive document that cannot be read counts as off.
+    /// setting). An archive document that cannot be read, or a folder whose archive cannot be told, counts as off.
     public static func mirrorsFinderTags(inFolder folder: URL, outsideArchive: Bool) -> Bool {
-        guard let root = archiveRoot(containing: folder) else { return outsideArchive }
-        return ((try? read(root: root)) ?? nil)?.mirrorFinderTags ?? false
+        switch membership(of: folder) {
+        case .outside: return outsideArchive
+        case .unknown: return false
+        case .archive(let root): return ((try? read(root: root)) ?? nil)?.mirrorFinderTags ?? false
+        }
     }
 
     // MARK: Writing

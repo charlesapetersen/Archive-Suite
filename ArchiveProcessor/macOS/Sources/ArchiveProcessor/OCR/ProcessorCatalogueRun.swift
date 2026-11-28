@@ -188,7 +188,8 @@ struct ProcessorCatalogueRun: Codable, Sendable {
         for file in files {
             try Task.checkCancellation()
             do {
-                _ = try file.filing.file(preparedPDF: file.prepared, record: file.record, preservation: file.preservation)
+                _ = try file.filing.file(preparedPDF: file.prepared, record: file.record, preservation: file.preservation,
+                                         sources: file.sources)
             } catch where file.preservation != nil {
                 throw PreservationFilingError(filename: file.destination.lastPathComponent, underlying: error)
             }

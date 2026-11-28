@@ -117,16 +117,20 @@ extension OCRProcessor {
                                                  exportingImages: exportingImages, stampsUnread: stampsUnread)
                 let workingRoot = run.workingRoot
                 let outputRoot = run.outputRoot
-                let carriesFinderTags = activeRunConfig?.mirrorFinderTags == true
+                let generalMirrors = activeRunConfig?.mirrorFinderTags == true
                 let captureCandidates: [URL: PreservationCopy.Fingerprint] = run.captureHandoffPhotos.map { snapshot in
                     let read = Set(jobs.lazy.filter { $0.status == .succeeded }.map(\.sourceURL))
                     let warnings = Set(placeholderOutputs)
                     return snapshot.filter { read.contains($0.key) && !warnings.contains($0.key.lastPathComponent) }
                 } ?? [:]
                 let prepared = try await PDFGenerator.runWorker(priority: .utility) {
-                    try Self.prepareCatalogueFiles(drafts, workingRoot: workingRoot, outputRoot: outputRoot,
-                                                   captureSources: Set(captureCandidates.keys),
-                                                   carriesFinderTags: carriesFinderTags)
+                    // The archive the output folder belongs to decides; outside one, the general setting
+                    // (W49.storage-finder-reader-mirror). Frozen in each filing request from here on.
+                    let carriesFinderTags = ProcessorCatalogueFiling.mirrorsFinderTags(inFolder: outputRoot,
+                                                                                       general: generalMirrors)
+                    return try Self.prepareCatalogueFiles(drafts, workingRoot: workingRoot, outputRoot: outputRoot,
+                                                          captureSources: Set(captureCandidates.keys),
+                                                          carriesFinderTags: carriesFinderTags)
                 }
                 run.files = prepared.files
                 run.captureHandoffPhotos = captureCandidates.filter { prepared.completedCapture.contains($0.key) }
