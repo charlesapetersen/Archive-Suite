@@ -156,8 +156,11 @@ public struct CorpusScanResult: Sendable {
     public let cancelled: Bool
 
     /// Catalogue companions among the regular files seen (W49.storage-finder): a folder whose new output keeps its
-    /// fields only there, with no Finder tags, lists nothing outside catalogue mode, and the Reader says why.
-    public let catalogueCompanionsSeen: Int
+    /// fields only there, with no Finder tags, lists nothing outside catalogue mode, and the Reader says why. The
+    /// Reader keeps their paths so a companion its file watcher reports is counted at once, without double counting
+    /// one the pass already saw (W49.reader-mirror-followups).
+    public let catalogueCompanions: [URL]
+    public var catalogueCompanionsSeen: Int { catalogueCompanions.count }
 
     /// True only when the enumerator ran to its natural end.
     public var completed: Bool { !rootUnreadable && !cancelled }
@@ -172,8 +175,8 @@ public struct CorpusScanResult: Sendable {
     /// that produces one from a real tree.
     public init(entries: [CorpusEntry], unreadable: [CorpusReadFailure],
                 directoryErrors: [CorpusReadFailure], filesSeen: Int, vanishedMidScan: Int,
-                rootUnreadable: Bool, cancelled: Bool, catalogueCompanionsSeen: Int = 0) {
-        self.catalogueCompanionsSeen = catalogueCompanionsSeen
+                rootUnreadable: Bool, cancelled: Bool, catalogueCompanions: [URL] = []) {
+        self.catalogueCompanions = catalogueCompanions
         self.entries = entries
         self.unreadable = unreadable
         self.directoryErrors = directoryErrors
@@ -489,7 +492,7 @@ public enum CorpusWalker {
         var entries: [CorpusEntry] = []
         var unreadable: [CorpusReadFailure] = []
         var filesSeen = 0
-        var companions = 0
+        var companions: [URL] = []
         var vanished = 0
         var cancelled = false
         var batch: [CorpusEntry] = []
@@ -549,7 +552,7 @@ public enum CorpusWalker {
             case let .ok(isRegularFile, _, _, fingerprint):
                 guard isRegularFile else { continue }   // directories, symlinks to dirs, devices…
                 filesSeen += 1
-                if CatalogueRecord.isCompanionFilename(url.lastPathComponent) { companions += 1 }
+                if CatalogueRecord.isCompanionFilename(url.lastPathComponent) { companions.append(url) }
                 // Progress is about files EXAMINED, not matches found. The old match-sized batching
                 // left a 150k-file untagged tree at "0 scanned" until the pass ended — a real counter
                 // that never moved was scarcely better than Spotlight's indeterminate spinner.
@@ -605,7 +608,7 @@ public enum CorpusWalker {
                                 vanishedMidScan: vanished,
                                 rootUnreadable: false,
                                 cancelled: cancelled,
-                                catalogueCompanionsSeen: companions)
+                                catalogueCompanions: companions)
     }
 
     /// Walk only regular-file `stat(2)` fingerprints — no tag or content/resource-value reads.

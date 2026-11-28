@@ -39,6 +39,8 @@ final class CorpusWalkerTests: XCTestCase {
         try makeFile("c.pdf", tags: ["Unread"])
         let result = CorpusWalker.scan(root: tempDir)
         XCTAssertEqual(result.catalogueCompanionsSeen, 2)
+        XCTAssertEqual(result.catalogueCompanions.map(\.lastPathComponent).sorted(),
+                       ["a.pdf.archivesuite.json", "b.PDF.archivesuite.json"])
         XCTAssertEqual(result.entries.map(\.url.lastPathComponent), ["c.pdf"])
         XCTAssertTrue(CatalogueRecord.isCompanionFilename("x.pdf.archivesuite.json"))
         XCTAssertFalse(CatalogueRecord.isCompanionFilename(".archivesuite.json"))

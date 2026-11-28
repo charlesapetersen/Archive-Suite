@@ -85,8 +85,13 @@ final class ArchiveLibrary: ObservableObject {
     @Published private(set) var sidecarRevision: UInt64 = 0
     /// Catalogue companions the last finished tags-mode pass saw (W49.storage-finder). The Processor files new output
     /// with no Finder tags unless mirroring is on, so a folder of it lists nothing here and the empty list offers
-    /// catalogue mode instead. Zero in catalogue mode and until a pass finishes.
+    /// catalogue mode instead. Zero in catalogue mode and until a pass finishes. A companion the file watcher reports
+    /// counts at once (W49.reader-mirror-followups): the count is of `catalogueCompanionFolders`, which a finished pass
+    /// replaces and each watch batch amends.
     @Published private(set) var catalogueCompanionsSeen = 0
+    /// Each folder holding companions, by its path, to their filenames; by folder so that a watch batch clears what a
+    /// removed folder held with one look-up per ancestor of each folder rather than a pass over every companion.
+    private var catalogueCompanionFolders: [String: Set<String>] = [:]
     private var touchedSidecarFolders: Set<String> = []
 
     /// The root being walked, so `rescan()` needs no argument.
@@ -344,6 +349,7 @@ final class ArchiveLibrary: ObservableObject {
         currentScan = clock
         self.catalogueInstance = scope == nil ? nil : catalogueInstance
         catalogueCompanionsSeen = 0
+        catalogueCompanionFolders = [:]
         catalogueReader = nil
         catalogueSnapshot = nil
         cataloguePass = nil
@@ -964,7 +970,12 @@ final class ArchiveLibrary: ObservableObject {
         cancelScanStallDeadline()
         let next = DiscoveryHealth.phase(after: pass.result, root: pass.rootStability,
                                          finishedAt: Date(), lastSettled: lastSettled)
-        if pass.result.completed { catalogueCompanionsSeen = pass.result.catalogueCompanionsSeen }
+        if pass.result.completed {
+            var folders: [String: Set<String>] = [:]
+            for url in pass.result.catalogueCompanions { Self.insertCompanion(LibraryIndexPath(url).value, into: &folders) }
+            catalogueCompanionFolders = folders
+            catalogueCompanionsSeen = folders.values.reduce(0) { $0 + $1.count }
+        }
 
         guard let indexScan, let index = libraryIndex else {
             let nextFiles = merged(pass: pass, generation: generation,
@@ -1376,7 +1387,65 @@ final class ArchiveLibrary: ObservableObject {
         watchWorkInFlight = false
         watchCancellation = nil
         ReaderStages.measure("library.apply (watch batch)") { apply(changes, readGeneration: readGeneration) }
+        noteCatalogueCompanions(changes)
         drainWatchWork()
+    }
+
+    /// Amend the companion count from a tags-mode watch batch (W49.reader-mirror-followups), by the rules `apply` uses
+    /// for rows: a path read as a file, gone or replaced clears what it held (a folder replaced by a file, or removed,
+    /// clears everything beneath it) and a walked companion is then put back; an unreadable path proves neither and
+    /// keeps what was known. A clean subtree pass replaces what was known beneath it; an unclean one only adds.
+    private func noteCatalogueCompanions(_ changes: CorpusWatchChangeSet) {
+        guard !changes.paths.isEmpty || !changes.subtrees.isEmpty else { return }
+        var folders = catalogueCompanionFolders
+        var cleared: Set<String> = []
+        var added: [String] = []
+        for change in changes.paths {
+            switch change.inspection {
+            case .tracked, .untracked, .directorySymbolicLink, .nonRegular, .vanished:
+                let path = LibraryIndexPath(change.url).value
+                cleared.insert(path)
+                if let (folder, name) = Self.splitCompanionPath(path) { folders[folder]?.remove(name) }
+                if change.isWalkedCatalogueCompanion { added.append(path) }
+            case .directory, .unreadable:
+                break
+            }
+        }
+        for change in changes.subtrees {
+            if DiscoveryHealth.failure(for: change.pass.result, root: change.pass.rootStability) == nil {
+                cleared.insert(LibraryIndexPath(change.url).value)
+            }
+            added += change.pass.result.catalogueCompanions.map { LibraryIndexPath($0).value }
+        }
+        if !cleared.isEmpty {
+            for folder in Array(folders.keys) where Self.isAtOrUnder(folder, anyOf: cleared) { folders[folder] = nil }
+        }
+        for path in added { Self.insertCompanion(path, into: &folders) }
+        catalogueCompanionFolders = folders.filter { !$0.value.isEmpty }
+        let count = catalogueCompanionFolders.values.reduce(0) { $0 + $1.count }
+        if count != catalogueCompanionsSeen { catalogueCompanionsSeen = count }
+    }
+
+    /// `path` split at its last slash, by bytes, as the index keys paths.
+    nonisolated static func splitCompanionPath(_ path: String) -> (folder: String, name: String)? {
+        let bytes = Array(path.utf8)
+        guard let slash = bytes.lastIndex(of: UInt8(ascii: "/")) else { return nil }
+        return (String(decoding: bytes[..<slash], as: UTF8.self), String(decoding: bytes[(slash + 1)...], as: UTF8.self))
+    }
+
+    nonisolated static func insertCompanion(_ path: String, into folders: inout [String: Set<String>]) {
+        guard let (folder, name) = splitCompanionPath(path) else { return }
+        folders[folder, default: []].insert(name)
+    }
+
+    /// Whether `folder` is one of `prefixes` or lies beneath one: a look-up for it and for each of its ancestors.
+    nonisolated static func isAtOrUnder(_ folder: String, anyOf prefixes: Set<String>) -> Bool {
+        var cursor = folder
+        while true {
+            if prefixes.contains(cursor) { return true }
+            guard let (parent, _) = splitCompanionPath(cursor), !parent.isEmpty else { return false }
+            cursor = parent
+        }
     }
 
     /// Merge a path/subtree batch once. A clean subtree may authoritatively replace only that prefix;

@@ -304,7 +304,7 @@ extension NavigationModel {
             var result = CatalogueActionResult()
             result.unavailable = preflightRefusals
             result.failures = preflightFailures
-            for file in plan.files {
+            for file in plan.files(readAgainIn: reader) {
                 try result.attempt(operation, occurrence: file.base.pair.occurrence, journal: journal) {
                     try file.verifyMembership(in: reader)
                     return try writer.save(file.edits, basedOn: file.base)
@@ -504,6 +504,22 @@ private struct CatalogueEditPlan: Sendable {
     let files: [File]
     let refusedPaths: [String]
     var refused: Int { refusedPaths.count }
+
+    /// `files`, each based on its PDF as read again now when only the PDF's change time moved since the row was read
+    /// (W49.reader-mirror-followups). The Finder mirror's tag write moves it, and the Reader reads the PDF again only
+    /// when the mirror's batch finishes, so a save in between was refused once. The base is replaced only for the same
+    /// physical occurrence and PDF generation with the same record revision; any other change keeps the row's base,
+    /// and the writer's own checks then decide as before.
+    func files(readAgainIn reader: CatalogueReader) -> [File] {
+        guard !files.isEmpty else { return [] }
+        let snapshot = reader.snapshot(.init(relativePDFPaths: [], isComplete: false),
+                                       including: files.map(\.base.pair.occurrence.relativePath))
+        return files.map { file in
+            guard let live = try? snapshot.facts(at: file.base.pair.occurrence.relativePath).file.get(),
+                  live.revision == file.base.revision, file.base.samePhysicalOccurrence(as: live) else { return file }
+            return File(base: live, edits: file.edits, members: file.members)
+        }
+    }
 
     init(_ operations: [Intent]) {
         let buckets = Dictionary(grouping: operations, by: { $0.base.pair.occurrence })

@@ -98,15 +98,12 @@ final class FinderMirrorReaderTests: XCTestCase {
         try setTags(pdf, tags(pdf).filter { $0 != "Unread" } + ["Read"])
         model.checkFinderMirror(relativePath: "Letter.pdf")
         try await waitUntil("divergence shown") { model.finderMirrorDivergences["Letter.pdf"] != nil }
-        // The file watcher re-reads a PDF changed in Finder (its change time moved, which a save's base checks); the
-        // test host has none, so ask as it would, and save once the list holds the re-read file.
-        for _ in 0..<20 where model.library.files.first?.subjects.contains("Bonn") != true {
-            model.library.reviseCatalogue(relativePaths: ["Letter.pdf"])
-            try await Task.sleep(nanoseconds: 250_000_000)
-            model.applyEdit(.addSubject("Bonn"), paths: [path])
-            try await waitUntil("save finished") { !model.catalogueEditSaving }
-        }
-        XCTAssertTrue(model.library.files.first?.subjects.contains("Bonn") == true, "saved")
+        // The Finder edit moved the PDF's change time and the list has not read the file again (the test host has no
+        // file watcher). The save reads the PDF again itself, so it is not refused (W49.reader-mirror-followups).
+        model.applyEdit(.addSubject("Bonn"), paths: [path])
+        try await waitUntil("save finished") { !model.catalogueEditSaving }
+        XCTAssertEqual(model.catalogueEditFailures, [], "saved at the first try")
+        try await waitUntil("saved") { model.library.files.first?.subjects.contains("Bonn") == true }
         try await waitUntil("projection refused") { model.finderMirrorTask == nil }
         XCTAssertFalse(tags(pdf).contains("Bonn"), "a diverged file is not written")
         XCTAssertTrue(tags(pdf).contains("Read"))

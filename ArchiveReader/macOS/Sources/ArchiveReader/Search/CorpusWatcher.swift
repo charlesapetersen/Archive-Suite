@@ -379,6 +379,9 @@ final class CorpusWatcher: CorpusWatching, @unchecked Sendable {
 struct CorpusPathChange: Sendable {
     let url: URL
     let inspection: CorpusPathInspection
+    /// A regular file named as a catalogue companion that the full walk would also see (not hidden, not inside a
+    /// package), so the tags-mode companion count takes it at once (W49.reader-mirror-followups).
+    var isWalkedCatalogueCompanion = false
 }
 
 struct CorpusSubtreeChange: Sendable {
@@ -446,6 +449,12 @@ enum CorpusWatchWork {
                     pathChanges.append(CorpusPathChange(url: url, inspection: .nonRegular))
                 case .tracked where !CorpusWatchEligibility.includes(url, under: root):
                     pathChanges.append(CorpusPathChange(url: url, inspection: .untracked))
+                case .tracked, .untracked:
+                    // The eligibility read costs metadata calls, so only a companion's name pays for it.
+                    let companion = CatalogueRecord.isCompanionFilename(url.lastPathComponent)
+                        && CorpusWatchEligibility.includes(url, under: root)
+                    pathChanges.append(CorpusPathChange(url: url, inspection: inspection,
+                                                        isWalkedCatalogueCompanion: companion))
                 default:
                     pathChanges.append(CorpusPathChange(url: url, inspection: inspection))
                 }

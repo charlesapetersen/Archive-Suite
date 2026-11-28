@@ -211,6 +211,56 @@ final class CorpusWatcherLibraryTests: XCTestCase {
         XCTFail("condition did not become true within \(timeout)s")
     }
 
+    /// W49.reader-mirror-followups: a catalogue companion the watcher reports counts at once in tags mode, once each,
+    /// and a removed one stops counting; one the full walk would skip (inside a hidden folder) is not counted.
+    func testTheWatcherKeepsTheCatalogueCompanionCountCurrent() async throws {
+        let root = try makeRoot()
+        try makeFile("a.pdf", tags: ["Unread"], root: root)
+        let first = try makeFile("a.pdf.archivesuite.json", tags: [], root: root)
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0) { _, handler in
+            MockCorpusWatcher(handler: handler)
+        }
+        library.start(scope: root)
+        try await waitUntil { library.phase.isSettled }
+        XCTAssertEqual(library.catalogueCompanionsSeen, 1)
+        func seen(_ urls: URL...) {
+            library.receiveWatchRequestForTesting(CorpusWatchRequest(paths: CorpusWatchPathSet(urls.map(\.path))))
+        }
+
+        let filed = try makeFile("b.pdf.archivesuite.json", tags: [], root: root)
+        let hidden = try makeFile(".hidden/c.pdf.archivesuite.json", tags: [], root: root)
+        seen(filed, hidden, first)
+        try await waitUntil { library.catalogueCompanionsSeen != 1 }
+        XCTAssertEqual(library.catalogueCompanionsSeen, 2, "the new one counts once; the hidden one not at all")
+
+        try FileManager.default.removeItem(at: first)
+        seen(first, filed)
+        try await waitUntil { library.catalogueCompanionsSeen != 2 }
+        XCTAssertEqual(library.catalogueCompanionsSeen, 1)
+
+        try makeFile("sub/d.pdf.archivesuite.json", tags: [], root: root)
+        library.receiveWatchRequestForTesting(CorpusWatchRequest(
+            subtrees: CorpusWatchPathSet([root.appendingPathComponent("sub").path])))
+        try await waitUntil { library.catalogueCompanionsSeen != 1 }
+        XCTAssertEqual(library.catalogueCompanionsSeen, 2)
+
+        // A removed folder takes its companions with it.
+        let sub = root.appendingPathComponent("sub")
+        try FileManager.default.removeItem(at: sub)
+        seen(sub)
+        try await waitUntil { library.catalogueCompanionsSeen != 2 }
+        XCTAssertEqual(library.catalogueCompanionsSeen, 1)
+    }
+
+    func testCompanionFoldersClearByAncestor() {
+        let cleared: Set<String> = ["/r/a"]
+        XCTAssertTrue(ArchiveLibrary.isAtOrUnder("/r/a", anyOf: cleared))
+        XCTAssertTrue(ArchiveLibrary.isAtOrUnder("/r/a/b/c", anyOf: cleared))
+        XCTAssertFalse(ArchiveLibrary.isAtOrUnder("/r/ab", anyOf: cleared))
+        XCTAssertFalse(ArchiveLibrary.isAtOrUnder("/r", anyOf: cleared))
+        XCTAssertEqual(ArchiveLibrary.splitCompanionPath("/r/a/x.pdf.archivesuite.json")?.folder, "/r/a")
+    }
+
     func testAThirdPartyPathReadUpdatesTheRowWithoutAFullWalk() async throws {
         let root = try makeRoot()
         let file = try makeFile("changed.pdf", tags: ["Unread"], root: root)

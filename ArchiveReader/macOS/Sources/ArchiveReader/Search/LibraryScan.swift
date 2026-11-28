@@ -118,8 +118,8 @@ enum LibraryScan {
                                          vanishedMidScan: vanished,
                                          rootUnreadable: fingerprints.rootUnreadable,
                                          cancelled: cancelled,
-                                         catalogueCompanionsSeen: fingerprints.entries.reduce(0) {
-                                             $0 + (CatalogueRecord.isCompanionFilename($1.url.lastPathComponent) ? 1 : 0)
+                                         catalogueCompanions: fingerprints.entries.compactMap {
+                                             CatalogueRecord.isCompanionFilename($0.url.lastPathComponent) ? $0.url : nil
                                          }),
                 rootStability: .between(before, after)
             )
