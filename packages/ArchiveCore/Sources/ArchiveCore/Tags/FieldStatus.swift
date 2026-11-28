@@ -59,6 +59,50 @@ public enum FieldStatusPolicy {
     /// The fill rule, as `ItemFieldPolicy` states it (`segbench-results/item-fields-score.md`).
     public static let fillRule = "the fill rule is a Wilson lower bound of 0.85 and a point of 0.90 on 40 owner-checked pairs"
 
+    /// The evidence route recorded by the Processor's Mac item-field extractor (`ItemFieldExtractor.macRoute`).
+    /// Shared across Processor and Reader so catalogue-filed Mac item fields carry their lower-confidence status.
+    public static let macItemFieldsRoute = "This Mac · Qwen3-VL 8B and Qwen3.5 4B"
+
+    /// Status of a catalogue-filed item field (`CatalogueRecord.Field`) for `documentKind`, `title`, `byline`,
+    /// `publication`, `publicationDate` and `recipientPlace` (`W49.reader-catalogue-field-status`).
+    /// A `model` value whose active `item-fields` evidence route is `macItemFieldsRoute` is lower confidence until
+    /// checked (owner call 23). A `model` value without active `item-fields` evidence (such as a tagging-call
+    /// fallback) is unmeasured and therefore lower confidence until checked.
+    /// Returns nil for unassessed, cleared, or unchecked non-model fields.
+    public static func catalogueItemField<V: Decodable & Sendable>(
+        _ field: CheckableField,
+        record: CatalogueRecord.Field<V>?
+    ) -> FieldStatus? {
+        guard let record, case .value = record.current else { return nil }
+        switch record.origin {
+        case "user":
+            return record.isChecked
+                ? FieldStatus(level: .checked, source: "Set by the user", measured: "")
+                : nil
+        case "model":
+            let activeItemFields = record.evidence.filter {
+                $0.source == "item-fields"
+                    && ($0.supportsRevision == nil || $0.supportsRevision == record.fieldRevision)
+            }
+            if activeItemFields.contains(where: { $0.route == macItemFieldsRoute }) {
+                return itemField(field, checked: record.isChecked, lowerConfidence: true)
+            }
+            if !activeItemFields.isEmpty {
+                return itemField(field, checked: record.isChecked, lowerConfidence: false)
+            }
+            let source = "From the Processor’s tagging call"
+            return record.isChecked
+                ? FieldStatus(level: .checked, source: source, measured: "")
+                : FieldStatus(level: .lowerConfidence, source: source, measured: "Not measured as an item field.")
+        case "imported":
+            return record.isChecked
+                ? FieldStatus(level: .checked, source: "Imported and checked by the user", measured: "")
+                : nil
+        default:
+            return nil
+        }
+    }
+
     /// A page-2 item field. The gateway's Gemini 3.7 Flash image prompt fills fields that cleared the fill rule.
     /// Its tooltips show those stratified scores, including title's last look (W47.item-fields-title).
     /// The Mac suggestions explicitly carry lower confidence and show the separate complete-value rescore

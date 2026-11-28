@@ -1579,6 +1579,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `OCR/OCRProcessor+Catalogue.swift` (roles `["page"]`); `CatalogueEdit.swift` (rotation targets).
 - **Would confirm it:** a rotation edit on a scratch pre-OCRed pair is refused.
 - **Would clear it:** the Reader rotates such pages another way, or the refusal is intended and documented.
-- **Status:** `open` — verification queued as `W49.proc-s066-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s066-verify`, 2026-11-27).
 - **History:**
   - 2026-11-27 W49.corpus-adoption-tool — raised.
+  - 2026-11-27 W49.proc-s066-verify (Gemini) — confirmed both `CatalogueEdit.swift` and `ArchiveReader`'s `DocumentViewerModel.cataloguePageFacts` accepted only `["image", "text", "searchable"]`, refusing `viewRotation` on `"page"`-role pre-OCRed/adopted pages. Added `"page"` to `SPEC/catalogue.md` and shared `CatalogueRecord.Page.rotatableRoles` used by both `CatalogueEdit` and `DocumentViewerModel`; added unit tests in `CatalogueEditTests` and `PageRotationTests.testCatalogueModeRotatesPreOCRedPageRole`.

@@ -128,7 +128,7 @@ struct CatalogueEditPatch {
             documents = try CatalogueJSON.entries(in: rawDocuments)
             pages = try CatalogueJSON.entries(in: rawPages)
             pageIndices = Dictionary(uniqueKeysWithValues: record.pages.enumerated().compactMap { index, page in
-                ["image", "text", "searchable"].contains(page.role) ? (page.id, index) : nil
+                CatalogueRecord.Page.rotatableRoles.contains(page.role) ? (page.id, index) : nil
             })
             ownerIndices = Dictionary(uniqueKeysWithValues: record.documents.enumerated().compactMap { index, document in
                 document.ownerFileID == record.fileID ? (document.id, index) : nil

@@ -532,17 +532,32 @@ public enum PDFHeaderParser {
         text.range(of: #"[0-9]{4}$"#, options: .regularExpression) != nil
     }
 
+    private static let provenanceMonths: [String: Int] = [
+        "January": 1, "February": 2, "March": 3, "April": 4,
+        "May": 5, "June": 6, "July": 7, "August": 8,
+        "September": 9, "October": 10, "November": 11, "December": 12
+    ]
+
+    /// Pure ASCII `d MMMM yyyy` check validated through `GregorianDay` (zero `DateFormatter` allocation per page,
+    /// W49.core-header-date-perf).
+    static func isValidProvenanceDate(_ raw: String) -> Bool {
+        let fields = raw.split(separator: " ", omittingEmptySubsequences: false)
+        guard fields.count == 3 else { return false }
+        let dayStr = fields[0], monthStr = fields[1], yearStr = fields[2]
+        guard (1...2).contains(dayStr.count), dayStr.first != "0",
+              dayStr.utf8.allSatisfy({ $0 >= 48 && $0 <= 57 }),
+              let day = Int(dayStr) else { return false }
+        guard let month = provenanceMonths[String(monthStr)] else { return false }
+        guard yearStr.count == 4, yearStr.utf8.allSatisfy({ $0 >= 48 && $0 <= 57 }),
+              let year = Int(yearStr), year >= 1 else { return false }
+        return GregorianDay.isValidDay(year: year, month: month, day: day)
+    }
+
     private static func parseProvenance(_ raw: String) -> PDFReaderProvenance? {
         let parts = raw.components(separatedBy: " · ").map { $0.trimmingCharacters(in: .whitespaces) }
         guard parts.count == 3, !parts[0].isEmpty, !parts[1].isEmpty,
               parts.allSatisfy({ !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) }),
-              parts[2].range(of: #"^[0-9]{1,2} [A-Za-z]+ [0-9]{4}$"#, options: .regularExpression) != nil else { return nil }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "d MMMM yyyy"
-        formatter.isLenient = false
-        guard let date = formatter.date(from: parts[2]), formatter.string(from: date) == parts[2] else { return nil }
+              isValidProvenanceDate(parts[2]) else { return nil }
         return PDFReaderProvenance(provider: parts[0], model: parts[1], processingDate: parts[2])
     }
 }

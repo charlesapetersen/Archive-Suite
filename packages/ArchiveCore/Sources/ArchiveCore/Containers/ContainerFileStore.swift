@@ -472,16 +472,12 @@ public enum ContainerFileStore {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let s = try decoder.singleValueContainer().decode(String.self)
-            if let date = isoWhole.date(from: s) ?? isoFractional.date(from: s) { return date }
+            if let date = (try? isoWhole.parse(s)) ?? (try? isoFractional.parse(s)) { return date }
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "not ISO 8601"))
         }
         return d
     }
-    // Shared: making two formatters per date cost most of a large file's read (W49.ct-file-size-cap).
-    nonisolated(unsafe) private static let isoWhole = ISO8601DateFormatter()
-    nonisolated(unsafe) private static let isoFractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    // Value-type Sendable format styles: safe for concurrent reads without locking (W49.core-iso8601-sendable).
+    private static let isoWhole = Date.ISO8601FormatStyle()
+    private static let isoFractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 }

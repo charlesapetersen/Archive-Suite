@@ -566,7 +566,7 @@ final class DocumentViewerModel: ObservableObject {
         guard let navigation = catalogueNavigation,
               let file = navigation.libraryFiles(atPaths: [path]).first,
               let facts = navigation.catalogueFacts(for: file, physicalPageIndex: pageIndex),
-              let page = facts.page, ["image", "text", "searchable"].contains(page.role),
+              let page = facts.page, CatalogueRecord.Page.rotatableRoles.contains(page.role),
               openedCatalogueInstance == nil || openedCatalogueInstance == navigation.library.catalogueInstance
         else { return nil }
         return facts

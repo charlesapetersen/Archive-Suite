@@ -64,6 +64,29 @@ struct CatalogueEditTests {
         }
     }
 
+    @Test func patchRotatesPreOCRedOrAdoptedPageRoleButRefusesUnknownRole() throws {
+        let pageID = UUID(), unknownID = UUID()
+        let raw = try CatalogueRecord(json: Data("""
+        {"schema":1,"fileID":"\(file)","contentRevision":"\(UUID())","revision":"\(baseRevision)","parents":[],
+         "pages":[
+           {"id":"\(pageID)","physicalIndex":0,"documentID":"\(document)","role":"page"},
+           {"id":"\(unknownID)","physicalIndex":1,"documentID":"\(document)","role":"attachment"}
+         ],
+         "documents":[{"id":"\(document)","ownerFileID":"\(file)","fields":{}}],
+         "fileFields":{}}
+        """.utf8))
+        let turned = try CatalogueEditPatch(edits: [.init(.pageViewRotation(pageID), .set(.rotation(90)))])
+            .applying(to: raw)
+        #expect(turned.pages[0].viewRotation == 90)
+        let reset = try CatalogueEditPatch(edits: [.init(.pageViewRotation(pageID), .clear)])
+            .applying(to: turned)
+        #expect(reset.pages[0].viewRotation == nil)
+        #expect(throws: CatalogueEdit.Invalid.unavailableTarget(.pageViewRotation(unknownID))) {
+            try CatalogueEditPatch(edits: [.init(.pageViewRotation(unknownID), .set(.rotation(90)))])
+                .applying(to: raw)
+        }
+    }
+
     private func record(owned: Bool = true) throws -> CatalogueRecord {
         let owner = owned ? file : UUID()
         let fields = owned ? """

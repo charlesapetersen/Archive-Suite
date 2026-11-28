@@ -70,9 +70,9 @@ keys, at most 16 MiB and 500,000 values, with values no more than 63 levels belo
 semantic constraints such as dense page indices, unique document and page IDs, ownership and valid
 calendar dates. The schema number identifies required semantics. An unsupported schema or state
 for a known field makes the record unavailable. Optional extension keys and open vocabulary strings
-(round-tripped as written) can be introduced without changing required semantics. Common page roles
-are `image`, `text` and `searchable`. Common origins are `user`, `model` and `imported`. Unknown
-roles or origins confer no edit privileges. Use `read` and `unread` for read state, `box` and `folder`
+(round-tripped as written) can be introduced without changing required semantics. Common page roles are `image`, `text`, `searchable` and `page` (a pre-OCRed or adopted PDF page without a
+Suite image/text split). Common origins are `user`, `model` and `imported`. Unknown roles or origins confer
+no edit privileges. Use `read` and `unread` for read state, `box` and `folder`
 for item type, and `gray`, `green`, `purple`, `blue`, `yellow`, `red` and `orange` for the current
 colour vocabulary. Use a recorded clear for neither read state, no type, no colour or unrated, when
 that absence is intentional. Raw names and strings retain international text.

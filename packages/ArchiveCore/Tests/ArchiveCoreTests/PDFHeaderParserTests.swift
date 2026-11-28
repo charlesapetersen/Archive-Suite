@@ -390,4 +390,21 @@ final class PDFHeaderParserTests: XCTestCase {
         XCTAssertEqual(PDFHeaderParser.parseClassification(
             from: "Extracted text.\nBox 4 \u{00B7} 1957\n\(meta)\nClassification: Box\nBody"), "Box")
     }
+
+    func testProvenanceDateParsingPureASCIIAndGregorianValidation() {
+        for valid in ["7 November 2026", "3 April 2026", "29 February 2024", "29 February 2000", "31 December 1999", "10 October 1582"] {
+            XCTAssertTrue(PDFHeaderParser.isValidProvenanceDate(valid), "should accept \(valid)")
+            let parsed = PDFHeaderParser.parse("Extracted text.\nGemini \u{00B7} Flash \u{00B7} \(valid)\n\nBody")
+            XCTAssertEqual(parsed.header?.provenance?.processingDate, valid)
+        }
+        for invalid in ["07 November 2026", "7 november 2026", "7 Nov 2026", "29 February 2026",
+                        "29 February 1900", "31 April 2026", "0 January 2026", "32 January 2026",
+                        "7 November 0000", "7 November 26", "7  November 2026"] {
+            XCTAssertFalse(PDFHeaderParser.isValidProvenanceDate(invalid), "should reject \(invalid)")
+            let parsed = PDFHeaderParser.parse("Extracted text.\nGemini \u{00B7} Flash \u{00B7} \(invalid)\n\nBody")
+            XCTAssertNil(parsed.header?.provenance, "should reject provenance with date \(invalid)")
+        }
+        XCTAssertFalse(PDFHeaderParser.isValidProvenanceDate(" 7 November 2026"))
+        XCTAssertFalse(PDFHeaderParser.isValidProvenanceDate("7 November 2026 "))
+    }
 }

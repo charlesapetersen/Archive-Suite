@@ -24,7 +24,7 @@ enum ItemFieldExtractor {
     static let timeout: TimeInterval = 180
     static let macImageModel = LocalModelRoute.qwen3VL8B4.modelID(for: .mlxVLM)
     static let macTextModel = "lmstudio-community/Qwen3.5-4B-MLX-4bit"
-    static let macRoute = "This Mac · Qwen3-VL 8B and Qwen3.5 4B"
+    static let macRoute = FieldStatusPolicy.macItemFieldsRoute
     static let macCost = "Item fields on this Mac: 8B images ~15.5 s/document, 9.0 GB peak; 4B text ~5.0 s/document, 4.8 GB peak"
     static let macSetup = "Reads page images with Qwen3-VL 8B, downloaded in Settings › Accounts › Local models on this "
         + "Mac or served by mlx-vlm on this Mac (port 8080), and text with Qwen3.5 4B through mlx-vlm on port 8080, both 4-bit."

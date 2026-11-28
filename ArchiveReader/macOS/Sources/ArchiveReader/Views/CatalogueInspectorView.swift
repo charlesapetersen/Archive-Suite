@@ -316,10 +316,39 @@ struct CatalogueInspectorView: View {
                           _ key: KeyPath<Document, CatalogueRecord.Field<V>?>, _ facts: [ItemFacts], _ page: Int?) -> some View {
         let values = facts.compactMap { (try? $0.document.get())?.document.fields?[keyPath: key] }
         let checked = !values.isEmpty && values.allSatisfy(\.isChecked)
-        return Toggle("Checked", isOn: Binding(get: { checked }, set: { edit(field, .check($0), page, facts) }))
-            .toggleStyle(.checkbox)
-            .accessibilityIdentifier("ar.catalogue.check.\(field.rawValue)")
-            .disabled(values.isEmpty)
+        return HStack(spacing: 8) {
+            Toggle("Checked", isOn: Binding(get: { checked }, set: { edit(field, .check($0), page, facts) }))
+                .toggleStyle(.checkbox)
+                .accessibilityIdentifier("ar.catalogue.check.\(field.rawValue)")
+                .disabled(values.isEmpty)
+            if let status = Self.itemFieldStatus(for: field, values: values) {
+                Spacer(minLength: 4)
+                FieldStatusBadge(status)
+                    .accessibilityIdentifier("ar.catalogue.status.\(field.rawValue)")
+            }
+        }
+    }
+
+    static func itemFieldStatus<V: Decodable & Sendable>(
+        for field: CatalogueEdit.DocumentField,
+        values: [CatalogueRecord.Field<V>]
+    ) -> FieldStatus? {
+        let checkable: CheckableField? = switch field {
+        case .documentKind: .documentKind
+        case .title: .title
+        case .byline: .byline
+        case .publication: .publication
+        case .publicationDate: .publicationDate
+        case .recipientPlaces: .recipientPlace
+        default: nil
+        }
+        guard let checkable, !values.isEmpty else { return nil }
+        let statuses = values.compactMap { FieldStatusPolicy.catalogueItemField(checkable, record: $0) }
+        guard let first = statuses.first else { return nil }
+        if statuses.allSatisfy({ $0.level == first.level }) { return first }
+        if let lower = statuses.first(where: { $0.level == .lowerConfidence }) { return lower }
+        if let unchecked = statuses.first(where: { $0.level == .unchecked }) { return unchecked }
+        return first
     }
 
     private func flag(_ label: String, _ field: CatalogueEdit.FileField,

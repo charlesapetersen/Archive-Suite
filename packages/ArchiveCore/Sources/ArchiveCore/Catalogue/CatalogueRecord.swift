@@ -129,6 +129,9 @@ public struct CatalogueRecord: Sendable {
     }
 
     public struct Page: Decodable, Sendable {
+        /// Page roles that accept a viewer rotation (`SPEC/catalogue.md`, S-066).
+        public static let rotatableRoles: Set<String> = ["image", "text", "searchable", "page"]
+
         public let id: UUID
         public let physicalIndex: Int
         public let documentID: UUID

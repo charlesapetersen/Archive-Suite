@@ -397,6 +397,32 @@ final class ContainerFileStoreTests: XCTestCase {
         guard case .unreadable(let why) = ContainerFileStore.load(directory: dir) else { return XCTFail("read") }
         XCTAssertEqual(why, "over 64 MB")
     }
+
+    func testConcurrentISO8601DecodingWithSendableFormatStyle() async throws {
+        struct Box: Decodable { let whole: Date; let frac: Date; let offset: Date }
+        let payload = Data(#"{"whole":"2026-11-27T02:17:34Z","frac":"2026-11-27T02:17:34.125Z","offset":"2026-11-27T04:17:34+02:00"}"#.utf8)
+        let bad = Data(#"{"whole":"not-a-date","frac":"2026-11-27T02:17:34Z","offset":"2026-11-27T02:17:34Z"}"#.utf8)
+        let reference = try ContainerFileStore.decoder.decode(Box.self, from: payload)
+        XCTAssertEqual(reference.whole, reference.offset)
+        XCTAssertEqual(reference.frac.timeIntervalSince(reference.whole), 0.125, accuracy: 0.001)
+        XCTAssertThrowsError(try ContainerFileStore.decoder.decode(Box.self, from: bad))
+
+        try await withThrowingTaskGroup(of: Int.self) { group in
+            for _ in 0..<16 {
+                group.addTask {
+                    var ok = 0
+                    for _ in 0..<200 {
+                        let decoded = try ContainerFileStore.decoder.decode(Box.self, from: payload)
+                        if decoded.whole == reference.whole && decoded.offset == reference.offset { ok += 1 }
+                    }
+                    return ok
+                }
+            }
+            var total = 0
+            for try await n in group { total += n }
+            XCTAssertEqual(total, 16 * 200)
+        }
+    }
 }
 
 private final class ContainerTestCounter: @unchecked Sendable {

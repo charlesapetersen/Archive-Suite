@@ -148,6 +148,102 @@ final class FieldStatusTests: XCTestCase {
         }
     }
 
+    func testCatalogueMacItemFieldsShowLowerConfidenceUntilChecked() throws {
+        let fileID = UUID(), docID = UUID(), rev = UUID()
+        let kindRev = UUID(), bylineRev = UUID(), pubDateRev = UUID(), titleRev = UUID(), userKindRev = UUID()
+        let fallbackRev = UUID(), uncheckedUserRev = UUID(), checkedUserRev = UUID()
+        let macRoute = FieldStatusPolicy.macItemFieldsRoute
+        let record = try CatalogueRecord(json: Data("""
+        {
+          "schema": 1, "fileID": "\(fileID)", "contentRevision": "\(UUID())", "revision": "\(rev)", "parents": [],
+          "pages": [{"id": "\(UUID())", "physicalIndex": 0, "documentID": "\(docID)", "role": "image"}],
+          "documents": [{
+            "id": "\(docID)", "ownerFileID": "\(fileID)",
+            "fields": {
+              "documentKind": {
+                "state": "value", "value": "report", "origin": "model", "fieldRevision": "\(kindRev)",
+                "evidence": [{"source": "item-fields", "route": "\(macRoute)"}]
+              },
+              "byline": {
+                "state": "value", "value": ["Mary Jones"], "origin": "model", "fieldRevision": "\(bylineRev)",
+                "checkedRevision": "\(bylineRev)",
+                "evidence": [{"source": "item-fields", "route": "\(macRoute)"}]
+              },
+              "publicationDate": {
+                "state": "value", "value": {"date": "1967-03", "uncertain": false}, "origin": "model",
+                "fieldRevision": "\(pubDateRev)",
+                "evidence": [{"source": "item-fields", "route": "\(macRoute)"}]
+              },
+              "title": {
+                "state": "value", "value": "Harbour Report", "origin": "model", "fieldRevision": "\(titleRev)",
+                "evidence": [{"source": "item-fields", "route": "Stanford gateway · Gemini 3.7 Flash"}]
+              },
+              "publication": {
+                "state": "cleared", "origin": "user", "fieldRevision": "\(userKindRev)"
+              },
+              "recipientPlaces": {
+                "state": "value", "value": ["Boston"], "origin": "model", "fieldRevision": "\(fallbackRev)",
+                "evidence": []
+              }
+            }
+          }],
+          "fileFields": {}
+        }
+        """.utf8))
+        let fields = try XCTUnwrap(record.documents.first?.fields)
+
+        let kindStatus = try XCTUnwrap(CatalogueInspectorView.itemFieldStatus(for: .documentKind, values: [try XCTUnwrap(fields.documentKind)]))
+        XCTAssertEqual(kindStatus.level, .lowerConfidence)
+        XCTAssertTrue(kindStatus.detail.contains("Exact kind: 76% (76 owner-checked fills)"))
+
+        let bylineStatus = try XCTUnwrap(CatalogueInspectorView.itemFieldStatus(for: .byline, values: [try XCTUnwrap(fields.byline)]))
+        XCTAssertEqual(bylineStatus.level, .checked)
+        XCTAssertTrue(bylineStatus.measured.contains("Complete byline: 83%"))
+
+        let pubDateStatus = try XCTUnwrap(CatalogueInspectorView.itemFieldStatus(for: .publicationDate, values: [try XCTUnwrap(fields.publicationDate)]))
+        XCTAssertEqual(pubDateStatus.level, .lowerConfidence)
+        XCTAssertTrue(pubDateStatus.detail.contains("Full issue date: 70%"))
+        XCTAssertTrue(pubDateStatus.detail.contains("Qwen3.5 4B"))
+
+        let titleStatus = try XCTUnwrap(CatalogueInspectorView.itemFieldStatus(for: .title, values: [try XCTUnwrap(fields.title)]))
+        XCTAssertEqual(titleStatus.level, .unchecked)
+
+        XCTAssertNil(CatalogueInspectorView.itemFieldStatus(for: .publication, values: [try XCTUnwrap(fields.publication)]),
+                     "cleared field shows no status badge")
+
+        // Model field with no item-fields evidence (tagging-call fallback) stays lower confidence, never gateway stats.
+        let fallbackStatus = try XCTUnwrap(CatalogueInspectorView.itemFieldStatus(for: .recipientPlaces, values: [try XCTUnwrap(fields.recipientPlaces)]))
+        XCTAssertEqual(fallbackStatus.level, .lowerConfidence)
+        XCTAssertTrue(fallbackStatus.detail.contains("Not measured as an item field"))
+
+        // Unchecked user edit shows no green Checked badge; checked user edit does.
+        let userRecord = try CatalogueRecord(json: Data("""
+        {
+          "schema": 1, "fileID": "\(fileID)", "contentRevision": "\(UUID())", "revision": "\(UUID())", "parents": [],
+          "pages": [{"id": "\(UUID())", "physicalIndex": 0, "documentID": "\(docID)", "role": "image"}],
+          "documents": [{
+            "id": "\(docID)", "ownerFileID": "\(fileID)",
+            "fields": {
+              "title": {"state": "value", "value": "Draft", "origin": "user", "fieldRevision": "\(uncheckedUserRev)"},
+              "publication": {"state": "value", "value": "Chronicle", "origin": "user", "fieldRevision": "\(checkedUserRev)", "checkedRevision": "\(checkedUserRev)"}
+            }
+          }],
+          "fileFields": {}
+        }
+        """.utf8))
+        let userFields = try XCTUnwrap(userRecord.documents.first?.fields)
+        XCTAssertNil(CatalogueInspectorView.itemFieldStatus(for: .title, values: [try XCTUnwrap(userFields.title)]),
+                     "unchecked user edit does not show a Checked badge beside an unchecked toggle")
+        XCTAssertEqual(CatalogueInspectorView.itemFieldStatus(for: .publication, values: [try XCTUnwrap(userFields.publication)])?.level, .checked)
+
+        // Multi-file mixed selection: a cleared or unassessed sibling must not hide another file's lower-confidence badge.
+        let mixedStatus = try XCTUnwrap(CatalogueInspectorView.itemFieldStatus(
+            for: .documentKind,
+            values: [try XCTUnwrap(fields.documentKind), try XCTUnwrap(fields.publication)]
+        ))
+        XCTAssertEqual(mixedStatus.level, .lowerConfidence)
+    }
+
     /// Sorted: a date edit removes and re-adds the year, so the order on disk is not the point here.
     private func tagsOnDisk(_ url: URL) throws -> [String] {
         (try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.tagNamesKey]).tagNames ?? []).sorted()

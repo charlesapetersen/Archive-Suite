@@ -95,6 +95,72 @@ final class PageRotationTests: XCTestCase {
         XCTAssertEqual(try sha256(pdf), before, "the file's bytes are unchanged")
     }
 
+    /// W49.proc-s066-verify: a pre-OCRed or adopted PDF whose pages have role `page` can be rotated in Catalogue Mode.
+    func testCatalogueModeRotatesPreOCRedPageRole() async throws {
+        let root = makeTempDir("turn-catalogue-page-role").resolvingSymlinksInPath()
+        let pdf = root.appendingPathComponent("Adopted.pdf")
+        let fileID = UUID(), contentRevision = UUID(), docID = UUID(), pageID = UUID()
+        let identity = CataloguePDFIdentity(fileID: fileID, contentRevision: contentRevision)
+        let packet = Data("""
+            <x:xmpmeta xmlns:x="adobe:ns:meta/">
+            <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"></rdf:RDF></x:xmpmeta>
+            """.utf8)
+        var bounds = CGRect(x: 0, y: 0, width: 400, height: 520)
+        let ctx = try XCTUnwrap(CGContext(pdf as CFURL, mediaBox: &bounds, nil))
+        ctx.addDocumentMetadata(try XCTUnwrap(identity.adding(to: packet)) as CFData)
+        ctx.beginPDFPage(nil)
+        ctx.fill(bounds.insetBy(dx: 20, dy: 20))
+        ctx.endPDFPage()
+        ctx.closePDF()
+        let before = try sha256(pdf)
+
+        let companion = root.appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: pdf.lastPathComponent))
+        try Data("""
+        {
+          "schema": 1,
+          "fileID": "\(fileID)",
+          "contentRevision": "\(contentRevision)",
+          "revision": "\(UUID())",
+          "parents": [],
+          "pages": [{"id": "\(pageID)", "physicalIndex": 0, "documentID": "\(docID)", "role": "page"}],
+          "documents": [{"id": "\(docID)", "ownerFileID": "\(fileID)", "fields": {}}],
+          "fileFields": {}
+        }
+        """.utf8).write(to: companion)
+
+        let suite = "PageRotationCatalogue.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let idxDir = makeTempDir("turn-catalogue-idx")
+        let indexer = ContentIndexer(url: idxDir.appendingPathComponent("index.sqlite"))
+        let navigation = NavigationModel(defaults: defaults, indexer: indexer)
+        XCTAssertNil(navigation.rootStore.setRoot(root))
+        navigation.setCatalogueMode(true)
+        let deadline = Date().addingTimeInterval(5)
+        while (navigation.library.files.isEmpty || !navigation.library.phase.isSettled) && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let openPath = try XCTUnwrap(navigation.library.files.first?.path)
+
+        let viewer = DocumentViewerModel(persists: false, pageTurns: PageTurnStore(url: nil), thumbnailer: nil)
+        viewer.followCatalogueRotation(navigation)
+        viewer.load(DocumentSelection(filePaths: [openPath]))
+        XCTAssertTrue(viewer.canRotate, "a catalogue-mode page with role 'page' is rotatable")
+        XCTAssertEqual(viewer.imageTurns, 0)
+
+        viewer.rotateRight()
+        let saveDeadline = Date().addingTimeInterval(5)
+        while (navigation.catalogueEditSaving || viewer.imageTurns != 1) && Date() < saveDeadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(viewer.imageTurns, 1)
+        let saved = try CatalogueRecord(json: Data(contentsOf: companion))
+        XCTAssertEqual(saved.pages.first?.viewRotation, 90)
+        XCTAssertEqual(try sha256(pdf), before, "the PDF bytes remain untouched")
+        navigation.library.start(scope: nil)
+        await indexer.closeForTesting()
+    }
+
     func testTheTurnIsPerPagePair() throws {
         let dir = makeTempDir("turn-pairs")
         let pdf = try makeScanPDF(in: dir, pairs: 2)

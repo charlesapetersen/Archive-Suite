@@ -229,17 +229,13 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let s = try decoder.singleValueContainer().decode(String.self)
-            if let date = isoWhole.date(from: s) ?? isoFractional.date(from: s) { return date }
+            if let date = (try? isoWhole.parse(s)) ?? (try? isoFractional.parse(s)) { return date }
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "date \(s)"))
         }
         return d
     }()
-    nonisolated(unsafe) private static let isoWhole = ISO8601DateFormatter()
-    nonisolated(unsafe) private static let isoFractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private static let isoWhole = Date.ISO8601FormatStyle()
+    private static let isoFractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 }
 
 // MARK: - The JSON shapes (SPEC/collection-settings.md), decoded leniently

@@ -653,17 +653,14 @@ enum FrontMatterCodec {
 
     // MARK: - ISO-8601 dates
 
-    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
+    private static let isoWhole = Date.ISO8601FormatStyle()
+    private static let isoFractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
 
     private static func parseISO(_ s: String) -> Date? {
-        isoFormatter.date(from: s)
+        (try? isoWhole.parse(s)) ?? (try? isoFractional.parse(s))
     }
 
     private static func formatISO(_ d: Date) -> String {
-        isoFormatter.string(from: d)
+        isoWhole.format(d)
     }
 }
