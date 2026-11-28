@@ -309,8 +309,7 @@ extension OCRProcessor {
             }
             let belongsToOwner = identity.fileID == ownerID
             let cover: ProcessorCatalogueRecord.DocumentReference? = belongsToOwner
-                && enclosureDateReviews[first]?.manual?.rejectedCover != true
-                ? segmentIndex.flatMap { Self.validCoverIndex(of: $0, in: finalSegments) }
+                ? segmentIndex.flatMap { effectiveCoverIndex(of: $0, in: finalSegments) }
                     .flatMap { finalSegments[$0].pdfURLs.first }
                     .flatMap { owners[$0] }
                     .map { .init(documentID: $0.0, ownerFileID: $0.1) }

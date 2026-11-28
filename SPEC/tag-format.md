@@ -672,9 +672,9 @@ unclassified page and never from adjacency alone; consecutive enclosures share o
 window split or a review edit changes the cover's pages the proposal drops, and document review offers
 the earlier documents in the same collection (never another enclosure) as an optional named cover; left
 blank, there is none (owner call 33, W49.proc-s047-cover-select). The
-enclosure's `Sent With` value is the covering letter's own date at tagging time (none if the letter is
-undated — no neighbour is borrowed). The manual tag sheet shows the proposal, can clear it, and takes a
-typed sent-with date. Mistral/Vision and pre-OCRed classification-only runs propose nothing. The owner already required two dates for an enclosure with its own date; the open
+the enclosure's `Sent With` value is the covering letter's own date at tagging time (none if the letter is
+undated — no neighbour is borrowed). The manual tag sheet shows the proposal, can clear it, can re-point it at
+another earlier letter in the run (`W49.proc-manual-repoint-relation`), and takes a typed sent-with date. Mistral/Vision and pre-OCRed classification-only runs propose nothing. The owner already required two dates for an enclosure with its own date; the open
 question is how those dates behave in the apps, not whether to add the feature.
 
 ### Recommended behaviour

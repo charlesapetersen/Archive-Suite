@@ -47,9 +47,12 @@ struct ManualTaggingSheet: View {
             Divider()
 
             if processor.currentManualIndex < count {
+                let cardIdx = processor.currentManualIndex
                 ManualTagSegmentView(
-                    segment: $processor.manualTagSegments[processor.currentManualIndex],
-                    focusedImage: $focusedImage
+                    segment: $processor.manualTagSegments[cardIdx],
+                    focusedImage: $focusedImage,
+                    coverOptions: processor.manualCoverOptions(forCardAt: cardIdx),
+                    onSelectCover: { processor.setManualEnclosureCover($0, forCardAt: cardIdx) }
                 )
                 .focusable(true)
                 .focused($canvasFocused)
@@ -126,6 +129,8 @@ struct ManualTaggingSheet: View {
 struct ManualTagSegmentView: View {
     @Binding var segment: ManualTagSegment
     @Binding var focusedImage: Int
+    var coverOptions: [OCRProcessor.ManualCoverOption] = []
+    var onSelectCover: ((Int?) -> Void)? = nil
 
     var body: some View {
         ScrollView {
@@ -182,7 +187,7 @@ struct ManualTagSegmentView: View {
                             }
                             Spacer()
                         }
-                        // W37.dual-date — the covering letter's date, for an enclosure with its own date.
+                        // W37.dual-date + W49.proc-manual-repoint-relation — the covering letter and its date.
                         SentWithDateSection(
                             sentWith: $segment.sentWith, uncertain: $segment.sentWithUncertain,
                             unreadable: $segment.sentWithTextUnreadable,
@@ -191,15 +196,55 @@ struct ManualTagSegmentView: View {
                                 : "Leave it empty for an item that was not enclosed with a letter.",
                             startsExpanded: segment.enclosureOfSegmentIndex != nil
                         ) {
-                            if let cover = segment.enclosureCoverName, segment.enclosureOfSegmentIndex != nil {
+                            if !coverOptions.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "paperclip")
+                                        Picker("Covering letter:", selection: Binding<Int?>(
+                                            get: { segment.enclosureOfSegmentIndex },
+                                            set: { chosen in
+                                                if let onSelectCover {
+                                                    onSelectCover(chosen)
+                                                } else {
+                                                    segment.enclosureOfSegmentIndex = chosen
+                                                    segment.enclosureCoverName = chosen.flatMap { c in
+                                                        coverOptions.first(where: { $0.segmentIndex == c })?.fileName
+                                                    }
+                                                    segment.refreshInheritedDate(from: nil)
+                                                }
+                                            }
+                                        )) {
+                                            Text("Not an enclosure").tag(Int?.none)
+                                            ForEach(coverOptions) { option in
+                                                let suffix = option.dateSummary.map { " (\($0))" } ?? ""
+                                                Text("Segment \(option.displayIndex) — \(option.fileName)\(suffix)")
+                                                    .tag(Int?.some(option.segmentIndex))
+                                            }
+                                        }
+                                        .pickerStyle(.menu)
+                                        .frame(maxWidth: 420)
+                                        .accessibilityIdentifier("ap.manual.enclosureCoverPicker")
+                                    }
+                                    if let cover = segment.enclosureCoverName, segment.enclosureOfSegmentIndex != nil {
+                                        Text(segment.enclosureOfSegmentIndex == segment.proposedEnclosureOfSegmentIndex
+                                             ? "Proposed: enclosure sent with “\(cover)”. Choose another letter above or Not an enclosure."
+                                             : "Enclosure sent with “\(cover)”.")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            } else if let cover = segment.enclosureCoverName, segment.enclosureOfSegmentIndex != nil {
                                 HStack(spacing: 8) {
                                     Image(systemName: "paperclip")
                                     Text("Proposed: enclosure sent with the letter starting “\(cover)”.")
                                         .font(.caption)
                                     Button("Not an enclosure") {
-                                        segment.enclosureOfSegmentIndex = nil
-                                        segment.enclosureCoverName = nil
-                                        segment.refreshInheritedDate(from: nil)
+                                        if let onSelectCover { onSelectCover(nil) }
+                                        else {
+                                            segment.enclosureOfSegmentIndex = nil
+                                            segment.enclosureCoverName = nil
+                                            segment.refreshInheritedDate(from: nil)
+                                        }
                                     }
                                     .controlSize(.small)
                                 }

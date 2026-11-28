@@ -581,6 +581,106 @@ enum DualDateTestDriver {
                   multisetEqual(try MacOSTagger.readTags(from: typedPDF), written))
         } catch { check("typed-date tags land on a scratch PDF as written", false) }
 
+        // --- 5d. W49.proc-manual-repoint-relation: manual tag sheet re-points an enclosure at another letter. ---
+        // Box (seg 0) · Letter A 1950 (seg 1, card 0) · Letter B 1958-03 (seg 2, card 1) ·
+        // Enclosure E proposed->B (seg 3, card 2) · Standalone Doc D (seg 4, card 3).
+        do {
+            let dir = tmp.appendingPathComponent("manual-repoint", isDirectory: true)
+            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            let names = ["M0_Box.jpg", "M1_LetterA.jpg", "M2_LetterB.jpg", "M3_Encl.jpg", "M4_Doc.jpg"]
+            let urls = names.map(u)
+            let classes: [DocumentClassification] = [.boxLabel, .documentStart, .documentStart, .documentStart, .documentStart]
+            let p = OCRProcessor()
+            p.taggingMode = .human
+            p.jobs = urls.indices.map { i in
+                var job = OCRJob(sourceURL: urls[i])
+                job.result = OCRResult(text: "text \(names[i])", classification: classes[i], rotationDegrees: 0,
+                                       errorMessage: nil, errorCode: nil, enclosure: i == 3)
+                job.classification = classes[i]
+                return job
+            }
+            var outs: [URL: URL] = [:]
+            for job in p.jobs {
+                let pdf = dir.appendingPathComponent(job.sourceURL.deletingPathExtension().lastPathComponent + ".pdf")
+                writeOnePagePDF(pdf)
+                outs[job.sourceURL] = pdf
+            }
+            p.outputURLMap = outs
+            p.rebuildSegments(files: urls)
+
+            let task = Task { @MainActor in
+                await p.performManualTaggingPhase(
+                    mode: .human, provider: .anthropic, model: model, thinkingLevel: nil,
+                    apiKey: "", outputDirectory: dir, enableSegmentJSON: true
+                )
+            }
+            while !p.awaitingManualTagging { await Task.yield() }
+
+            // Seed dates on Letter A (1950), Letter B (1958-03), Encl E (1957), Doc D (1956).
+            p.manualTagSegments[0].ownDate = ArchiveDate(year: 1950)
+            p.manualTagSegments[1].ownDate = ArchiveDate(year: 1958, month: 3)
+            p.manualTagSegments[2].ownDate = ArchiveDate(year: 1957)
+            p.manualTagSegments[3].ownDate = ArchiveDate(year: 1956)
+
+            // Candidate list excludes box label (seg 0), self, later segments, and other enclosures (seg 3).
+            let optsForEncl = p.manualCoverOptions(forCardAt: 2).map(\.segmentIndex)
+            let optsForDoc = p.manualCoverOptions(forCardAt: 3).map(\.segmentIndex)
+            check("W49.proc-manual-repoint-relation: cover options offer earlier non-label, non-enclosure letters only",
+                  p.manualCoverOptions(forCardAt: 0).isEmpty && optsForEncl == [1, 2] && optsForDoc == [1, 2])
+            check("W49.proc-manual-repoint-relation: proposed enclosure starts on Letter B",
+                  p.manualTagSegments[2].enclosureOfSegmentIndex == 2
+                  && p.manualTagSegments[2].proposedEnclosureOfSegmentIndex == 2)
+
+            // Guard checks: self, forward, box label, and another enclosure are all rejected.
+            p.setManualEnclosureCover(0, forCardAt: 2)   // box label
+            check("W49.proc-manual-repoint-relation: box label rejected as cover",
+                  p.manualTagSegments[2].enclosureOfSegmentIndex == nil)
+            p.setManualEnclosureCover(3, forCardAt: 2)   // self
+            check("W49.proc-manual-repoint-relation: self rejected as cover",
+                  p.manualTagSegments[2].enclosureOfSegmentIndex == nil)
+            p.setManualEnclosureCover(4, forCardAt: 2)   // later segment
+            check("W49.proc-manual-repoint-relation: later document rejected as cover",
+                  p.manualTagSegments[2].enclosureOfSegmentIndex == nil)
+
+            // Re-point Enclosure E from Letter B (seg 2) to Letter A (seg 1).
+            p.setManualEnclosureCover(1, forCardAt: 2)
+            check("W49.proc-manual-repoint-relation: re-pointing updates cover index and name",
+                  p.manualTagSegments[2].enclosureOfSegmentIndex == 1
+                  && p.manualTagSegments[2].enclosureCoverName == "M1_LetterA.jpg")
+            // Cannot chain: Doc D cannot pick Enclosure E (seg 3) while E is an enclosure.
+            p.setManualEnclosureCover(3, forCardAt: 3)
+            check("W49.proc-manual-repoint-relation: chained enclosure rejected as cover",
+                  p.manualTagSegments[3].enclosureOfSegmentIndex == nil)
+            // Point standalone Doc D at Letter B (seg 2), with an explicit typed Sent With override.
+            p.setManualEnclosureCover(2, forCardAt: 3)
+            p.manualTagSegments[3].sentWith = "1959-01"
+            // If Letter B itself becomes an enclosure of Letter A, Doc D's pointer to Letter B is cleared (no chains).
+            p.setManualEnclosureCover(1, forCardAt: 1)
+            check("W49.proc-manual-repoint-relation: turning a cover into an enclosure clears downstream pointers",
+                  p.manualTagSegments[1].enclosureOfSegmentIndex == 1
+                  && p.manualTagSegments[3].enclosureOfSegmentIndex == nil)
+            // Restore Letter B as standalone and point Doc D back at Letter B (keeping its explicit Sent With).
+            p.setManualEnclosureCover(nil, forCardAt: 1)
+            p.setManualEnclosureCover(2, forCardAt: 3)
+
+            p.finishManualTagging()
+            await task.value
+
+            let enclPDF = outs[urls[3]]!
+            let enclJSON = jsonOf(enclPDF.deletingPathExtension().appendingPathExtension("json"))
+            let docPDF = outs[urls[4]]!
+            let docJSON = jsonOf(docPDF.deletingPathExtension().appendingPathExtension("json"))
+
+            check("W49.proc-manual-repoint-relation: re-pointed enclosure takes Letter A's Sent With + sidecar enclosure_of",
+                  sentWithTokens(enclPDF) == ["Sent With 1950"]
+                  && (enclJSON["enclosure_of"] as? String) == "M1_LetterA.jpg"
+                  && p.effectiveCoverIndex(of: 3, in: p.segments) == 1)
+            check("W49.proc-manual-repoint-relation: newly pointed doc keeps explicit Sent With while recording chosen cover",
+                  sentWithTokens(docPDF) == ["Sent With 1959-01"]
+                  && (docJSON["enclosure_of"] as? String) == "M2_LetterB.jpg"
+                  && p.effectiveCoverIndex(of: 4, in: p.segments) == 2)
+        }
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["DUAL_DATE_TEST_OUT"]

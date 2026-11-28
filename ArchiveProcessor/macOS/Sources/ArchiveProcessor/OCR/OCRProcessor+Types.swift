@@ -222,11 +222,19 @@ struct SegmentTagData {
 
 /// Dating inputs already read for this run, kept until post-tagging review finishes.
 struct EnclosureDateReview {
+    struct ManualOverride {
+        var sentWith: String
+        var uncertain: Bool
+        var rejectedCover: Bool
+        /// W49.proc-manual-repoint-relation: the covering letter's first-page source URL when the user
+        /// selected or re-pointed the enclosure in the manual tag sheet.
+        var chosenCoverSource: URL? = nil
+    }
     var inheritance: DateRoute.Inheritance?
     var decision: DateRoute.Decision?
     var phoneMonth: String? = nil
     var pendingSidecarDecision: DateRoute.Decision? = nil
-    var manual: (sentWith: String, uncertain: Bool, rejectedCover: Bool)? = nil
+    var manual: ManualOverride? = nil
 }
 
 /// One document segment presented for manual/human tagging (feature 6).
@@ -246,9 +254,12 @@ struct ManualTagSegment: Identifiable {
     var quality: Int = 0
     /// True while the auto-date LLM prefetch for this segment is still in flight.
     var dateLoading: Bool = false
-    /// W37.dual-date — the PROPOSED enclosure relation, seeded from `DocumentSegment.enclosureOf`: the
-    /// covering letter's index into `segments`. The owner can clear it (→ nil); it is never invented here.
+    /// W37.dual-date + W49.proc-manual-repoint-relation — the enclosure relation: the covering letter's
+    /// index into `segments`. Seeded from `DocumentSegment.enclosureOf`; the owner can clear it (→ nil)
+    /// or re-point it at another earlier document in the manual tag sheet.
     var enclosureOfSegmentIndex: Int? = nil
+    /// The segmenter's original proposed cover index (for UI hint only; nil if none was proposed).
+    var proposedEnclosureOfSegmentIndex: Int? = nil
     /// The covering letter's first page file name, for display only.
     var enclosureCoverName: String? = nil
     /// Explicit covering-letter date (wire value); empty = take it from the relation's cover, if any.

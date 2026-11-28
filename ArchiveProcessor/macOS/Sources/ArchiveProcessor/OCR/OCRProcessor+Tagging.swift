@@ -592,7 +592,7 @@ extension OCRProcessor {
             let phoneYear = phoneFileIdx.flatMap { phoneYearTag(at: $0) }
             let phoneMonth = phoneFileIdx.flatMap { phoneMonthTag(at: $0) }
             let prefilledQuality = phoneFileIdx.map { phoneQuality(at: $0) } ?? 0
-            // W37: seed the segmenter's PROPOSED enclosure relation for the owner to confirm or clear.
+            // W37: seed the segmenter's PROPOSED enclosure relation for the owner to confirm, re-point, or clear.
             let coverIndex = Self.validCoverIndex(of: i, in: segments)
             manual.append(ManualTagSegment(
                 segmentIndex: i,
@@ -603,6 +603,7 @@ extension OCRProcessor {
                 quality: prefilledQuality,
                 dateLoading: mode == .autoDate && phoneYear == nil && phoneMonth == nil,
                 enclosureOfSegmentIndex: coverIndex,
+                proposedEnclosureOfSegmentIndex: coverIndex,
                 enclosureCoverName: coverIndex.flatMap { segments[$0].pdfURLs.first?.lastPathComponent }
             ))
         }
@@ -648,14 +649,16 @@ extension OCRProcessor {
             var tags = m.ownDateTags
             tags.subjectTags = m.subjectTags
             tags.quality = m.quality
-            // W37: only a relation the owner left in place, and only to a valid preceding document cover.
+            // W37 + W49.proc-manual-repoint-relation: honor either the kept proposal or a cover re-pointed
+            // by the owner in the manual sheet (validated: earlier non-label document, never chained).
             let coverIndex = m.enclosureOfSegmentIndex.flatMap { c in
-                Self.validCoverIndex(of: m.segmentIndex, in: segments) == c ? c : nil
+                resolvedManualCoverIndex(c, for: m.segmentIndex, cardBySegment: cardBySegment)
             }
             EnclosureDates.resolveManual(entry: m.sentWith, uncertain: m.sentWithUncertain,
                                          cover: coverIndex.flatMap { cardBySegment[$0] }.map { manualTagSegments[$0].ownDateTags },
                                          into: &tags)
-            let enclosureOfName = coverIndex.flatMap { segments[$0].pdfURLs.first?.lastPathComponent }
+            let coverSourceURL = coverIndex.flatMap { segments[$0].pdfURLs.first }
+            let enclosureOfName = coverSourceURL?.lastPathComponent
             // The late Live-Capture boundary runs after this phase. Save the manual decision into
             // its aligned handoff array so it cannot re-apply the incoming phone P value afterwards.
             recordManualQualityIntent(m.quality, for: seg.pdfURLs)
@@ -663,10 +666,15 @@ extension OCRProcessor {
             let dating = m.standingDating
             rememberCatalogueFields(tags, segment: seg, dateIsUserSet: m.dateEdited || mode == .human,
                                     subjectsAreUserSet: true, dating: dating)
-            let review = EnclosureDateReview(inheritance: dating == nil ? nil : m.dateInheritance, decision: dating,
-                                             manual: (m.sentWith, m.sentWithUncertain,
-                                                      m.enclosureOfSegmentIndex == nil &&
-                                                        Self.validCoverIndex(of: m.segmentIndex, in: segments) != nil))
+            let proposedCover = Self.validCoverIndex(of: m.segmentIndex, in: segments)
+            let review = EnclosureDateReview(
+                inheritance: dating == nil ? nil : m.dateInheritance,
+                decision: dating,
+                manual: .init(sentWith: m.sentWith,
+                              uncertain: m.sentWithUncertain,
+                              rejectedCover: coverIndex == nil && proposedCover != nil,
+                              chosenCoverSource: coverIndex != proposedCover ? coverSourceURL : nil)
+            )
 
             for sourceURL in seg.pdfURLs {
                 appliedGeneratedTags[sourceURL] = tags
@@ -721,9 +729,6 @@ extension OCRProcessor {
         let cardBySegment = Dictionary(uniqueKeysWithValues: manualTagSegments.indices.map {
             (manualTagSegments[$0].segmentIndex, $0)
         })
-        let enclosuresByCover = Dictionary(grouping: manualTagSegments.indices.filter {
-            manualTagSegments[$0].enclosureOfSegmentIndex != nil
-        }, by: { manualTagSegments[$0].enclosureOfSegmentIndex! })
         let maxConcurrent = min(6, work.count)
         // A document with no text can still use the opt-in local image pass.
         let task: @Sendable ((idx: Int, input: DateRoute.Input?)) async -> (Int, DateRoute.Decision?) = { w in
@@ -758,8 +763,10 @@ extension OCRProcessor {
                     }
                     manualTagSegments[idx].dateLoading = false
                     refreshManualCardDate(at: idx, cardBySegment: cardBySegment, allowRuleFallback: true)
-                    for enclosure in enclosuresByCover[manualTagSegments[idx].segmentIndex] ?? []
-                    where !manualTagSegments[enclosure].dateLoading {
+                    let thisSegIndex = manualTagSegments[idx].segmentIndex
+                    for enclosure in manualTagSegments.indices
+                    where manualTagSegments[enclosure].enclosureOfSegmentIndex == thisSegIndex
+                          && !manualTagSegments[enclosure].dateLoading {
                         refreshManualCardDate(at: enclosure, cardBySegment: cardBySegment, allowRuleFallback: true)
                     }
                 }
@@ -771,6 +778,71 @@ extension OCRProcessor {
             }
         }
     }
+    /// W49.proc-manual-repoint-relation: earlier document cards that may serve as the covering letter for
+    /// `cardIndex` in the manual tag sheet (earlier segment, not a box/folder label, never itself an enclosure).
+    struct ManualCoverOption: Identifiable, Equatable {
+        let segmentIndex: Int
+        let displayIndex: Int    // 1-based card ordinal for display
+        let fileName: String
+        let dateSummary: String?
+        var id: Int { segmentIndex }
+    }
+
+    func manualCoverOptions(forCardAt cardIndex: Int) -> [ManualCoverOption] {
+        guard manualTagSegments.indices.contains(cardIndex) else { return [] }
+        let targetSeg = manualTagSegments[cardIndex].segmentIndex
+        guard targetSeg < segments.count,
+              !segments[targetSeg].isBox, !segments[targetSeg].isFolder else { return [] }
+        var options: [ManualCoverOption] = []
+        for idx in 0..<cardIndex {
+            let card = manualTagSegments[idx]
+            let s = card.segmentIndex
+            guard s < targetSeg, s < segments.count,
+                  !segments[s].isBox, !segments[s].isFolder,
+                  card.enclosureOfSegmentIndex == nil,
+                  let name = segments[s].pdfURLs.first?.lastPathComponent else { continue }
+            let dateSummary = card.ownDate?.display ?? (card.year.isEmpty ? nil : card.year)
+            options.append(ManualCoverOption(segmentIndex: s, displayIndex: idx + 1,
+                                             fileName: name, dateSummary: dateSummary))
+        }
+        return options
+    }
+
+    /// W49.proc-manual-repoint-relation: set, re-point, or clear the covering letter of `cardIndex`.
+    /// Rejects self, later segments, box/folder labels, and chained enclosures; clears any later card
+    /// that pointed at `cardIndex` if `cardIndex` itself becomes an enclosure, and refreshes inherited dates.
+    func setManualEnclosureCover(_ coverSegmentIndex: Int?, forCardAt cardIndex: Int) {
+        guard manualTagSegments.indices.contains(cardIndex) else { return }
+        let segIndex = manualTagSegments[cardIndex].segmentIndex
+        let validated = coverSegmentIndex.flatMap { c in
+            resolvedManualCoverIndex(c, for: segIndex, cardBySegment: nil)
+        }
+        manualTagSegments[cardIndex].enclosureOfSegmentIndex = validated
+        manualTagSegments[cardIndex].enclosureCoverName = validated.flatMap {
+            segments[$0].pdfURLs.first?.lastPathComponent
+        }
+        if validated != nil {
+            // Prevent chains: a card that becomes an enclosure cannot remain another card's cover.
+            for later in (cardIndex + 1)..<manualTagSegments.count
+            where manualTagSegments[later].enclosureOfSegmentIndex == segIndex {
+                manualTagSegments[later].enclosureOfSegmentIndex = nil
+                manualTagSegments[later].enclosureCoverName = nil
+                refreshManualCardDate(at: later)
+            }
+        }
+        refreshManualCardDate(at: cardIndex)
+    }
+
+    private func resolvedManualCoverIndex(_ candidate: Int, for segmentIndex: Int,
+                                          cardBySegment: [Int: Int]?) -> Int? {
+        guard segmentIndex < segments.count, candidate >= 0, candidate < segmentIndex,
+              !segments[segmentIndex].isBox, !segments[segmentIndex].isFolder,
+              !segments[candidate].isBox, !segments[candidate].isFolder else { return nil }
+        let coverCard = cardBySegment?[candidate] ?? manualTagSegments.firstIndex(where: { $0.segmentIndex == candidate })
+        if let coverCard, manualTagSegments[coverCard].enclosureOfSegmentIndex != nil { return nil }
+        return candidate
+    }
+
     private func refreshManualCardDate(at index: Int, cardBySegment: [Int: Int]? = nil,
                                        allowRuleFallback: Bool = false) {
         guard manualTagSegments.indices.contains(index) else { return }
@@ -778,7 +850,7 @@ extension OCRProcessor {
         var cover: GeneratedTags?
         var coverDatedByFolder = false
         if let c = manualTagSegments[index].enclosureOfSegmentIndex,
-           Self.validCoverIndex(of: segment, in: segments) == c,
+           resolvedManualCoverIndex(c, for: segment, cardBySegment: cardBySegment) == c,
            let coverIndex = cardBySegment?[c] ?? manualTagSegments.firstIndex(where: { $0.segmentIndex == c }),
            !manualTagSegments[coverIndex].dateTextUnreadable {
             cover = manualTagSegments[coverIndex].ownDateTags
@@ -1037,7 +1109,9 @@ extension OCRProcessor {
             for sourceURL in seg.pdfURLs {
                 appliedGeneratedTags[sourceURL] = gtags
                 enclosureDateReviews[sourceURL] = .init(inheritance: nil, decision: dating,
-                                                        manual: (data.sentWith, data.sentWithUncertain, true))
+                                                        manual: .init(sentWith: data.sentWith,
+                                                                      uncertain: data.sentWithUncertain,
+                                                                      rejectedCover: true))
                 if let outputPDF = outputURLMap[sourceURL] {
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     tagOutput(gtags, at: outputPDF, source: sourceURL, stampUnread: outputSettings.stampUnread)
@@ -1515,6 +1589,22 @@ extension OCRProcessor {
                                       settings: activeResolvedSettings?.values ?? [:], provider: provider, model: model,
                                       gateway: gateway, localAgent: localAgent)
     }
+    /// W37 + W49.proc-manual-repoint-relation: resolve the effective covering segment index for `i` in `snapshot`,
+    /// honoring any manual sheet override (`rejectedCover` or `chosenCoverSource`) while validating the target
+    /// is still an earlier non-label document segment in `snapshot`.
+    func effectiveCoverIndex(of i: Int, in snapshot: [DocumentSegment]) -> Int? {
+        guard i < snapshot.count, !snapshot[i].isBox, !snapshot[i].isFolder else { return nil }
+        if let first = snapshot[i].pdfURLs.first, let manual = enclosureDateReviews[first]?.manual {
+            if manual.rejectedCover { return nil }
+            if let chosen = manual.chosenCoverSource {
+                guard let c = snapshot.firstIndex(where: { $0.pdfURLs.first == chosen }),
+                      c < i, !snapshot[c].isBox, !snapshot[c].isFolder else { return nil }
+                return c
+            }
+        }
+        return Self.validCoverIndex(of: i, in: snapshot)
+    }
+
     /// W37 — the covering segment's index when `snapshot[i]` carries a usable enclosure relation: the
     /// cover precedes it, is in range, and is a document (never a box/folder label). `nil` otherwise.
     nonisolated static func validCoverIndex(of i: Int, in snapshot: [DocumentSegment]) -> Int? {
@@ -1722,7 +1812,7 @@ extension OCRProcessor {
                                           uniquingKeysWith: { first, _ in first })
 
         for (i, seg) in segs.enumerated() {
-            let coverSource = Self.validCoverIndex(of: i, in: segs).flatMap { c -> URL? in
+            let coverSource = effectiveCoverIndex(of: i, in: segs).flatMap { c -> URL? in
                 guard let source = segs[c].pdfURLs.first, let job = jobIndexBySource[source],
                       !jobs[job].appliedTags.isEmpty else { return nil }
                 return source
@@ -1734,7 +1824,7 @@ extension OCRProcessor {
                       let outputURL = outputURLMap[source],
                       !OutputFileSafety.isFiledCatalogue(at: outputURL) else { continue }
                 var review = enclosureDateReviews[source]
-                let coverName = review?.manual?.rejectedCover == true ? nil : coverSource?.lastPathComponent
+                let coverName = coverSource?.lastPathComponent
                 let cover = coverName == nil ? nil : coverTags
                 var tags = appliedGeneratedTags[source] ?? GeneratedTags()
                 if let manual = review?.manual {
