@@ -272,11 +272,9 @@ final class ReaderPreviewPopover {
             return
         }
 
-        let pageIndex = (page ?? 1) - 1 // 1-based → 0-based
-        let pdfPage = doc.page(at: max(0, pageIndex))
-
-        let controller = NotesPDFPaneController()
-        let content = PreviewContentView(page: pdfPage, controller: controller, fileName: fileURL.lastPathComponent)
+        let targetIndex = NotesPDFPaneController.clampedPageIndex(oneBased: page, pageCount: doc.pageCount)
+        let controller = NotesPDFPaneController(initialPageIndex: targetIndex)
+        let content = PreviewContentView(document: doc, controller: controller, fileName: fileURL.lastPathComponent)
 
         let pop = NSPopover()
         pop.contentSize = NSSize(width: 400, height: 500)
@@ -314,30 +312,68 @@ final class ReaderPreviewPopover {
 // MARK: - SwiftUI content views
 
 private struct PreviewContentView: View {
-    let page: PDFPage?
-    let controller: NotesPDFPaneController
+    let document: PDFDocument
+    @ObservedObject var controller: NotesPDFPaneController
     let fileName: String
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 6) {
                 Text(fileName)
                     .font(.caption)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Spacer()
+                Spacer(minLength: 4)
+                if controller.pageCount > 1 {
+                    HStack(spacing: 3) {
+                        Button { controller.previousPage() } label: {
+                            Image(systemName: "chevron.up")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(!controller.canGoPrevious)
+                        .help("Previous page")
+                        .accessibilityIdentifier("an.preview.prevPage")
+
+                        Text("Page \(controller.currentPageIndex + 1) of \(controller.pageCount)")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("an.preview.pageLabel")
+
+                        Button { controller.nextPage() } label: {
+                            Image(systemName: "chevron.down")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(!controller.canGoNext)
+                        .help("Next page")
+                        .accessibilityIdentifier("an.preview.nextPage")
+
+                        if !controller.isOnInitialPage {
+                            Button { controller.goToInitialPage() } label: {
+                                Image(systemName: "arrow.uturn.backward")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Return to linked page \(controller.clampedInitialPageIndex + 1)")
+                            .accessibilityIdentifier("an.preview.returnToLinkedPage")
+                        }
+                    }
+                    Divider().frame(height: 12)
+                }
                 Button { controller.zoomOut() } label: { Image(systemName: "minus.magnifyingglass") }
                     .buttonStyle(.borderless)
+                    .help("Zoom out")
                 Button { controller.fit() } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
                     .buttonStyle(.borderless)
+                    .help("Zoom to fit")
                 Button { controller.zoomIn() } label: { Image(systemName: "plus.magnifyingglass") }
                     .buttonStyle(.borderless)
+                    .help("Zoom in")
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(.bar)
             Divider()
-            NotesPDFPaneView(page: page, controller: controller)
+            NotesPDFPaneView(document: document, controller: controller)
         }
     }
 }

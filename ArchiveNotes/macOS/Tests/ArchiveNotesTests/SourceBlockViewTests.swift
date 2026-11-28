@@ -74,6 +74,99 @@ struct NotesPDFPaneControllerTests {
         controller.applyToView()
         #expect(view.autoScales, "detached zoom calls must leave no saved scale behind")
     }
+
+    private func makeMultiPageDoc(pages: Int) -> PDFDocument {
+        let doc = PDFDocument()
+        for i in 0..<pages {
+            doc.insert(PDFPage(), at: i)
+        }
+        return doc
+    }
+
+    @MainActor @Test("clampedPageIndex handles nil, zero, negative, in-range, out-of-range, and empty PDFs")
+    func clampedPageIndexEdges() {
+        #expect(NotesPDFPaneController.clampedPageIndex(oneBased: nil, pageCount: 6) == 0)
+        #expect(NotesPDFPaneController.clampedPageIndex(oneBased: 0, pageCount: 6) == 0)
+        #expect(NotesPDFPaneController.clampedPageIndex(oneBased: -3, pageCount: 6) == 0)
+        #expect(NotesPDFPaneController.clampedPageIndex(oneBased: 1, pageCount: 6) == 0)
+        #expect(NotesPDFPaneController.clampedPageIndex(oneBased: 5, pageCount: 6) == 4)
+        #expect(NotesPDFPaneController.clampedPageIndex(oneBased: 99, pageCount: 6) == 5)
+        #expect(NotesPDFPaneController.clampedPageIndex(oneBased: 3, pageCount: 0) == 0)
+    }
+
+    @MainActor @Test("multi-page merged PDF loads at linked page, steps, jumps back, and keeps page on zoom/fit")
+    func multiPageScrollNavigationAndZoom() {
+        let doc = makeMultiPageDoc(pages: 6)
+        let view = PDFView(frame: NSRect(x: 0, y: 0, width: 400, height: 500))
+        view.displayMode = .singlePageContinuous
+        view.displaysPageBreaks = true
+        view.document = doc
+
+        // Open on 1-based page 5 (0-based index 4) of a 6-page merged PDF.
+        let controller = NotesPDFPaneController(initialPageIndex: 4)
+        controller.pdfView = view
+        controller.documentDidLoad(doc)
+
+        #expect(controller.pageCount == 6)
+        #expect(controller.currentPageIndex == 4)
+        #expect(controller.isOnInitialPage)
+        #expect(controller.canGoPrevious)
+        #expect(controller.canGoNext)
+        #expect(view.currentPage === doc.page(at: 4))
+
+        // Step forward to last page (index 5); next becomes disabled.
+        controller.nextPage()
+        #expect(controller.currentPageIndex == 5)
+        #expect(!controller.canGoNext)
+        #expect(!controller.isOnInitialPage)
+        #expect(view.currentPage === doc.page(at: 5))
+
+        // Stepping past the end is a no-op.
+        controller.nextPage()
+        #expect(controller.currentPageIndex == 5)
+
+        // Step backward twice to index 3.
+        controller.previousPage()
+        controller.previousPage()
+        #expect(controller.currentPageIndex == 3)
+        #expect(view.currentPage === doc.page(at: 3))
+
+        // Zooming and fitting keep the current page rather than snapping back to page 0.
+        controller.zoomIn()
+        controller.recordScale()
+        #expect(controller.currentPageIndex == 3)
+        controller.fit()
+        #expect(controller.currentPageIndex == 3)
+        #expect(view.currentPage === doc.page(at: 3))
+
+        // Return to linked page jumps back to index 4.
+        controller.goToInitialPage()
+        #expect(controller.currentPageIndex == 4)
+        #expect(controller.isOnInitialPage)
+        #expect(view.currentPage === doc.page(at: 4))
+
+        // External scroll (simulated via PDFView.go(to:)) syncs currentPageIndex.
+        view.go(to: doc.page(at: 1)!)
+        controller.syncCurrentPage()
+        #expect(controller.currentPageIndex == 1)
+        #expect(!controller.isOnInitialPage)
+    }
+
+    @MainActor @Test("single-page PDF keeps single-page display and disables page stepping")
+    func singlePageDisablesStepping() {
+        let doc = makeMultiPageDoc(pages: 1)
+        let view = PDFView(frame: NSRect(x: 0, y: 0, width: 400, height: 500))
+        view.document = doc
+        let controller = NotesPDFPaneController(initialPageIndex: 0)
+        controller.pdfView = view
+        controller.documentDidLoad(doc)
+
+        #expect(controller.pageCount == 1)
+        #expect(controller.currentPageIndex == 0)
+        #expect(!controller.canGoPrevious)
+        #expect(!controller.canGoNext)
+        #expect(controller.isOnInitialPage)
+    }
 }
 
 // MARK: - BlockHeaderChipView reveal + preview
