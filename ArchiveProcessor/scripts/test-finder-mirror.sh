@@ -117,4 +117,4 @@ for f in sorted(os.listdir(sys.argv[1])):
         print(f'  FAIL source {f} lost its own tag: {names}'); sys.exit(1)
 print('PASS the source photos keep their own tags')
 EOF
-[ "$fail" -eq 0 ] && echo "ALL PASS" || { echo "FAILED (scratch kept: $WORK)"; exit 1; }
+[ "$fail" -eq 0 ] && echo "ALL PASS" || { echo "FAILED (see the output above)"; exit 1; }

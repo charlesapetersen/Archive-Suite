@@ -16,7 +16,7 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
   folder that also holds tagged PDFs lists those and gives no such notice, and the count is taken when a scan
   finishes, so a companion filed while the folder is open is counted at the next scan. The Reader's own mirroring,
   Import or Re-publish of a Finder edit and an undoable Remove Suite Tags follow in the same item
-  (queued: W49.storage-finder).
+  (queued: W49.storage-finder-reader-mirror).
 
 ## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
 
