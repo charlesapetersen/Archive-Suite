@@ -22,15 +22,41 @@ where PyTorch took the page's own shape: the same 8 of 45 at the default floor, 
 and 14 boxes rather than 15.
 
 Reading the marks it finds is the other half (`marks-read.md`): on the owner's own boxes LightOnOCR-3 4B reads 17
-of 35 marks at NES 0.8 and Apple Vision 13; through this detector's boxes, 6 at best.
+of 35 marks at NES 0.8 and Apple Vision 13; through the public-only detector's boxes, 6 at best.
 
-So no detector measured here is a marks layer. Public training data does not transfer to these pages at a usable
-recall. The comparison that decides the route is a whole-page reader (W46.mixed-route), which needs no detector;
-a fine-tune on our own pages (W46.marks-detect-own) was to run only if whole-page readers missed marks, and was
-retired on 2026-11-05 on a misread of that condition: W46.mixed-route found no ranked reader's whole page behind the
-owner's box beyond noise, but the run condition was whether a whole-page reader misses marks a layer needs, and it
-does: given the mark's own box as well, LightOnOCR-3 4B and GLM-OCR each read 8 more of the 35 (W46.marks-two-pass,
-`mixed-route.md`, "Two passes"; measurement review pass 11, P11-1). Whether it reopens is the owner's call.
+### Fine-tuning on our own pages (`W46.marks-detect-own`, Colab 2026-11-27)
+
+Starting from the public YOLO11m `best.pt`, we fine-tuned on the 110 non-core marks-set pages using high-precision
+box-matched agreement (`IoU >= 0.30`) between the two independent drafters (Gemini 3.7 Flash + Qwen3-VL 8B MLX;
+disjoint from all 40 owner-core pages and 32 held-out evaluation pages). Before packing, we audited both drafters
+on the 32 held-out owner-core pages (45 truth marks): **only 1 of 45 truth marks (2.2%) was missed by both
+drafters** (at both IoU 0.1 and 0.3), and box-matched agreement (`IoU >= 0.30`) hit a verified truth mark on **22
+of 23 boxes (95.7%)**.
+
+On the 110 non-core pages, `IoU >= 0.30` yielded **60 positive pages (90 agreed boxes: 77 handwritten, 11
+signature, 2 stamp)** plus **21 clean negative pages** (both drafters emitted 0 marks) = **81 pages** split
+stratified 85/15 (69 train / 12 val, seed 46). The 26 unagreed-only pages (one drafter saw a mark, the other did
+not) and 3 missing-draft pages were excluded rather than treated as negatives. Fine-tuning ran on Google Colab
+(`imgsz=1024`, `lr0=0.001`, `patience=15`, stopped at epoch 32, best validation `mAP50 = 0.464` at epoch 16;
+~3 minutes, `$0`).
+
+On the same 32 held-out evaluation pages (45 marks), own-page fine-tuning more than doubled recall while *raising*
+precision:
+
+- **At `conf = 0.25` (default):** loose-hit recall jumped from **8/45 (18%) → 19/45 (42%, interval 29–60)** and
+  IoU ≥ 0.50 recall from **6/45 (13%) → 17/45 (38%)**, while precision rose from **53% → 79%** (0.16 unmatched
+  boxes/page vs 0.22). A-core rose from 1/6 → 4/6, B-core from 7/39 → 15/39, touching-print marks from 3/18 →
+  10/18, and in-body annotations from **2/17 → 11/17**.
+- **At `conf = 0.05`:** loose-hit recall reached **27/45 (60%, interval 45–76)** and IoU ≥ 0.50 reached **21/45
+  (47%)** at **44% precision** (vs public's 17/45 = 38% at 42% precision). Annotations reached **15/17 (88%)** and
+  touching-print marks **14/18 (78%)**; stamps stayed weak (**2/10**) because only 2 agreed stamp boxes appeared in
+  the 81 non-core training pages.
+- **At `conf = 0.40`:** **14/45 (31%)** recall at **93% precision** (0.03 unmatched boxes/page).
+
+This confirms domain shift — not YOLO11m capacity — was why the public detector missed our archival annotations.
+The remaining gap is stamps (only 2 agreed training examples); improving stamp recall needs either more stamp
+examples or a separate stamp cue. Next step before shipping a two-pass detector into the app is independent
+validation on `W46.marks-truth-independent` and measuring the two-pass crop-reading lift with `yolo-own`'s boxes.
 
 ## Arms not run here
 
@@ -49,7 +75,11 @@ does: given the mark's own box as well, LightOnOCR-3 4B and GLM-OCR each read 8 
   `marks-set-reconciled-da388b05c388-dac79c80c2f6`): owner keep/reject, class and touches-print on 32 pages. The
   boxes are rough draft boxes from Gemini 3.7 Flash and Qwen3-VL 8B that the owner kept, plus one owner box. They
   are not tight geometry, which is why the loose rule is reported beside IoU 0.5. Neither PP-DocLayoutV3 nor
-  the YOLO11m drafted or chose a page, and the YOLO11m was trained on public sets only (no page of ours).
+  the public YOLO11m drafted or chose a page, and the public YOLO11m was trained on public sets only. The
+  own-page fine-tune (`yolo-own`, `W46.marks-detect-own`) trained strictly on 81 disjoint non-core pages (0 of 32
+  eval pages in train/val), but its training labels came from Gemini 3.7 Flash + Qwen3-VL 8B box agreement — the
+  same two drafters whose rough boxes seeded the owner core before owner keep/reject — so shared drafter box style
+  is a mild positive bias to re-check on `W46.marks-truth-independent`.
 - **Selection.** The frozen two-phase selection: A-core (15 pages) independent of every route, B-core (17) drawn
   from Qwen3.6-27B's pre-flag bands. Reported apart and pooled descriptively, without population weights. Excluded
   pages (8) are not negatives.

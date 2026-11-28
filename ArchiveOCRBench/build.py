@@ -1242,17 +1242,24 @@ def layout_order_marks():
 
 
 def marks_detect():
-    """W46.marks-detect: the trained YOLO11m's recall on the same core, at its default floor and at 0.05 (loose hit)."""
+    """W46.marks-detect & W46.marks-detect-own: public and own-page fine-tuned YOLO11m recall on the core."""
     if not MARKS_DETECT.exists():
         return {}
-    d = json.loads(MARKS_DETECT.read_text()).get("yolo")
+    raw = json.loads(MARKS_DETECT.read_text())
+    d = raw.get("yolo")
     if not d:
         return {}
     cell = lambda r, p: f'{r["found"]} ({100 * r["rate"]:.0f}%, interval {100 * r["ci"][0]:.0f}-{100 * r["ci"][1]:.0f}) at {100 * p:.0f}% precision'
     a = d["score"]["hit"]["all"]
     low = d["sweep"][0]["hit"]
-    return {"detector": cell(a["recall"], a["precision"]), "detector_low": cell(low["recall"], low["precision"]),
-            **mixed_route()}
+    out = {"detector": cell(a["recall"], a["precision"]), "detector_low": cell(low["recall"], low["precision"])}
+    own = raw.get("yolo-own")
+    if own:
+        oa = own["score"]["hit"]["all"]
+        olow = own["sweep"][0]["hit"]
+        out["detector_own"] = cell(oa["recall"], oa["precision"])
+        out["detector_own_low"] = cell(olow["recall"], olow["precision"])
+    return {**out, **mixed_route()}
 
 
 MIXED_READERS = {"lighton": "LightOnOCR-3 4B", "vision": "Apple Vision", "glm": "GLM-OCR", "qwen27": "Qwen3.6-27B"}

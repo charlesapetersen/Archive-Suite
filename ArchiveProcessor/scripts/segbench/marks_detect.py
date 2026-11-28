@@ -30,6 +30,7 @@ IMAGES = SUPPORT / "marks-set-frozen-da388b05c388/images"
 WORK = Path.home() / "Library/Caches/ArchiveSuiteRehearsal/marks-detect"
 # The collected Sherlock results (sherlock/packs/W46.marks-detect.json "mac"): public.json, pilot.json, runs/.
 CLUSTER = Path.home() / ".local/state/archive-autonomous/artifacts/marks-detect-20261104"
+OWN_CLUSTER = Path.home() / ".local/state/archive-autonomous/artifacts/marks-detect-own-20261127"
 RESULTS = HERE.parent.parent / "segbench-results"
 
 # Which of each detector's classes count as a mark. Anything else it emits is ignored, not a false positive.
@@ -45,6 +46,11 @@ ARMS = {
     # The Core ML export run on this Mac: parity with the cluster's PyTorch boxes, and seconds a page.
     "yolo-coreml": dict(name="YOLO11m, Core ML on the Mac (conf 0.25)", file="coreml.json", labels=None,
                         pages="all", conf=0.25, sweep=False),
+    # W46.marks-detect-own: public YOLO11m fine-tuned on 81 non-core marks-set pages (Colab, 2026-11-27).
+    "yolo-own": dict(name="YOLO11m, fine-tuned on own 81 non-core pages (conf 0.25)",
+                     file=OWN_CLUSTER / "out" / "own.json", labels=None, pages="all", conf=0.25),
+    "yolo-own-pilot": dict(name="YOLO11m own-page 1-epoch pilot (conf 0.25)",
+                           file=OWN_CLUSTER / "out" / "pilot.json", labels=None, pages="all", conf=0.25, sweep=False),
 }
 SWEEP = (0.05, 0.1, 0.15, 0.25, 0.4, 0.5, 0.6)
 RULES = {"iou50": 0.5, "hit": 0.1}
