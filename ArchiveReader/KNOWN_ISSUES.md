@@ -19,14 +19,14 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 - **With mirroring on, a tag added in Finder that reads as a subject is kept as the user's own tag and not offered
   for Import.** The suite cannot tell "ToPrint" from a subject typed in Finder, so it neither imports nor removes such
   a tag and goes on mirroring the PDF; every other Finder edit of a mirrored tag is offered as Import or Re-publish
-  (asked: W49.reader-mirror-added-tags-owner-ok).
+  (queued: W49.storage-finder-drop-mirror).
 
 ## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
 
 - Both thumbnail sidebars put an unnamed element (type other) around each page thumbnail button, which is labelled
   itself. It is the row host of SwiftUI's `LazyVStack`: in guest probes it went only with a plain `VStack`, which
   would make and fetch a thumbnail for every page of every open file at once, and stayed with every lazy-stack
-  variant tried. `AccessibilityAuditUITests` exempts it on those two screens. (asked: W49.reader-thumb-row-host-owner-ok)
+  variant tried. `AccessibilityAuditUITests` exempts it on those two screens. (accepted: the owner's call, 2026-11-27 walkthrough, W49.reader-thumb-row-host-owner-ok — keep lazy sidebars and narrow audit exemption)
 - While any text field has the focus, the audit reports one unnamed "Parent/Child mismatch": AppKit's shared field
   editor, seen with the find field, the OCR search and the plain `NSTextField` file-name filter alike, and gone when
   the focus leaves. `AccessibilityAudit.focusedTextFieldOrphan` exempts it on the find-bar screen alone (the find
