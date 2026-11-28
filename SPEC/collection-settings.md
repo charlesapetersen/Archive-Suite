@@ -90,8 +90,9 @@ answer it follows, `_1`: the date; the general layer's `staysOnMac` follows "Spe
 The general layer alone holds `keys`, `plans`, `cluster`, `gpusPerJob`, `downloadsAllowed`, `moneyHabit`,
 `monthCeilingUSD`, `fineTuning`, `trainingOff`, `keepPreservationCopies` (`bool`, on by default: keep the
 full-resolution originals) and `mirrorFinderTags` (`bool`, off by default: filed PDFs also carry their fields as
-Finder tags; owner, 2026-11-27, `W49.storage-finder`). A collection's or project's copy of one of these is ignored on
-reading.
+Finder tags; owner, 2026-11-27, `W49.storage-finder`; it applies only to output outside any archive, since an
+archive's own choice decides inside it, §"The archive's settings"). A collection's or project's copy of one of these
+is ignored on reading.
 
 `settings` in a run record is the resolution frozen when the run started (`ResolvedSettingsSnapshot`):
 
@@ -108,6 +109,21 @@ reading.
 The same snapshot is kept in the run's pending record (`pending_run.json` / `pending_batch.json`,
 `resolvedSettings`), outside its fingerprint. It is a record. Nothing reads it to decide how a run goes. The pending
 record encodes its dates as that file's other dates are (seconds since 2001), not as ISO 8601.
+
+## The archive's settings
+
+`<archive root>/.archivesuite/archive-settings.json`, where the archive root is the folder the Reader was granted,
+the one carrying a Reader `RootMarker` (`.archive-suite-root.json`). It holds the archive's own choices, shared by the
+apps (`ArchiveCore.ArchiveSettings`; `W49.storage-finder-reader-mirror`). UTF-8 JSON, sorted keys:
+`schemaVersion` (`1`; a larger one is neither read nor replaced), `mirrorFinderTags` (`bool`: the archive mirrors its
+catalogue fields to Finder tags, `SPEC/tag-format.md` §"The suite's Finder mirror") and `updatedAt` (ISO 8601).
+
+- **Who reads it.** The Reader, for the root it shows. The Processor, for the folder it files into: the nearest folder
+  at or above it with a Reader root marker is the archive; its document decides, and an archive with no document
+  (or one that cannot be read) does not mirror. Outside any archive the general `mirrorFinderTags` decides.
+- **Who writes it.** The Reader, when the user turns mirroring on or off for the open archive. The write follows the
+  collection document's rules below: an existing root only, `.archivesuite` created one level, never through a link
+  or over a file that is not ordinary, a temporary file renamed in place, and a newer document left alone.
 
 ## The review records
 

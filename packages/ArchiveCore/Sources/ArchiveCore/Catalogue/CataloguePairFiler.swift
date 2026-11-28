@@ -269,8 +269,10 @@ public struct CataloguePairFiler: Sendable {
         return verified.member
     }
 
-    /// The Finder tag list and the Finder info that holds the label colour.
-    static let finderTagAttributes: Set<String> = ["com.apple.metadata:_kMDItemUserTags", "com.apple.FinderInfo"]
+    /// The Finder tag list, the Finder info that holds the label colour, and the record of which of those tags the
+    /// suite wrote (`FinderMirror.ledgerAttribute`), which must never arrive without the tags it describes.
+    static let finderTagAttributes: Set<String> = ["com.apple.metadata:_kMDItemUserTags", "com.apple.FinderInfo",
+                                                   FinderMirror.ledgerAttribute]
 
     /// `fcopyfile` with `COPYFILE_ALL` between two open descriptors, leaving the Finder tags and label behind unless
     /// `carriesFinderTags`. Returns `fcopyfile`'s result; `errno` explains a failure. Also used for a producer's

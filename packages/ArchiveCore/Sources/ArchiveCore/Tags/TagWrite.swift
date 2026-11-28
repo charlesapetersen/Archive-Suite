@@ -6,7 +6,8 @@ import Foundation
 //  This is the coordinated tag-write primitive shared by all Archive Suite apps. Every tag
 //  mutation — Reader's delta-apply, Processor's fresh-write, Notes' tag projection — funnels
 //  through `CoordinatedTagWriter.write`. It edits ONLY Finder-tag metadata (the tag-name array
-//  + optionally the color label). It NEVER touches file bytes.
+//  + optionally the color label, and for the suite's Finder mirror its ownership record,
+//  `FinderMirror.ledgerAttribute`). It NEVER touches file bytes.
 //
 //  Guarantees (per write()):
 //   §1 coordinated, metadata-only write (never .forReplacing).
@@ -230,6 +231,52 @@ public enum CoordinatedTagWriter {
         expectedIdentity: FileIdentity? = nil,
         transform: ([String], Int?) -> ([String], Int?)?
     ) throws -> TagWriteResult {
+        try perform(url, expectedIdentity: expectedIdentity, transform: { tags, label, _ in transform(tags, label) },
+                    afterVerify: nil)
+    }
+
+    /// What a Finder-mirror write does, decided from the fresh tags, label and ownership record.
+    enum MirrorAction {
+        /// Write these tags and label, then this ownership record (nil removes it).
+        case write(tags: [String], label: Int?, ledger: FinderMirror.Ledger?)
+    }
+
+    /// `FinderMirror`'s write: the same read→modify→verify sequence as `write`, with the file's ownership
+    /// record read fresh inside the same coordination and per-path lock, and the new one written there after
+    /// the tags verify (also when the tags were already right). `decide` returning nil writes nothing.
+    /// A failure to write the record after the tags were written is reported, naming that the tags changed.
+    static func writeMirror(
+        _ url: URL,
+        expectedIdentity: FileIdentity? = nil,
+        decide: ([String], Int?, FinderMirror.LedgerState) -> MirrorAction?
+    ) throws -> TagWriteResult {
+        var pending: FinderMirror.Ledger??
+        return try perform(url, expectedIdentity: expectedIdentity, transform: { tags, label, target in
+            guard case .write(let newTags, let newLabel, let ledger)? = decide(tags, label, FinderMirror.readLedger(target))
+            else { return nil }
+            pending = .some(ledger)
+            if newTags == tags && normalizedLabel(newLabel) == normalizedLabel(label) { return nil }
+            return (newTags, newLabel)
+        }, afterVerify: { target in
+            guard let ledger = pending else { return }
+            do {
+                if let ledger {
+                    try FinderMirrorLedgerXattr.write(JSONEncoder().encode(ledger), to: target)
+                } else {
+                    try FinderMirrorLedgerXattr.remove(from: target)
+                }
+            } catch {
+                throw TagWriteError.verificationFailed("the tags were written, but the record of what the suite wrote was not: \(error.localizedDescription)")
+            }
+        })
+    }
+
+    private static func perform(
+        _ url: URL,
+        expectedIdentity: FileIdentity?,
+        transform: ([String], Int?, URL) -> ([String], Int?)?,
+        afterVerify: ((URL) throws -> Void)?
+    ) throws -> TagWriteResult {
         // §10 in-process per-resolved-path serialization. Hold a per-file lock across the ENTIRE
         // read→modify→verify→write below, so two concurrent in-process writers to the same file
         // can't both read pre-write state and clobber each other (a lost update). Acquired BEFORE
@@ -292,7 +339,8 @@ public enum CoordinatedTagWriter {
                 // means there are no colours to keep: the names read above are what the write is judged by.
                 let beforeRaw = TagXattr.rawEntries(target)
 
-                guard let (intendedTags, intendedLabel) = transform(before, beforeLabel) else {
+                guard let (intendedTags, intendedLabel) = transform(before, beforeLabel, target) else {
+                    try afterVerify?(target)
                     box.result = TagWriteResult(url: url, before: before, after: before,
                                                 beforeLabel: beforeLabel, afterLabel: beforeLabel,
                                                 inverse: TagDelta())
@@ -351,6 +399,7 @@ public enum CoordinatedTagWriter {
                 // unchanged; consumers switch to this in W15.tu2.
                 let occurrenceInverse = tagOccurrenceInverse(before: before, after: after,
                                                              beforeLabel: beforeLabel, afterLabel: afterLabel)
+                try afterVerify?(target)
                 box.result = TagWriteResult(url: url, before: before, after: after,
                                             beforeLabel: beforeLabel, afterLabel: afterLabel,
                                             inverse: inverse, occurrenceInverse: occurrenceInverse)
@@ -434,4 +483,48 @@ func multisetDifference(_ a: [String], minus b: [String]) -> [String] {
         else { out.append(t) }                                   // surplus occurrence → part of a − b
     }
     return out
+}
+
+// MARK: - The Finder mirror's ownership record (W49.storage-finder-reader-mirror)
+
+/// The extended attribute `FinderMirror.Ledger` lives in. Its writes are here, beside the tag writes,
+/// because they happen only inside `CoordinatedTagWriter.writeMirror`'s coordination block (lint rule 1).
+/// Paths are followed as the tag write follows them (options `0`), so the record and the tags it
+/// describes are always on the same file.
+enum FinderMirrorLedgerXattr {
+    enum ReadResult: Equatable { case absent, data(Data), failure(String) }
+
+    /// The largest record read; a larger one is not the suite's.
+    static let maximumBytes = 64 * 1024
+
+    static func read(_ url: URL) -> ReadResult {
+        guard url.isFileURL else { return .failure("not a file URL") }
+        return url.withUnsafeFileSystemRepresentation { rawPath -> ReadResult in
+            guard let rawPath else { return .failure("path has no filesystem representation") }
+            let size = getxattr(rawPath, FinderMirror.ledgerAttribute, nil, 0, 0, 0)
+            if size == -1 { return errno == ENOATTR ? .absent : .failure(String(cString: strerror(errno))) }
+            guard size <= maximumBytes else { return .failure("the ownership record is too large") }
+            var buffer = [UInt8](repeating: 0, count: size)
+            let read = getxattr(rawPath, FinderMirror.ledgerAttribute, &buffer, size, 0, 0)
+            if read == -1 { return errno == ENOATTR ? .absent : .failure(String(cString: strerror(errno))) }
+            return .data(Data(buffer[0..<read]))
+        }
+    }
+
+    static func write(_ data: Data, to url: URL) throws {
+        let status = url.withUnsafeFileSystemRepresentation { rawPath -> Int32 in
+            guard let rawPath else { errno = EINVAL; return -1 }
+            return data.withUnsafeBytes { setxattr(rawPath, FinderMirror.ledgerAttribute, $0.baseAddress, data.count, 0, 0) }
+        }
+        guard status == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        guard read(url) == .data(data) else { throw TagWriteError.verificationFailed("ownership record re-read did not match") }
+    }
+
+    static func remove(from url: URL) throws {
+        let status = url.withUnsafeFileSystemRepresentation { rawPath -> Int32 in
+            guard let rawPath else { errno = EINVAL; return -1 }
+            return removexattr(rawPath, FinderMirror.ledgerAttribute, 0)
+        }
+        guard status == 0 || errno == ENOATTR else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    }
 }

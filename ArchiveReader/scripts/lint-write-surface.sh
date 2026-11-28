@@ -244,6 +244,19 @@ ALLOW=(
   # cannot read costs an under-counted byte total in a cache that is rebuilt on demand — not a
   # corpus file, and not an absence anything reports to the user.
   "enumerator${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}guard let enumerator = fm.enumerator("
+  # W49.storage-finder-reader-mirror: the Finder mirror's ownership record (`FinderMirror.ledgerAttribute`), written and
+  # removed only by `CoordinatedTagWriter.writeMirror` inside the same metadata-only coordination block and per-path
+  # lock as the tag write, after the tags verify; re-read after writing. It never touches file bytes.
+  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}return data.withUnsafeBytes { setxattr(rawPath, FinderMirror.ledgerAttribute, \$0.baseAddress, data.count, 0, 0) }"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}return removexattr(rawPath, FinderMirror.ledgerAttribute, 0)"
+  # W49.storage-finder-reader-mirror: the archive's settings document (SPEC/collection-settings.md §"The archive's
+  # settings"), at the root's hidden `.archivesuite` folder only. `mkdirat` makes only that folder; every later step
+  # goes through its O_NOFOLLOW descriptor. The temporary is created O_EXCL, removed only if the rename did not
+  # happen, and renamed over the document, which is refused when it is a link or not an ordinary file.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}guard mkdirat(directory, folderName, 0o755) == 0 || errno == EEXIST else {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}let file = openat(folder, temporary, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}if !renamed { unlinkat(folder, temporary, 0) }"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}guard renameat(folder, temporary, folder, fileName) == 0 else { throw Failure.io(String(cString: strerror(errno))) }"
 )
 
 is_allowed() {   # <rule> <path> <trimmed line>

@@ -605,6 +605,43 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 
 ---
 
+## The suite's Finder mirror (W49.storage-finder-reader-mirror)
+
+In an archive whose catalogue companions hold the fields (`SPEC/catalogue.md`), Finder tags are a **mirror**, off
+unless the archive turns it on (owner, 2026-11-27, `W49.storage-finder-owner-ok`: 1c, 2b, 3b). The archive's choice
+is `mirrorFinderTags` in its settings document (`SPEC/collection-settings.md` §"The archive's settings"); the Reader
+sets it, the Processor's filing follows it, and outside any archive the Processor's general setting decides.
+
+- **Projection.** `ArchiveCore.FinderMirror.projection` derives the tokens from one occurrence's file fields and the
+  fields of the document it shows: the own date (`TagEditing.dateTokens`, `Date Uncertain`), `Sent With …` and its
+  uncertain token, subjects verbatim, `Q1`–`Q3`, `Read`/`Unread`, `Box`/`Folder`, `OCR Poor`, `OCR Failed`, and a
+  `Checked <Field>` for each current check. The colour is the label plus its name token. A cleared or unassessed
+  field projects nothing. Every write goes through `CoordinatedTagWriter` (`writeMirror`).
+- **Ownership record.** The extended attribute `com.archivesuite.finder-mirror` on the PDF holds UTF-8 JSON
+  `{"v":1,"owned":[…],"ownedLabel":N,"baseline":[…],"baselineLabel":N}`: the tokens (with multiplicity) and label
+  the suite introduced, and the whole tag list and label right after its last write. It is written inside the same
+  coordination and per-path lock as the tags, after they verify. A projected token already on the file stays
+  unowned; a hand-made tag is never owned. It travels with the tags: a filing that leaves the Finder tags behind
+  (`CataloguePairFiler.copyFile`) leaves it behind too. A record that is unreadable or has a larger `v` is unknown:
+  nothing counts as owned and it is replaced only by a deliberate Re-publish.
+- **Writing a change.** A projection removes owned tokens the record no longer gives, adds projected tokens the
+  file lacks, and keeps every other tag. A label the suite did not set is left. The record is never changed from
+  tags, and enabling the mirror never reads tags into it.
+- **A Finder edit (2b).** The tags *diverge* when, against the baseline, an owned token or a facet token is gone,
+  a facet token appeared (anything `DocumentTags.parse` claims as other than a subject, a colour name, `OCR Poor`,
+  `OCR Failed`), or the suite's label changed. A tag that could be hand-made (read as a subject) and was added in
+  Finder is not a divergence: the suite cannot tell it from the user's own. A diverged file is not written; the
+  Reader offers **Import** (the Finder values become user edits of the record, then the mirror is re-projected) or
+  **Re-publish** (the record's values go back, removing the facet tokens that appeared).
+- **Turning it off (3b).** Writing stops; tags stay and can go stale. **Remove Suite Tags** removes, per file, only
+  owned tokens still present and the label if it is still the suite's, then drops the record; a file with no
+  readable record keeps every tag. Undo puts back each removed token the file lacks (and the label if it has none)
+  and records them as owned again.
+- **The Processor.** A mirrored filing claims every tag on its own fresh working copy as owned
+  (`FinderMirror.claimAll`) just before the copy, since the Processor wrote all of them.
+
+---
+
 ## Where each side lives
 
 | Facet / element | Processor (writer) | Reader (reader / editor) |
