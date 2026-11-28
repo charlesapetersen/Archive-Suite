@@ -26,8 +26,8 @@ enum ItemFieldExtractor {
     static let macTextModel = "lmstudio-community/Qwen3.5-4B-MLX-4bit"
     static let macRoute = FieldStatusPolicy.macItemFieldsRoute
     static let macCost = "Item fields on this Mac: 8B images ~15.5 s/document, 9.0 GB peak; 4B text ~5.0 s/document, 4.8 GB peak"
-    static let macSetup = "Reads page images with Qwen3-VL 8B, downloaded in Settings › Accounts › Local models on this "
-        + "Mac or served by mlx-vlm on this Mac (port 8080), and text with Qwen3.5 4B through mlx-vlm on port 8080, both 4-bit."
+    static let macSetup = "Reads page images with Qwen3-VL 8B and text with Qwen3.5 4B (both 4-bit), downloaded in "
+        + "Settings › Accounts › Local models on this Mac or served by mlx-vlm on this Mac (port 8080)."
     static let macTimingNote = "Times are for model inference. Vision reading and model loading add time."
     static let macImageLongSide = 1280
     static let macMaxTokens = 1024
@@ -298,10 +298,11 @@ enum ItemFieldExtractor {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer " + LocalModelRoute.placeholderKey, forHTTPHeaderField: "Authorization")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        // The image half goes to the app's own Qwen3-VL 8B when installed (W49.proc-managed-mac-image-calls).
+        // Both halves go to the app's own models when installed (W49.proc-managed-mac-image-calls /
+        // W49.proc-managed-item-fields-text), else fall back to mlx-vlm on 127.0.0.1:8080.
         let send: () async throws -> (Data, URLResponse) = model == macImageModel
             ? { try await ManagedOCRModel.sendImageCall(request) }
-            : { try await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0, followRedirects: false) }
+            : { try await ManagedOCRModel.sendItemFieldTextCall(request) }
         guard request.httpBody != nil,
               let (data, response) = try? await send(),
               (response as? HTTPURLResponse)?.statusCode == 200,

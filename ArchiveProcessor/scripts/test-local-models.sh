@@ -26,7 +26,7 @@ ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
 # The physical-Mac proofs (LOCALMODELS_SCRATCH_GEMMA_ROOT, LOCALMODELS_SCRATCH_OCR_ROOT, under the heavy lock) install and
 # load real models: the OCR proof's fresh install fetches the runtime from the network.
 limit=120
-[ -n "${LOCALMODELS_SCRATCH_OCR_ROOT:-}" ] && limit=2400
+[ -n "${LOCALMODELS_SCRATCH_OCR_ROOT:-}${LOCALMODELS_SCRATCH_ITEM_TEXT_ROOT:-}" ] && limit=2400
 for _ in $(seq 1 "$limit"); do
     [ -f "$report" ] && break
     sleep 1

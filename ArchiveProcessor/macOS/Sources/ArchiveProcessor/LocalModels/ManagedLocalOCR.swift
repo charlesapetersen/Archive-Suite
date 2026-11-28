@@ -114,6 +114,101 @@ enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
             return try await NetworkSession.data(for: pointed, policy: .nonIdempotent, maxRetries: 0, followRedirects: false)
         }
     }
+
+    /// W49.proc-managed-item-fields-text — the Mac item-field call's Qwen3.5 4B text half (publication date).
+    /// With the app's own Qwen3.5 4B installed, routes through `LocalModelSupervisor.withEndpoint` (one model loaded at
+    /// a time, never beside Qwen3-VL 8B); otherwise falls back to the mlx-vlm server at 127.0.0.1:8080 as before.
+    static func sendItemFieldTextCall(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let supervisor = await LocalModelSupervisor.serving
+        let model = LocalModelSupervisor.qwen35_4b
+        guard await supervisor.isInstalled(model) else {
+            return try await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0, followRedirects: false)
+        }
+        return try await supervisor.withEndpoint(model) { url, secret in
+            var pointed = request
+            pointed.url = url
+            pointed.setValue(secret, forHTTPHeaderField: "Authorization")
+            return try await NetworkSession.data(for: pointed, policy: .nonIdempotent, maxRetries: 0, followRedirects: false)
+        }
+    }
+}
+
+/// Download and removal state for the app-managed Qwen3.5 4B item-field text reader (W49.proc-managed-item-fields-text),
+/// backed by `LocalModelSupervisor.shared` so it never runs alongside another large model.
+@MainActor
+final class ManagedItemFieldsText: ObservableObject {
+    static let shared = ManagedItemFieldsText()
+    static let model = LocalModelSupervisor.qwen35_4b
+
+    static var supported: Bool {
+        guard ManagedGemma.supportedArchitecture else { return false }
+#if DEBUG
+        let memoryGB = ProcessorUITestConfiguration.managedOCRMemoryGB ?? LocalModelRoute.thisMacMemoryGB
+#else
+        let memoryGB = LocalModelRoute.thisMacMemoryGB
+#endif
+        return memoryGB >= 16
+    }
+
+    static var sizeNote: String {
+        "About 3.1 GB to download and 4.4 GB of disk space with its software (less if another model is installed), and "
+            + "4.8 GB of memory while reading, about 5 s a document."
+    }
+
+    @Published private(set) var state: ManagedLocalOCR.State = .notInstalled
+    @Published private(set) var partial = false
+    private var installation: Task<Void, Never>?
+    private let supervisor: LocalModelSupervisor
+
+    init(supervisor: LocalModelSupervisor = .shared) {
+        self.supervisor = supervisor
+        state = supervisor.isInstalled(Self.model) ? .installed : .notInstalled
+        partial = state == .notInstalled && supervisor.downloadedBytes(Self.model) > 0
+    }
+
+    func download() {
+        guard installation == nil, state != .removing, Self.supported || KeychainHelper.isHeadlessTestMode else { return }
+        state = .installing("Preparing the download…", nil)
+        installation = Task {
+            defer { installation = nil }
+            do {
+                try await supervisor.install(Self.model) { step in
+                    guard case .installing = self.state else { return }
+                    self.state = switch step {
+                    case .waiting: .installing("Waiting for another model’s download to finish…", nil)
+                    case .software: .installing("Installing the reader’s software…", nil)
+                    case .model(let share): .installing("Downloading \(Self.model.name)…", share)
+                    }
+                }
+                state = .installed
+                partial = false
+            } catch {
+                if supervisor.downloadedBytes(Self.model) > 0 { partial = true }
+                state = Task.isCancelled || error is CancellationError
+                    ? .failed("Download cancelled. What arrived is kept; Download again resumes it.")
+                    : .failed("The model could not be downloaded. Check your connection and free disk space, then try again.")
+            }
+        }
+    }
+
+    func cancel() { installation?.cancel() }
+    func cancelAll() { installation?.cancel() }
+
+    func remove() async {
+        guard installation == nil, state != .removing else { return }
+        let before = state
+        state = .removing
+        do {
+            try await supervisor.remove(Self.model)
+            state = .notInstalled
+            partial = false
+        } catch LocalModelSupervisor.Failure.installing {
+            state = before
+        } catch {
+            state = supervisor.isInstalled(Self.model) ? before
+                : .failed("The model could not be removed completely. Quit the app and try again.")
+        }
+    }
 }
 
 /// The downloads, removals and failures the operator sees for the managed page readers. `LocalModelSupervisor` installs

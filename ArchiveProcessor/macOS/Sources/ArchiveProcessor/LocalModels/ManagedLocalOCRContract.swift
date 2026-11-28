@@ -226,6 +226,26 @@ enum ManagedLocalOCRContract {
                 && fieldCalls.first?["enable_thinking"] as? Bool == false, "\(Array(fieldCalls))")
         check("6 and its Qwen3.5 4B text half still goes to the server", serverHits.models == [ItemFieldExtractor.macTextModel],
               "\(serverHits.models)")
+        // W49.proc-managed-item-fields-text: once Qwen3.5 4B is installed, both halves run through the supervisor (one
+        // model loaded at a time) with zero hits to port 8080; removing it returns the text half to port 8080.
+        try? await s.install(LocalModelSupervisor.qwen35_4b) { _ in }
+        let beforeManagedBoth = requests().count
+        let hitsBeforeManagedBoth = serverHits.models.count
+        let eventsBeforeManagedBoth = s.events.count
+        _ = await ItemFieldExtractor.extract(ItemFieldExtractor.Input(texts: ["Dear Sir"], pages: [(url: page, rotation: 0)]),
+                                             via: .mac)
+        let bothCalls = Array(requests().dropFirst(beforeManagedBoth))
+        let bothEvents = Array(s.events.dropFirst(eventsBeforeManagedBoth))
+        check("6b with Qwen3.5 4B installed, both item-field halves go to the managed supervisor with no server call",
+              bothCalls.count == 2 && bothCalls[0]["images"] as? Int == 1 && bothCalls[1]["images"] as? Int == 0
+                && bothCalls[1]["max_tokens"] as? Int == ItemFieldExtractor.macMaxTokens
+                && bothCalls[1]["enable_thinking"] as? Bool == false
+                && serverHits.models.count == hitsBeforeManagedBoth,
+              "calls=\(bothCalls) server=\(serverHits.models.dropFirst(hitsBeforeManagedBoth))")
+        check("6b the supervisor unloads Qwen3-VL 8B before loading Qwen3.5 4B",
+              bothEvents.contains("unload Qwen3-VL 8B") && bothEvents.contains("load Qwen3.5 4B"),
+              "\(bothEvents)")
+        try? await s.remove(LocalModelSupervisor.qwen35_4b)
         NetworkSession.testTransport = nil
 
         // 5. A removal waits for a read in flight (another model's here), and a page for a removed model fails as one,
@@ -361,6 +381,79 @@ enum ManagedLocalOCRContract {
                            m.shortID, Int(installSeconds), dlGB, dlGiB, Int(readSeconds), gb), true, ""))
         check("managed OCR proof: the worker peaks under the 10 GB ceiling", s.lastPeakBytes > 0
               && gb < LocalModelSupervisor.memoryCeilingGB, String(format: "%.2f GB", gb))
+        return out
+    }
+
+    /// Physical-Mac proof for W49.proc-managed-item-fields-text: installs Qwen3.5 4B into an empty scratch root and
+    /// runs the Mac item-field text prompt through `LocalModelWorker.py` (text-only, `images = []`) via
+    /// `ManagedOCRModel.sendItemFieldTextCall`, confirming it returns a valid publication date under the memory ceiling.
+    static func realInstallAndReadItemFieldText(scratch: URL, store: URL?) async -> [(String, Bool, String)] {
+        var out: [(String, Bool, String)] = []
+        func check(_ name: String, _ ok: Bool, _ detail: String = "") { out.append(("W49 " + name, ok, detail)) }
+        let root = scratch.resolvingSymlinksInPath()
+        guard KeychainHelper.isHeadlessTestMode, ["/tmp", "/private/tmp"].contains(root.deletingLastPathComponent().path),
+              root.lastPathComponent.hasPrefix("w49-item-text."),
+              (try? FileManager.default.contentsOfDirectory(atPath: root.path))?.isEmpty == true else {
+            check("managed item-field text proof: an empty scratch root under /tmp", false, root.path)
+            return out
+        }
+        if let store {
+            try? FileManager.default.createDirectory(at: root.appending(path: "model-store"), withIntermediateDirectories: true)
+            try? FileManager.default.moveItem(at: store, to: root.appending(path: "model-store/hub"))
+        }
+        let s = LocalModelSupervisor.forTest(root: root)
+        defer { s.stopAll() }
+        let model = LocalModelSupervisor.qwen35_4b
+        let started = ContinuousClock.now
+        do {
+            try await s.install(model) { _ in }
+        } catch {
+            check("managed item-field text proof: install finishes", false, "\(error)")
+            return out
+        }
+        let installSeconds = (ContinuousClock.now - started).components.seconds
+        check("managed item-field text proof: install finishes", s.isInstalled(model), "\(installSeconds) s")
+        LocalModelSupervisor.testOverride = s
+        defer { LocalModelSupervisor.testOverride = nil }
+        let sample = "[page 1 of 1]\nTHE DAILY CHRONICLE\nMarch 14, 1968\nBy Sarah Miller\nSENATE APPROVES ARCHIVE BILL\nWashington — The Senate passed the bill yesterday."
+        let prompt = ItemFieldExtractor.macPrompt(marked: sample, images: false)
+        var body: [String: Any] = [
+            "model": ItemFieldExtractor.macTextModel, "temperature": 0, "max_tokens": ItemFieldExtractor.macMaxTokens,
+            "messages": [["role": "user", "content": prompt]],
+        ]
+        LocalModelRoute.applyReasoningOff(&body)
+        var req = URLRequest(url: URL(string: LocalModelRoute.Server.mlxVLM.baseURL + "/chat/completions")!,
+                             timeoutInterval: LocalModelRoute.requestTimeout)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer " + LocalModelRoute.placeholderKey, forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        let readStarted = ContinuousClock.now
+        let rawReply: String
+        do {
+            let (data, resp) = try await ManagedOCRModel.sendItemFieldTextCall(req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            let choices = json["choices"] as? [[String: Any]]
+            let content = (choices?.first?["message"] as? [String: Any])?["content"] as? String ?? ""
+            rawReply = code == 200 ? content : "HTTP \(code): \(String(decoding: data, as: UTF8.self).prefix(200))"
+        } catch {
+            rawReply = "ERR: \(error)"
+        }
+        let readSeconds = (ContinuousClock.now - readStarted).components.seconds
+        let parsed = ItemFieldExtractor.parse(rawReply)
+        check("managed item-field text proof: Qwen3.5 4B reads publication date through app worker",
+              parsed?.publicationDate == "1968-03-14",
+              "\(readSeconds) s; parsed=\(String(describing: parsed?.publicationDate)) kind=\(String(describing: parsed?.kind)) raw=\(rawReply.prefix(250))")
+        s.stopAll()
+        try? await Task.sleep(for: .seconds(4))
+        let gb = Double(s.lastPeakBytes) / 1_073_741_824
+        let dlBytes = s.downloadedBytes(model)
+        out.append((String(format: "NOTE managed item-field text (qwen35-4b) install %d s, download %.2f GB (%.2f GiB), first read %d s (model load included), peak %.2f GB",
+                           Int(installSeconds), Double(dlBytes) / 1_000_000_000, Double(dlBytes) / 1_073_741_824,
+                           Int(readSeconds), gb), true, ""))
+        check("managed item-field text proof: worker peaks under 10 GB ceiling",
+              s.lastPeakBytes > 0 && gb < LocalModelSupervisor.memoryCeilingGB, String(format: "%.2f GB", gb))
         return out
     }
 }

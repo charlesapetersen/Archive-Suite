@@ -9,10 +9,13 @@ struct SettingsAccountsTab: View {
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
     @ObservedObject private var gemma = ManagedGemma.shared
     @ObservedObject private var managedOCR = ManagedLocalOCR.shared
+    @ObservedObject private var managedItemFieldsText = ManagedItemFieldsText.shared
     @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
     @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
     @State private var confirmOCRDownload: ManagedOCRModel?
     @State private var confirmOCRRemove: ManagedOCRModel?
+    @State private var confirmItemFieldsDownload = false
+    @State private var confirmItemFieldsRemove = false
     @ObservedObject private var claudeUsage = ClaudeCLIUsage.shared
     @State private var anthropicKey = ""
     @State private var geminiKey = ""
@@ -59,6 +62,18 @@ struct SettingsAccountsTab: View {
             Button("Remove", role: .destructive) { Task { await managedOCR.remove(m) } }
         } message: { m in
             Text("Deletes its files (up to \(Int(m.model.downloadGB.rounded())) GB) from this Mac. If it is the Reader, Apple Vision becomes the Reader. You can download it again later.")
+        }
+        .confirmationDialog("Download Qwen3.5 4B?",
+                            isPresented: $confirmItemFieldsDownload, titleVisibility: .visible) {
+            Button("Download") { managedItemFieldsText.download() }
+        } message: {
+            Text(ManagedItemFieldsText.sizeNote + " It comes from Hugging Face under the Apache 2.0 licence.")
+        }
+        .confirmationDialog("Remove Qwen3.5 4B?",
+                            isPresented: $confirmItemFieldsRemove, titleVisibility: .visible) {
+            Button("Remove", role: .destructive) { Task { await managedItemFieldsText.remove() } }
+        } message: {
+            Text("Deletes its files (about 3.1 GB) from this Mac. Without it, Mac item publication dates need an mlx-vlm server on port 8080. You can download it again later.")
         }
     }
 
@@ -169,6 +184,59 @@ struct SettingsAccountsTab: View {
                 .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
             }
+            VStack(alignment: .leading, spacing: 4) {
+                LabeledContent("Qwen3.5 4B (item publication dates)") {
+                    HStack(spacing: 8) {
+                        if !ManagedItemFieldsText.supported && managedItemFieldsText.state == .notInstalled {
+                            Text("Needs 16 GB Apple silicon").foregroundStyle(.primary)
+                        } else {
+                            switch managedItemFieldsText.state {
+                            case .notInstalled, .failed:
+                                Button(managedItemFieldsText.state == .notInstalled ? "Download…" : "Try Again…") {
+                                    confirmItemFieldsDownload = true
+                                }
+                                .accessibilityIdentifier("ap.managedItemFieldsText.download")
+                                if managedItemFieldsText.partial {
+                                    Button("Remove…") { confirmItemFieldsRemove = true }
+                                        .accessibilityIdentifier("ap.managedItemFieldsText.remove")
+                                }
+                            case .removing:
+                                ProgressView().controlSize(.small)
+                            case .installing(_, let share):
+                                if let share {
+                                    ProgressView(value: share).frame(width: 120)
+                                    Text("\(Int(share * 100))%").font(.caption).monospacedDigit()
+                                } else {
+                                    ProgressView().controlSize(.small)
+                                }
+                                Button("Cancel") { managedItemFieldsText.cancel() }
+                                    .accessibilityIdentifier("ap.managedItemFieldsText.cancel")
+                            case .installed:
+                                Text("Installed").foregroundStyle(.primary)
+                                Button("Remove…") { confirmItemFieldsRemove = true }
+                                    .accessibilityIdentifier("ap.managedItemFieldsText.remove")
+                            }
+                        }
+                    }
+                }
+                Group {
+                    switch managedItemFieldsText.state {
+                    case .installing(let status, _): Text(status)
+                    case .failed(let why): Text(why)
+                    case .removing: Text("Removing…")
+                    case .notInstalled:
+                        Text(managedItemFieldsText.partial
+                             ? ManagedItemFieldsText.sizeNote + " Part of a download is on this Mac; Download resumes it."
+                             : ManagedItemFieldsText.sizeNote)
+                    case .installed:
+                        Text("Reads publication dates for Fill item fields on this Mac alongside Qwen3-VL 8B (one model loaded at a time).")
+                    }
+                }
+                .font(.caption).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("ap.managedItemFieldsText")
             VStack(alignment: .leading, spacing: 4) {
                 Text("Newspaper layout helper")
                 NewspaperLayoutDownloadRow()

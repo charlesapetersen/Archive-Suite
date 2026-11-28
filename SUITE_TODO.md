@@ -555,7 +555,6 @@ The owner answered the withheld-features sheet on 2026-11-19 (`execution-plans/p
 
 ## Processor local OCR setup
 
-- [ ] **W49.proc-managed-item-fields-text — The Mac item-field call's publication date with only the app's own models [S]** (lane: processor) (uses: build) — Filed by W49.proc-managed-mac-image-calls, 2026-11-27. The `.mac` item-field call reads kind and byline from Qwen3-VL 8B's page images, which now go to the app's own copy, but the publication date only from its Qwen3.5 4B text half, which still needs an mlx-vlm server at 127.0.0.1:8080 (`ItemFieldPolicy.macFields`). With only the app's models a document gets no publication date. Choose and measure on the item-field set: offer Qwen3.5 4B as a managed download, read the date with a managed model already installed (unmeasured for this prompt), or leave it to the server; a route that scores below the 4B's figures is the owner's call (owner, 2026-11-18). Covers ArchiveProcessor/KNOWN_ISSUES.md §W49.proc-managed-local-ocr.
 
 ## Known limits are queued, accepted or asked (owner, 2026-11-19)
 

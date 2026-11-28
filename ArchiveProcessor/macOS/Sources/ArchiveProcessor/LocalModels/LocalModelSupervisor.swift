@@ -46,6 +46,12 @@ final class LocalModelSupervisor {
                                   revision: "86cc6a8dedbc456dd0e4af01a9d09f396f77e558", peakGB: 9.0,
                                   downloadGB: 8.0)
 
+    /// The Mac item-field text reader for publication dates (W49.proc-managed-item-fields-text): exact repo and
+    /// revision measured in `segbench-results/item-fields-score.md` (~5.0 s/doc, 4.8 GB peak, 3.06 GB / 2.85 GiB).
+    nonisolated static let qwen35_4b = Model(name: "Qwen3.5 4B", repo: "lmstudio-community/Qwen3.5-4B-MLX-4bit",
+                                             revision: "c43ee1d65576a5d98de1e8405cac93c371a655c1", peakGB: 4.8,
+                                             downloadGB: 3.1)
+
     /// No model may need more. The Agent Manager stops a session past 65% of this 18 GB Mac (11.7 GB) under memory
     /// pressure, and the app itself needs some of what is left.
     static let memoryCeilingGB = 10.0
