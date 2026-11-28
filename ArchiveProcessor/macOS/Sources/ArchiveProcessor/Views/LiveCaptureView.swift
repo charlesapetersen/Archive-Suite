@@ -198,8 +198,8 @@ struct LiveCaptureView: View {
             let urls = liveProc.stagedURLs(for: id)
             if !urls.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(urls) }
             else { session.revealBackupFolder() }
-        case .reclassify, .fileAsImageOnly:
-            break   // not offered by SegmentItem (reclassify is Files-only; image-only is auto per §4a)
+        case .reclassify:
+            break   // not offered by SegmentItem (reclassify is Files-only)
         }
     }
 

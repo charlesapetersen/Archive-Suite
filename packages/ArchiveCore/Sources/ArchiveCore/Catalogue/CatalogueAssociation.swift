@@ -64,11 +64,6 @@ public enum CatalogueAssociation {
             return try owner(of: document.id, inFile: document.ownerFileID, among: candidates)
         }
 
-        /// Resolve an explicit relationship, such as an enclosure, with the same ownership rules.
-        public func owner(of reference: CatalogueRecord.DocumentReference, among candidates: [Pair]) throws -> Pair {
-            try owner(of: reference.documentID, inFile: reference.ownerFileID, among: candidates)
-        }
-
         private func owner(of documentID: UUID, inFile fileID: UUID, among candidates: [Pair]) throws -> Pair {
             let owner: Pair
             if fileID == record.fileID {

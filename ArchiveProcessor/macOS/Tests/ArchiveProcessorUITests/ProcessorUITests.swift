@@ -1430,7 +1430,6 @@ final class ProcessorUITests: XCTestCase {
         app.terminate()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", inputDirectory.path,
             "-APUITestOutputDirectory", outputDirectory.path
         ] + extra)
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"

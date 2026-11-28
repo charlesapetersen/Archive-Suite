@@ -546,14 +546,6 @@ final class NotesNavigationModel: ObservableObject {
         return true
     }
 
-    /// The current user filter with the live keyword folded into `searchText` (the durable title
-    /// predicate) — the basis for "Save as Smart Folder".
-    var currentUserFilter: NotesFilter {
-        var f = filter
-        f.searchText = searchText.trimmingCharacters(in: .whitespaces)
-        return f
-    }
-
     /// Persist what the list shows (the shared scope narrowed by this window's filter bar and search box) as
     /// a root-level smart folder (06-viewers §4, "Save as Smart Folder"). The search box is kept as the text
     /// rule it is, so the smart folder finds what the list shows rather than a title substring.

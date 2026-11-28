@@ -650,14 +650,6 @@ public enum CollectionSettingsVocabulary {
         "N4": "Hebrew book hands, medieval", "N5": "Chinese print", "N6": "Devanagari print",
     ]
 
-    /// A processing setting's value with no key-specific words.
-    public static func plain(_ value: CollectionSettingValue) -> String {
-        switch value {
-        case .string(let s): return s
-        default: return describe("", value)
-        }
-    }
-
     public static func runKindLabel(_ kind: String) -> String {
         switch kind {
         case "processFiles": return "Processed files"

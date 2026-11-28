@@ -685,7 +685,6 @@ final class LocalModelSupervisor {
 
     var residentModel: Model? { resident?.model }
     func simulateMemoryPressure(critical: Bool) { memoryPressure(critical: critical) }
-    var residentPID: pid_t? { resident?.process.processIdentifier }
 #else
     private func note(_ event: String) {}
 #endif

@@ -26,8 +26,7 @@ public enum ContainerBackfill {
     }
 
     /// One directory of the chosen folder that holds files.
-    public struct Directory: Equatable, Sendable, Identifiable {
-        public var id: String { relativePath }
+    public struct Directory: Equatable, Sendable {
         public var url: URL
         /// The folders below the chosen folder, top first; empty for the chosen folder itself.
         public var components: [String]

@@ -97,12 +97,6 @@ final class ModelSelectionStore: ObservableObject {
 
     // MARK: - Static conveniences
 
-    /// The persisted model for a provider. Kept as a static so non-view callers read the same resolution
-    /// (and the same deleted-custom-model fallback) as the views.
-    static func savedModel(for provider: LLMProvider) -> LLMModel {
-        shared.model(for: provider)
-    }
-
     /// Persist the selected model id for a provider.
     static func saveModel(_ model: LLMModel, for provider: LLMProvider) {
         shared.setModel(model, for: provider)

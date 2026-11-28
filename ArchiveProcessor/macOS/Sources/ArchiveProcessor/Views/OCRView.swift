@@ -1579,7 +1579,7 @@ struct OCRView: View {
             fileTextViewerTarget = FileTextViewerTarget(jobIndex: jobIndex)
         case .reclassify:
             editingFileIndex = jobIndex
-        case .revealFiles, .fileAsImageOnly:
+        case .revealFiles:
             break
         }
     }

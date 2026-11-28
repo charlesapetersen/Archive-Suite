@@ -556,11 +556,6 @@ final class ContentIndexer: ObservableObject {
         return await index.searchRanked(expression: expression, snippetLimit: snippetLimit, bodyOnly: bodyOnly)
     }
 
-    func snippets(expression: String, for paths: [String], bodyOnly: Bool = false) async -> (snippets: [String: String], attempted: Int) {
-        guard let index = await openForQuery() else { return ([:], 0) }
-        return await index.snippets(expression: expression, for: paths, bodyOnly: bodyOnly)
-    }
-
     /// The snippets `searchRanked` left out, for the hits the list is showing (see `ContentIndex.snippets`).
     func snippets(_ query: String, for paths: [String], bodyOnly: Bool = false) async -> (snippets: [String: String], attempted: Int) {
         guard let index = await openForQuery() else { return ([:], 0) }

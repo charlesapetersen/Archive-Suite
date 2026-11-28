@@ -17,7 +17,7 @@ final class CloudDriveWarningUITests: XCTestCase {
         let app = XCUIApplication()
         defer { app.terminate() }
         app.launchArguments = UITestLaunch.arguments([
-            "-APUITestMode", "-APUITestInputDirectory", input.path, "-APUITestOutputDirectory", output.path
+            "-APUITestMode", "-APUITestOutputDirectory", output.path
         ])
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"
         app.launchEnvironment["ARCHIVE_CLOUD_WARNING_TEST_SUITE"] = "archive-processor-warning-\(UUID())"

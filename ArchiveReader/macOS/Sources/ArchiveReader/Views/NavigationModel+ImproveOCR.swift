@@ -290,10 +290,6 @@ struct TextPageSummary: Equatable, Sendable {
         }
     }
 
-    static func summarize(_ textPages: [PDFPage]) -> TextPageSummary {
-        summarize(headers: textPages.map { PDFHeaderParser.parse($0).header })
-    }
-
     static func summarize(headers: [PDFPageHeader?]) -> TextPageSummary {
         TextPageSummary(kind: summary(headers.map { $0?.kind }), reader: summary(headers.map { $0?.provenance }))
     }
@@ -304,15 +300,6 @@ struct TextPageSummary: Equatable, Sendable {
         guard values.contains(where: { $0 != nil }) else { return .unknown }
         guard let first = values.first, let first else { return .mixed }
         return values.allSatisfy { $0 == first } ? .uniform(first) : .mixed
-    }
-
-    /// "Typewritten", "Mixed", or nil when no text page names one.
-    var kindLabel: String? {
-        switch kind {
-        case .unknown: nil
-        case .uniform(let k): k.displayName
-        case .mixed: "Mixed"
-        }
     }
 
     /// "Gemini · gemini-3.7-flash", "Mixed", or nil.

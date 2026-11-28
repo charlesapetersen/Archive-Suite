@@ -163,14 +163,12 @@ final class LiveCaptureJourneyUITests: XCTestCase {
         let root = scratchRoot.appendingPathComponent(name, isDirectory: true)
         let out = root.appendingPathComponent("out", isDirectory: true)
         let backup = root.appendingPathComponent("backup", isDirectory: true)
-        let inDir = root.appendingPathComponent("IN", isDirectory: true)
-        for dir in [out, backup, inDir] {
+        for dir in [out, backup] {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
         app.terminate()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", inDir.path,
             "-APUITestOutputDirectory", out.path,
             "-liveProcessingMode", mode,
             "-useAppleVision", "YES", "-visionUseLLMJudgment", "NO",

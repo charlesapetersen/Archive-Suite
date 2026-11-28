@@ -172,22 +172,6 @@ struct MacOSTagger {
         return result
     }
 
-    @discardableResult
-    static func applyTags(
-        _ generatedTags: GeneratedTags,
-        to url: URL,
-        stampUnread: Bool
-    ) throws -> TagWriteResult {
-        // Pass the app-assigned color explicitly so a subject tag equal to "Red"/"Purple" isn't
-        // promoted to a Finder color label.
-        try applyTags(
-            generatedTags.allTags,
-            to: url,
-            appColor: generatedTags.colorTag,
-            colorIsAuthoritative: true,
-            stampUnread: stampUnread)
-    }
-
     /// Finder label number for a color name. Processor-specific (the shared primitive works with
     /// `ArchiveColor`, but this adapter bridges the raw-string color names the Processor uses).
     private static func finderLabelIndex(for colorName: String) -> Int {

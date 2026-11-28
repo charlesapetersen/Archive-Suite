@@ -734,7 +734,6 @@ class OCRProcessor: ObservableObject {
         var exportOriginals: Bool { config.outputImageFile }
         var visionTextProvider: LLMProvider? { config.visionText?.provider }
         var visionTextModel: LLMModel? { config.visionText?.model }
-        var visionTextThinkingLevel: ThinkingLevel? { config.visionText?.thinkingLevel }
     }
 
     struct PendingRun: Codable {

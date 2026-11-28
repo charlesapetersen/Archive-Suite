@@ -501,7 +501,6 @@ macOS/Sources/ArchiveNotes/
     ZoteroClient.swift             actor — probe cascade (BBT→localAPI→unavailable), CSL fetch,
                                    citation fetch, in-memory cache, injected ZoteroTransport (§D.3/D.4);
                                    URLSessionZoteroTransport has an init(session:) DI seam (W8-S5 tests)
-    ZoteroCacheStore.swift         actor — disposable on-disk JSON cache for CSL metadata (§D.6)
     ZoteroAutoFill.swift           CSL→front-matter mapping (date+precision/title; never authors) +
                                    AutoFillPlan (per-field diff, fill-empty default policy) (§D.4/D.5)
     ZoteroAutoFillModel.swift      @MainActor confirmation view-model + exact-one attached-reference

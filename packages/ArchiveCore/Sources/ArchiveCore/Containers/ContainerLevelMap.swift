@@ -11,20 +11,6 @@ public enum ContainerLevelRole: String, Sendable, CaseIterable, Codable {
     case repository, collection, accession, series, box, folder
     /// Names no field. In `levels` it occupies its depth; as an override it is a workflow folder and does not count.
     case ignore
-
-    /// The field the directory's name fills (a collection's number and a folder's title are split out by
-    /// `W47.ct-infer`).
-    public var field: ContainerField? {
-        switch self {
-        case .repository: return .repository
-        case .collection: return .collectionTitle
-        case .accession: return .accession
-        case .series: return .series
-        case .box: return .container
-        case .folder: return .folder
-        case .ignore: return nil
-        }
-    }
 }
 
 public struct ContainerLevelMap: Equatable, Sendable {

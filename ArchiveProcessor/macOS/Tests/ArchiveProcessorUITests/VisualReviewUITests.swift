@@ -333,7 +333,6 @@ final class VisualReviewUITests: XCTestCase {
         app.terminate()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
         ] + appearanceArguments(dark: dark) + extra)
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"

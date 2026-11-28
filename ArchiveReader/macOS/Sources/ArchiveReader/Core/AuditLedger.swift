@@ -10,7 +10,7 @@ import os
 //  ledger's location is derived from the app's support directory and nothing else, so no scanned
 //  URL can steer it. A failed write throws before it gets here, so the ledger holds only changes
 //  that are on disk. A ledger that cannot be appended to never fails the tag write that already
-//  happened; the error is logged and kept in `lastError`.
+//  happened; the error is logged.
 //
 //  Each line carries what the durable undo source needs (§9: undo is the inverse DELTA applied to a
 //  fresh read, never a stored full array): the path, a bookmark, the file's device/inode at write
@@ -239,7 +239,6 @@ final class AuditLedger: @unchecked Sendable {
 
     private let lock = NSLock()
     private var _fileURL: URL
-    private var _lastError: String?
     private var _hasRecordingGap = false
     private var _proven: [UUID: Int] = [:]   // unclosed actions whose files proved them complete, and on how many lines
     private var _recordingFailureCount: UInt64 = 0
@@ -252,9 +251,6 @@ final class AuditLedger: @unchecked Sendable {
         get { lock.withLock { _fileURL } }
         set { lock.withLock { _fileURL = newValue; _hasRecordingGap = false } }
     }
-
-    /// The last append failure, nil once an append succeeds.
-    var lastError: String? { lock.withLock { _lastError } }
 
     /// A successful change missing from the ledger makes older inverses unsafe to offer as “last”.
     var hasRecordingGap: Bool { lock.withLock { _hasRecordingGap } }
@@ -377,12 +373,10 @@ final class AuditLedger: @unchecked Sendable {
                 try handle.write(contentsOf: line)
                 if synchronize || hadGap { try Self.flushToStorage(handle) }
                 _hasRecordingGap = false
-                _lastError = nil
             }
             return true
         } catch {
             lock.withLock {
-                _lastError = String(describing: error)
                 if recordsChange {
                     _hasRecordingGap = true
                     _recordingFailureCount &+= 1
@@ -753,11 +747,9 @@ final class AuditLedger: @unchecked Sendable {
                 defer { try? handle.close() }
                 try handle.write(contentsOf: data)
                 try Self.flushToStorage(handle)
-                _lastError = nil
             }
             return true
         } catch {
-            lock.withLock { _lastError = String(describing: error) }
             Self.log.error("audit ledger append failed: \(String(describing: error), privacy: .public)")
             return false
         }

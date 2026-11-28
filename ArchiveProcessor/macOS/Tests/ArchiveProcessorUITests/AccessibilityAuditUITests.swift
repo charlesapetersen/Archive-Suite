@@ -60,7 +60,6 @@ final class AccessibilityAuditUITests: XCTestCase {
         app = .archiveProcessorUITestApp()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
             // Show the badge without saving a key or contacting a provider: a dummy Gemini key, marked validated
             // (W49.proc-fix-audit-badge-fixture; the headless Keychain reads nothing, so the chip needs the stand-in).

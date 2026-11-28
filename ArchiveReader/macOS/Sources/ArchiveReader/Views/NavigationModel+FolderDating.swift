@@ -59,7 +59,6 @@ struct FolderDatingOffer: Identifiable, Equatable {
     /// The first part's folder date; nil takes the dates away. Each part writes its own.
     var date: ContainerFolderDate? { parts.first?.date }
     var paths: [String] { parts.flatMap(\.paths) }
-    var recorded: [String] { parts.flatMap(\.recorded) }
 
     /// The folders the parts are in, each once, in order.
     var directories: [[String]] {

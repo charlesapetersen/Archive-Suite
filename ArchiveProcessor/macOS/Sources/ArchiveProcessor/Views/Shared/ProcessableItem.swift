@@ -54,7 +54,6 @@ enum ItemAction: Hashable {
     case reclassify                     // Files only (box/folder/start/continuation)
     case changeRotation                 // rotate & re-run
     case revealFiles                    // Live only — reveal staged output in Finder
-    case fileAsImageOnly                // force-file a no-text/failed doc as image-only
 
     var label: String {
         switch self {
@@ -63,7 +62,6 @@ enum ItemAction: Hashable {
         case .reclassify: return "Reclassify"
         case .changeRotation: return "Rotate & re-run"
         case .revealFiles: return "Reveal in Finder"
-        case .fileAsImageOnly: return "File as image-only"
         }
     }
 
@@ -74,7 +72,6 @@ enum ItemAction: Hashable {
         case .reclassify: return "tag"
         case .changeRotation: return "rotate.right"
         case .revealFiles: return "folder"
-        case .fileAsImageOnly: return "photo"
         }
     }
 }

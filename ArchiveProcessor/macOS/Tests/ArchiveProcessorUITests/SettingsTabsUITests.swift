@@ -21,7 +21,6 @@ final class SettingsTabsUITests: XCTestCase {
         app = .archiveProcessorUITestApp()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
             "-offerExperimentalRoutes", "NO",
         ])

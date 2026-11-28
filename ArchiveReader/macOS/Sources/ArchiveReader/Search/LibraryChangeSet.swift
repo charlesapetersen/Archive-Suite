@@ -41,9 +41,6 @@ struct LibraryChangeSet: Sendable {
     var fromRevision: UInt64 = 0
     var toRevision: UInt64 = 0
 
-    var isEmpty: Bool { rows?.isEmpty ?? false }
-    var isWhole: Bool { rows == nil }
-
     mutating func markWhole() { rows = nil }
 
     /// Record one row's change. Repeated changes to a path keep its first `old` and its last `new`; a row

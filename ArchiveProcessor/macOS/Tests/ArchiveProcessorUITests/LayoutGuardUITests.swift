@@ -40,7 +40,6 @@ final class LayoutGuardUITests: XCTestCase {
         app = .archiveProcessorUITestApp()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
         ] + extra)
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"

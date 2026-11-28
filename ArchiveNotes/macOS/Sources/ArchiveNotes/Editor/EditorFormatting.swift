@@ -88,8 +88,6 @@ final class FormattingContext: ObservableObject {
                      resolution: zoteroAutoFillResolution)
     }
 
-    var canAutoFillFromZotero: Bool { zoteroAutoFillMenuState.isAvailable }
-
     func updateZoteroAutoFillReference(from item: Item) {
         guard item.id == currentItemID else { return }
         setZoteroAutoFillResolution(ZoteroAutoFillReferenceResolver.resolve(in: item))

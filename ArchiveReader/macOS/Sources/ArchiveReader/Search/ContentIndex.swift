@@ -517,12 +517,6 @@ actor ContentIndex {
                  budget: budget)
     }
 
-    /// `snippets(_:for:)` for a ready-made expression (`searchRanked(expression:)`).
-    func snippets(expression: String, for paths: [String], budget: TimeInterval = SearchSnippet.timeBudget,
-                  bodyOnly: Bool = false) -> (snippets: [String: String], attempted: Int) {
-        snippets(match: Self.scopeToBody(expression, bodyOnly), stopTerms: nil, for: paths, budget: budget)
-    }
-
     private nonisolated static func scopeToBody(_ expression: String, _ bodyOnly: Bool) -> String {
         guard bodyOnly, !expression.isEmpty else { return expression }
         return "body : (\(expression))"

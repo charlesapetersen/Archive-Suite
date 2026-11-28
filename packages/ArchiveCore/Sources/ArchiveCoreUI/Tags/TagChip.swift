@@ -19,11 +19,6 @@ public struct TagChip: View {
         self.onRemove = onRemove
     }
 
-    /// The chip's height for `font`: one line of chips in a list.
-    public static func height(for font: NSFont = .systemFont(ofSize: NSFont.systemFontSize)) -> CGFloat {
-        TagChips.chipHeight(for: font)
-    }
-
     public var body: some View {
         let padding = TagChips.horizontalPadding(for: font)
         HStack(spacing: 3) {

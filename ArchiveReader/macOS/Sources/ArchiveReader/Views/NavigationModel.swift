@@ -3019,9 +3019,6 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Tag editing (single + group, all via TagWriter)
 
-    /// Facet summary across the current selection, for the tag editor's tri-state display.
-    var groupSummary: GroupTagSummary { GroupTagSummary(selectedFiles.map(\.tags)) }
-
     /// Apply one edit operation to every selected file (per-file delta), with grouped undo.
     /// `paths` nil acts on the list's selection; the tag editor opened from the document window passes its file.
     func applyEdit(_ op: TagEditOp, paths: [String]? = nil, physicalPageIndex: Int? = nil) {

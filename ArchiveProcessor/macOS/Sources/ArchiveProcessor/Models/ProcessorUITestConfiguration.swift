@@ -61,7 +61,6 @@ enum ProcessorUITestConfiguration {
 
     static var offersCollectionInterview: Bool { arguments.contains("-APUITestCollectionInterview") }
 
-    static var inputDirectory: URL? { urlValue(after: "-APUITestInputDirectory") }
     static var outputDirectory: URL? { urlValue(after: "-APUITestOutputDirectory") }
     /// Every UI-test launch gets an app-owned scratch backup, including Live Capture paths. The test runner
     /// cannot create this inside the app sandbox, so derive it from this process's temporary directory.

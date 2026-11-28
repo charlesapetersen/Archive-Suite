@@ -71,7 +71,6 @@ final class AppearanceSettingUITests: XCTestCase {
     private func launch(keepAppearance: Bool, extra: [String] = []) {
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
         ] + (keepAppearance ? ["-APUITestKeepAppearance"] : []) + extra)
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"

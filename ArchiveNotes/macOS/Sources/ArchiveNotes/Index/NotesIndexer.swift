@@ -71,13 +71,6 @@ final class NotesIndexer: ObservableObject {
         self.diagnosticLog = diagnosticLog
     }
 
-    /// Standalone convenience — owns its own default-location index. Retained for isolated use.
-    convenience init() {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("ArchiveNotes", isDirectory: true)
-        self.init(index: NotesIndex(url: dir.appendingPathComponent("notes-index-v1.sqlite3")))
-    }
-
     /// Incrementally index the given items (skips unchanged via mtime).
     ///
     /// - Empty set: cancel any in-flight pass (scope cleared / no items).

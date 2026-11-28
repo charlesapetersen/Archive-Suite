@@ -72,7 +72,6 @@ final class TransientStateUITests: XCTestCase {
         app = .archiveProcessorUITestApp()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode",
-            "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
         ] + TransientCheck.launchArguments(sections: Self.sections, plant: plant))
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"
