@@ -23,10 +23,21 @@ final class LocalModelSupervisor {
         let name: String
         let repo: String
         let revision: String
+        /// Optional subdirectory inside the Hugging Face repo (e.g. "8bit" for multi-quantization repos).
+        let subpath: String?
         /// The peak memory measured while it reads, in GB.
         let peakGB: Double
         /// What its pinned weights take to download, in GB (the download's progress is measured against it).
         let downloadGB: Double
+
+        init(name: String, repo: String, revision: String, peakGB: Double, downloadGB: Double, subpath: String? = nil) {
+            self.name = name
+            self.repo = repo
+            self.revision = revision
+            self.subpath = subpath
+            self.peakGB = peakGB
+            self.downloadGB = downloadGB
+        }
     }
 
     /// The box and folder label reader (W47.ct-capture-gemma): 8.95 and 9.00 GB lifetime peak footprint through this
@@ -132,7 +143,7 @@ final class LocalModelSupervisor {
     private var script: URL? { scriptOverride ?? Bundle.main.url(forResource: "LocalModelWorker", withExtension: "py") }
 
     private func environment(_ model: Model) -> [String: String] {
-        [
+        var env = [
             "HOME": root.path, "PATH": "/usr/bin:/bin", "LC_CTYPE": "UTF-8",
             "UV_CACHE_DIR": root.appending(path: "uv-cache").path,
             "UV_PYTHON_INSTALL_DIR": root.appending(path: "python").path,
@@ -146,10 +157,15 @@ final class LocalModelSupervisor {
             "HF_HUB_DISABLE_XET": "1",
             "ARCHIVE_MODEL_REPO": model.repo, "ARCHIVE_MODEL_REVISION": model.revision,
         ]
+        if let subpath = model.subpath, !subpath.isEmpty {
+            env["ARCHIVE_MODEL_SUBPATH"] = subpath
+        }
+        return env
     }
 
     nonisolated private static func marker(_ model: Model, root: URL) -> URL {
-        root.appending(path: "installed/\(model.repo.replacingOccurrences(of: "/", with: "--"))@\(model.revision)")
+        let sub = model.subpath.flatMap { $0.isEmpty ? nil : "@\($0.replacingOccurrences(of: "/", with: "-"))" } ?? ""
+        return root.appending(path: "installed/\(model.repo.replacingOccurrences(of: "/", with: "--"))@\(model.revision)\(sub)")
     }
 
     private func marker(_ model: Model) -> URL { Self.marker(model, root: root) }

@@ -83,31 +83,68 @@ enum PageKindRouting {
         return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .kind)
     }
 
-    /// Of `available`, the model on this Mac with the highest measured handwriting NES above Apple Vision's; ties by id.
+    /// Of `available`, the model on this Mac with the highest measured handwriting NES above Apple Vision's; ties prefer
+    /// an app-managed download over an external local server, then sort by id.
     static func bestLocal(_ available: Set<Candidate>) -> Candidate? {
-        available.compactMap { c -> (Candidate, Double)? in
-            guard c.provider == .appleVision, let m = ManagedOCRModel(rawValue: c.modelID),
-                  m.pick.handwrittenNES > LocalModelRoute.visionHandwrittenNES else { return nil }
-            return (c, m.pick.handwrittenNES)
+        available.compactMap { c -> (Candidate, Double, Bool)? in
+            guard c.provider == .appleVision, let pick = LocalModelRoute.pick(forModelID: c.modelID),
+                  pick.handwrittenNES > LocalModelRoute.visionHandwrittenNES else { return nil }
+            return (c, pick.handwrittenNES, ManagedOCRModel(rawValue: c.modelID) != nil)
         }
-        .sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.modelID < $1.0.modelID }
+        .sorted {
+            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            if $0.2 != $1.2 { return $0.2 }
+            return $0.0.modelID < $1.0.modelID
+        }
         .first?.0
     }
 
-    /// The readers on this Mac a free run can send pages to (W49.proc-kind-split-mac): each app-managed model offered for
-    /// this Mac's memory whose download has finished. A candidate's provider is Apple Vision ("on this Mac") and its id
-    /// the model's `ManagedOCRModel` raw value. Reads the disk: call it off a view body, as `keyedCandidates`.
-    static func localCandidates(offered: [ManagedOCRModel] = ManagedOCRModel.offered()) -> Set<Candidate> {
-        Set(offered.filter { managedGateway($0) != nil }.map { Candidate(provider: .appleVision, modelID: $0.rawValue) })
+    /// The readers on this Mac a free run can send pages to (W49.proc-kind-split-mac / W49.proc-kind-split-mac-fu):
+    /// each app-managed model offered for this Mac's memory whose download has finished, plus the user's own loopback
+    /// local server (LM Studio / Ollama / mlx-vlm) when its configured model ID is a measured pick. A candidate's
+    /// provider is Apple Vision ("on this Mac"). Reads the disk/defaults: call it off a view body, as `keyedCandidates`.
+    static func localCandidates(offered: [ManagedOCRModel] = ManagedOCRModel.offered(),
+                                defaults d: UserDefaults = .standard) -> Set<Candidate> {
+        var out = Set(offered.filter { managedGateway($0) != nil }.map { Candidate(provider: .appleVision, modelID: $0.rawValue) })
+        if let ext = externalLocalServerGateway(d), ext.pick.handwrittenNES > LocalModelRoute.visionHandwrittenNES {
+            out.insert(Candidate(provider: .appleVision, modelID: ext.gateway.modelID))
+        }
+        return out
     }
 
     /// Test seam: the gateway a managed model reads through, in place of its install (headless tests download nothing).
     nonisolated(unsafe) static var managedGatewayOverride: ((ManagedOCRModel) -> GatewayConfig?)?
+    /// Test seam: the user's own local server gateway for headless tests.
+    nonisolated(unsafe) static var externalLocalGatewayOverride: (() -> (pick: LocalModelRoute.Pick, gateway: GatewayConfig)?)?
 
     /// The gateway that reads with a downloaded model, or nil while it is not installed.
     static func managedGateway(_ m: ManagedOCRModel) -> GatewayConfig? {
         if let o = managedGatewayOverride { return o(m) }
         return GatewayConfig.managed(m)
+    }
+
+    /// The user's own local server (Settings › Advanced: gateway marked local, loopback URL, measured pick's model ID),
+    /// available to a Vision run even while Apple Vision is the active Reader. Never escalates to a cloud model.
+    static func externalLocalServerGateway(_ d: UserDefaults = .standard) -> (pick: LocalModelRoute.Pick, gateway: GatewayConfig)? {
+        if let o = externalLocalGatewayOverride { return o() }
+        guard d.bool(forKey: DefaultsKeys.gatewayLocalModel) else { return nil }
+        let base = GatewayConfig.normalizedBaseURL(d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? "")
+        let modelID = (d.string(forKey: DefaultsKeys.gatewayModelID) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty, !modelID.isEmpty, LocalModelRoute.isLoopback(base),
+              let pick = LocalModelRoute.pick(forModelID: modelID) else { return nil }
+        let rawName = (d.string(forKey: DefaultsKeys.gatewayDisplayName) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let gateway = GatewayConfig(baseURL: base, modelID: modelID,
+                                    displayName: rawName.isEmpty ? pick.displayName : rawName,
+                                    inputCostPer1M: nil, outputCostPer1M: nil,
+                                    localModel: true, localEscalates: nil, managedModel: nil)
+        return (pick, gateway)
+    }
+
+    /// Resolves a local candidate's gateway: installed app-managed model first, else the user's own local server.
+    static func localGateway(for modelID: String, defaults d: UserDefaults = .standard) -> GatewayConfig? {
+        if let m = ManagedOCRModel(rawValue: modelID), let gw = managedGateway(m) { return gw }
+        if let ext = externalLocalServerGateway(d), ext.gateway.modelID == modelID { return ext.gateway }
+        return nil
     }
 
     /// Every built-in model of a provider the user has a key for, as candidates. Reads the Keychain: call it off a
@@ -158,12 +195,14 @@ enum PageKindRouting {
             return Reader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
                           record: record(reason, provider, model))
         }
-        // W49.proc-kind-split-mac: a free run's page never leaves this Mac, and only a free run's goes to a model on it.
-        // A downloaded model since removed keeps the run's Vision (no_pick). The record names the reader as a gateway
-        // run on the same model does (its name, then its id), and prices it at nothing.
+        // W49.proc-kind-split-mac / W49.proc-kind-split-mac-fu: a free run's page never leaves this Mac, and only a
+        // free run's goes to a model on it (app-managed download or the user's own local server). A removed download or
+        // unconfigured server keeps the run's Vision (no_pick). The record names the reader as a gateway run on the
+        // same model does (its name, then its id), and prices it at nothing.
         if provider == .appleVision || c.provider == .appleVision {
-            guard provider == .appleVision, let m = ManagedOCRModel(rawValue: c.modelID),
-                  let gateway = managedGateway(m), let target = Self.model(Candidate(provider: c.provider, modelID: c.modelID))
+            guard provider == .appleVision,
+                  let gateway = localGateway(for: c.modelID),
+                  let target = Self.model(Candidate(provider: c.provider, modelID: c.modelID))
             else {
                 return Reader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
                               record: record(.noPick, provider, model))
@@ -199,8 +238,8 @@ enum PageKindRouting {
 
     /// The built-in model a candidate names, or nil. A model on this Mac is free and named as Settings names it.
     static func model(_ c: Candidate) -> LLMModel? {
-        if c.provider == .appleVision, let m = ManagedOCRModel(rawValue: c.modelID) {
-            return LLMModel(id: m.rawValue, displayName: m.pick.displayName, provider: .appleVision,
+        if c.provider == .appleVision, let pick = ManagedOCRModel(rawValue: c.modelID)?.pick ?? LocalModelRoute.pick(forModelID: c.modelID) {
+            return LLMModel(id: c.modelID, displayName: pick.displayName, provider: .appleVision,
                             supportsThinking: false, returnsMd: false, inputCostPer1M: 0, outputCostPer1M: 0,
                             batchDiscount: 1)
         }
@@ -264,14 +303,31 @@ struct PageReaderPlan: Codable, Equatable, Sendable {
         return delta
     }
 
-    /// Seconds the plan's pages on a model on this Mac add to the run (W49.proc-kind-split-mac): one page at a time, at
-    /// each model's measured pace (`LocalModelRoute.secondsPerPage`). Vision's own share is counted as before.
+    /// Seconds the plan's pages on a model on this Mac take on their dedicated one-worker lane (W49.proc-kind-split-mac /
+    /// W49.proc-kind-split-mac-fu): one page at a time, at each model's measured pace (`LocalModelRoute.secondsPerPage`).
     var localSeconds: Double {
         pages.values.reduce(0) { total, entry in
             guard entry.choice.reason.routes, entry.choice.provider == .appleVision,
-                  let m = ManagedOCRModel(rawValue: entry.choice.modelID) else { return total }
-            return total + m.pick.secondsPerPage
+                  let pick = LocalModelRoute.pick(forModelID: entry.choice.modelID) else { return total }
+            return total + pick.secondsPerPage
         }
+    }
+
+    /// Number of pages routed to a model on this Mac (excluded from Vision's lane count so they are counted once).
+    var localPageCount: Int {
+        pages.values.reduce(0) { count, entry in
+            guard entry.choice.reason.routes, entry.choice.provider == .appleVision,
+                  LocalModelRoute.pick(forModelID: entry.choice.modelID) != nil else { return count }
+            return count + 1
+        }
+    }
+
+    /// True when `url` is scheduled on the free Mac split's one-worker local-model lane rather than Vision's workers.
+    func routesToLocal(_ url: URL, runProvider: LLMProvider, runModelID: String) -> Bool {
+        guard runProvider == .appleVision, let entry = entry(for: url) else { return false }
+        let c = entry.choice
+        return c.reason.routes && c.provider == .appleVision && c.modelID != runModelID
+            && LocalModelRoute.pick(forModelID: c.modelID) != nil
     }
 
     /// Pages per reader the plan sends away from the run's model, for the cost caption: [(model, pages)], most first.

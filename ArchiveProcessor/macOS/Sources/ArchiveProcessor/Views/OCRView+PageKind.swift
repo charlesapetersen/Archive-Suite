@@ -141,7 +141,7 @@ struct PageKindRowLine: View {
 
     /// A reader's name in the menus: provider and model, or the model alone for one on this Mac.
     static func menuName(_ m: LLMModel) -> String {
-        ManagedOCRModel(rawValue: m.id) != nil ? m.displayName : "\(m.provider.rawValue) · \(m.displayName)"
+        LocalModelRoute.pick(forModelID: m.id) != nil ? m.displayName : "\(m.provider.rawValue) · \(m.displayName)"
     }
 
     private func runDefaultChoice(_ r: PageKindRouting.Reason) -> PageKindRouting.Choice {
@@ -217,8 +217,8 @@ struct PageKindBatchControl: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if runDefault.provider == .appleVision && store.local.isEmpty {
-                Text("No reader for handwriting is downloaded on this Mac, so handwritten pages stay on Apple Vision. "
-                     + "Download one in Settings › Accounts.")
+                Text("No reader for handwriting is available on this Mac, so handwritten pages stay on Apple Vision. "
+                     + "Download one in Settings › Accounts, or set up a local server in Settings › Advanced.")
                     .font(.caption2).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }

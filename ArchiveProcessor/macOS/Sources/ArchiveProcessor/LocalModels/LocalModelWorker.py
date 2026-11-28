@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 MODEL = os.environ["ARCHIVE_MODEL_REPO"]
 REVISION = os.environ["ARCHIVE_MODEL_REVISION"]
+SUBPATH = (os.environ.get("ARCHIVE_MODEL_SUBPATH") or "").strip("/")
 # The request names its own cap (a label reply is one short JSON object); this bounds what it may ask for.
 MAX_TOKENS_CEILING = 8192
 # A chat request may carry a page and the page before it, as base64 JPEGs.
@@ -34,10 +35,14 @@ def download():
 def snapshot(local_only=False):
     from huggingface_hub import snapshot_download
 
-    return snapshot_download(
+    patterns = ["*.jinja", "*.json", "*.model", "*.safetensors", "*.txt"]
+    if SUBPATH:
+        patterns = [f"{SUBPATH}/{p}" for p in patterns]
+    path = snapshot_download(
         MODEL, revision=REVISION, token=False, local_files_only=local_only,
-        allow_patterns=["*.jinja", "*.json", "*.model", "*.safetensors", "*.txt"],
+        allow_patterns=patterns,
     )
+    return os.path.join(path, SUBPATH) if SUBPATH else path
 
 
 def serve(secret):

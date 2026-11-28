@@ -41,15 +41,21 @@ struct OpenAICompatibleClient: Sendable {
     }
 
     func ocr(imageURL: URL, previousText: String? = nil, previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> OCRResult {
-        guard let jpegData = ImageEncoding.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
+        let localPick = localModel ? LocalModelRoute.pick(forModelID: modelID) : nil
+        let maxDim = localPick?.maxImageSide ?? ImageEncoding.maxOCRDimension
+        guard let jpegData = ImageEncoding.loadImageAsJPEG(url: imageURL, scale: imageScale, maxDimension: maxDim) else {
             throw OCRError.imageLoadFailed
         }
         let base64 = jpegData.base64EncodedString()
-        let prompt = OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil, customPrompt: customPrompt)
+        let plainPrompt = localPick?.plainOCRPrompt == true
+        let prompt = plainPrompt
+            ? ""
+            : OCRPrompt.build(previousText: previousText, previousImageIncluded: previousImageURL != nil, customPrompt: customPrompt)
 
         var contentParts: [[String: Any]] = []
 
-        if let prevURL = previousImageURL, let prevData = ImageEncoding.loadImageAsJPEG(url: prevURL, scale: imageScale) {
+        if !plainPrompt, let prevURL = previousImageURL,
+           let prevData = ImageEncoding.loadImageAsJPEG(url: prevURL, scale: imageScale, maxDimension: maxDim) {
             contentParts.append(["type": "image_url", "image_url": imageField(prevData.base64EncodedString())])
         }
 

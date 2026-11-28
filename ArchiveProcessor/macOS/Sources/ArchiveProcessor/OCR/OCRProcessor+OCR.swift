@@ -1669,7 +1669,7 @@ extension OCRProcessor {
             statusMessage = "OCR \(index + 1)/\(total) complete"
         }
     }
-    private func performOCRParallel(
+    func performOCRParallel(
         fileURLs: [URL],
         provider: LLMProvider,
         model: LLMModel,
@@ -1700,19 +1700,32 @@ extension OCRProcessor {
         // refill site below runs after a `handleOCRResult` that may have suspended on its detached PDF write,
         // so a `jobs[idx].id` there would be the very unguarded subscript W16.bat9 was filed for.
         let jobIDs: [OCRJob.ID] = (0..<total).map { jobs[$0].id }
-        statusMessage = "OCR 0/\(total)… (parallel, \(concurrency) workers)"
+        // W49.proc-kind-split-mac-fu: on Apple Vision, handwritten pages routed to a model on this Mac run on their
+        // own one-worker lane so typed pages never wait behind slow local-model reads.
+        let splitLocalLane = provider == .appleVision && gateway == nil && localAgent == nil && !ocrRun.readers.isEmpty
+        var primaryQueue: [Int] = []
+        var localQueue: [Int] = []
+        primaryQueue.reserveCapacity(total)
+        for i in 0..<total {
+            if splitLocalLane && ocrRun.readers.routesToLocal(fileURLs[i], runProvider: provider, runModelID: model.id) {
+                localQueue.append(i)
+            } else {
+                primaryQueue.append(i)
+            }
+        }
+        statusMessage = localQueue.isEmpty
+            ? "OCR 0/\(total)… (parallel, \(concurrency) workers)"
+            : "OCR 0/\(total)… (parallel, \(concurrency) Vision + 1 local)"
 
-        await withTaskGroup(of: (Int, OCRJob.ID, OCRResult).self) { group in
-            var nextIndex = 0
+        await withTaskGroup(of: (Int, OCRJob.ID, OCRResult, Bool).self) { group in
+            var nextPrimary = 0
+            var nextLocal = 0
 
-            // Seed initial batch
-            for _ in 0..<min(concurrency, total) {
-                let index = nextIndex
+            @MainActor func enqueue(_ index: Int, isLocalLane: Bool) -> Bool {
                 let url = fileURLs[index]
-                guard reserveMonthlyImage(url, runConfig: runConfig) else { break }
+                guard reserveMonthlyImage(url, runConfig: runConfig) else { return false }
                 let jobID = jobIDs[index]
                 let prevImageURL = (sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
-                nextIndex += 1
                 group.addTask {
                     let ocrResult = await Self.performOCRCall(
                         imageURL: url, provider: provider, model: model,
@@ -1728,12 +1741,23 @@ extension OCRProcessor {
                     let result = await Self.applyingVisionTextClassification(
                         to: ocrResult, previousText: nil, customPrompt: customPrompt,
                         configuration: visionTextLLM)
-                    return (index, jobID, result)
+                    return (index, jobID, result, isLocalLane)
                 }
+                return true
             }
 
-            // Collect results and feed new tasks
-            for await (index, jobID, result) in group {
+            // Seed initial batch: up to `concurrency` on the primary lane plus at most 1 on the local lane.
+            while nextPrimary < min(concurrency, primaryQueue.count) {
+                let index = primaryQueue[nextPrimary]
+                guard enqueue(index, isLocalLane: false) else { break }
+                nextPrimary += 1
+            }
+            if nextLocal < localQueue.count {
+                if enqueue(localQueue[nextLocal], isLocalLane: true) { nextLocal += 1 }
+            }
+
+            // Collect results and feed new tasks on the finished task's own lane.
+            for await (index, jobID, result, isLocalLane) in group {
                 guard !Task.isCancelled else { group.cancelAll(); return }
                 if result.errorCode == OpenRouterRoute.unavailableModelCode,
                    stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { continue }
@@ -1751,33 +1775,21 @@ extension OCRProcessor {
                 statusMessage = "OCR \(completed)/\(total) complete (parallel)" + Self.rateLimitSuffix
 
                 // Add next task if available; a quit or Stop waiting for the pages in flight starts no new one.
-                if nextIndex < total { stopForUnavailableOpenRouterModel(provider: provider, model: model) }
+                if nextPrimary < primaryQueue.count || nextLocal < localQueue.count {
+                    stopForUnavailableOpenRouterModel(provider: provider, model: model)
+                }
                 if drainingPages {
                     statusMessage = pageDrainMessage
-                } else if nextIndex < total {
-                    let idx = nextIndex
-                    let nextURL = fileURLs[idx]
-                    guard reserveMonthlyImage(nextURL, runConfig: runConfig) else { continue }
-                    let nextJobID = jobIDs[idx]
-                    let prevImageURL = (sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
-                    nextIndex += 1
-                    group.addTask {
-                        let ocrResult = await Self.performOCRCall(
-                            imageURL: nextURL, provider: provider, model: model,
-                            thinkingLevel: thinkingLevel, apiKey: apiKey,
-                            previousText: nil, previousImageURL: prevImageURL,
-                            customPrompt: customPrompt, imageScale: imageScale,
-                            gatewayConfig: gateway, localAgent: localAgent,
-                            rotationMode: ocrRun.rotationMode,
-                            standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
-                            scanDetector: scanDetector, postCorrection: postCorrection
-                        )
-                        let result = await Self.applyingVisionTextClassification(
-                            to: ocrResult, previousText: nil, customPrompt: customPrompt,
-                            configuration: visionTextLLM)
-                        return (idx, nextJobID, result)
+                } else if isLocalLane {
+                    if nextLocal < localQueue.count {
+                        let idx = localQueue[nextLocal]
+                        nextLocal += 1
+                        _ = enqueue(idx, isLocalLane: true)
                     }
+                } else if nextPrimary < primaryQueue.count {
+                    let idx = primaryQueue[nextPrimary]
+                    nextPrimary += 1
+                    _ = enqueue(idx, isLocalLane: false)
                 }
             }
         }

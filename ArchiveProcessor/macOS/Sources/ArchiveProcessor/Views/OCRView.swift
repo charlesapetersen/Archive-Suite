@@ -441,7 +441,8 @@ struct OCRView: View {
             localSecondsPerPage: currentGatewayConfig.flatMap {
                 $0.isLocalModel ? LocalModelRoute.secondsPerPage(modelID: $0.modelID) : nil },
             gatewayRotation: gatewayRotation, usesLocalAgent: useLocalAgent,
-            routedLocalSeconds: pageReaderPlan.localSeconds)
+            routedLocalSeconds: pageReaderPlan.localSeconds,
+            routedLocalPageCount: pageReaderPlan.localPageCount)
     }
 
     /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
@@ -546,6 +547,9 @@ struct OCRView: View {
         }
         // A download that finishes (or a model removed) while files are listed changes where handwriting goes.
         .onReceive(ManagedLocalOCR.shared.$states) { _ in
+            if pageKindsActive && useAppleVision { pageKinds.update(droppedFiles) }
+        }
+        .onChange(of: "\(gatewayLocalModel)|\(gatewayBaseURL)|\(gatewayModelID)") { _, _ in
             if pageKindsActive && useAppleVision { pageKinds.update(droppedFiles) }
         }
         .onChange(of: useAppleVision) { _, _ in

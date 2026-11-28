@@ -2508,18 +2508,29 @@ extension OCRProcessor {
             // PDF write, so re-reading the live `jobs` there could subscript an array that Clear emptied.
             // Parallel to `indices`, so a slot number resolves both without an optional to unwrap.
             let jobIDs: [OCRJob.ID] = indices.map { jobs[$0].id }
+            let splitLocalLane = provider == .appleVision && gateway == nil && localAgent == nil && !ocrRun.readers.isEmpty
+            var primarySlots: [Int] = []
+            var localSlots: [Int] = []
+            primarySlots.reserveCapacity(remaining)
+            for slot in 0..<remaining {
+                if splitLocalLane && ocrRun.readers.routesToLocal(fileURLs[indices[slot]], runProvider: provider, runModelID: model.id) {
+                    localSlots.append(slot)
+                } else {
+                    primarySlots.append(slot)
+                }
+            }
             statusMessage = "OCR 0/\(remaining) remaining… (parallel)"
 
-            await withTaskGroup(of: (Int, OCRJob.ID, OCRResult).self) { group in
-                var nextSlot = 0
+            await withTaskGroup(of: (Int, OCRJob.ID, OCRResult, Bool).self) { group in
+                var nextPrimary = 0
+                var nextLocal = 0
 
-                for _ in 0..<min(concurrency, remaining) {
-                    let index = indices[nextSlot]
+                @MainActor func enqueue(slot: Int, isLocalLane: Bool) -> Bool {
+                    let index = indices[slot]
                     let url = fileURLs[index]
-                    guard reserveMonthlyImage(url, runConfig: runConfig) else { break }
-                    let jobID = jobIDs[nextSlot]
+                    guard reserveMonthlyImage(url, runConfig: runConfig) else { return false }
+                    let jobID = jobIDs[slot]
                     let prevImageURL = (segmentationContext.sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
-                    nextSlot += 1
                     let scale = segmentationContext.imageScale
                     group.addTask {
                         let ocrResult = await Self.performOCRCall(
@@ -2538,11 +2549,20 @@ extension OCRProcessor {
                             to: ocrResult, previousText: nil,
                             customPrompt: segmentationContext.customPrompt,
                             configuration: visionTextLLM)
-                        return (index, jobID, result)
+                        return (index, jobID, result, isLocalLane)
                     }
+                    return true
                 }
 
-                for await (index, jobID, result) in group {
+                while nextPrimary < min(concurrency, primarySlots.count) {
+                    guard enqueue(slot: primarySlots[nextPrimary], isLocalLane: false) else { break }
+                    nextPrimary += 1
+                }
+                if nextLocal < localSlots.count {
+                    if enqueue(slot: localSlots[nextLocal], isLocalLane: true) { nextLocal += 1 }
+                }
+
+                for await (index, jobID, result, isLocalLane) in group {
                     guard !Task.isCancelled else { group.cancelAll(); return }
                     if result.errorCode == OpenRouterRoute.unavailableModelCode,
                        stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { continue }
@@ -2557,36 +2577,21 @@ extension OCRProcessor {
                     progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
                     statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)" + Self.rateLimitSuffix
 
-                    if nextSlot < remaining { stopForUnavailableOpenRouterModel(provider: provider, model: model) }
+                    if nextPrimary < primarySlots.count || nextLocal < localSlots.count {
+                        stopForUnavailableOpenRouterModel(provider: provider, model: model)
+                    }
                     if drainingPages {
                         statusMessage = pageDrainMessage
-                    } else if nextSlot < remaining {
-                        let idx = indices[nextSlot]
-                        let url = fileURLs[idx]
-                        guard reserveMonthlyImage(url, runConfig: runConfig) else { continue }
-                        let nextJobID = jobIDs[nextSlot]
-                        let prevImageURL = (segmentationContext.sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
-                        nextSlot += 1
-                        let scale = segmentationContext.imageScale
-                        group.addTask {
-                            let ocrResult = await Self.performOCRCall(
-                                imageURL: url, provider: provider, model: model,
-                                thinkingLevel: thinkingLevel, apiKey: apiKey,
-                                previousText: nil, previousImageURL: prevImageURL,
-                                customPrompt: segmentationContext.customPrompt,
-                                imageScale: scale,
-                                gatewayConfig: gateway, localAgent: localAgent,
-                                rotationMode: ocrRun.rotationMode,
-                                standardImageMB: ocrRun.standardImageMB,
-                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
-                                scanDetector: scanDetector, postCorrection: postCorrection
-                            )
-                            let result = await Self.applyingVisionTextClassification(
-                                to: ocrResult, previousText: nil,
-                                customPrompt: segmentationContext.customPrompt,
-                                configuration: visionTextLLM)
-                            return (idx, nextJobID, result)
+                    } else if isLocalLane {
+                        if nextLocal < localSlots.count {
+                            let slot = localSlots[nextLocal]
+                            nextLocal += 1
+                            _ = enqueue(slot: slot, isLocalLane: true)
                         }
+                    } else if nextPrimary < primarySlots.count {
+                        let slot = primarySlots[nextPrimary]
+                        nextPrimary += 1
+                        _ = enqueue(slot: slot, isLocalLane: false)
                     }
                 }
             }

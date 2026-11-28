@@ -58,6 +58,23 @@ enum LocalModelRoute {
         /// table's `handwritten` figure (`segbench-results/settings-routes-app.json`, reading stage). A free run's
         /// handwritten pages go to the downloaded pick with the highest (W49.proc-kind-split-mac).
         let handwrittenNES: Double
+        /// True for specialized OCR models (LightOnOCR-3 4B) whose card requires an empty prompt and plain-text output.
+        let plainOCRPrompt: Bool
+        /// Optional longest-side pixel cap from the model card (LightOnOCR-3 4B: 2048 px).
+        let maxImageSide: Int?
+
+        init(name: String, precision: String, memoryGiB: Double, summary: String, secondsPerPage: Double,
+             ids: [Server: String], handwrittenNES: Double, plainOCRPrompt: Bool = false, maxImageSide: Int? = nil) {
+            self.name = name
+            self.precision = precision
+            self.memoryGiB = memoryGiB
+            self.summary = summary
+            self.secondsPerPage = secondsPerPage
+            self.ids = ids
+            self.handwrittenNES = handwrittenNES
+            self.plainOCRPrompt = plainOCRPrompt
+            self.maxImageSide = maxImageSide
+        }
 
         var id: String { "\(name) \(precision)" }
         var displayName: String { "\(name), \(precision) (this Mac)" }
@@ -83,26 +100,55 @@ enum LocalModelRoute {
         secondsPerPage: 35.09,
         ids: [.mlxVLM: "mlx-community/Qwen3-VL-8B-Instruct-4bit", .ollama: "qwen3-vl:8b", .lmStudio: "qwen/qwen3-vl-8b"],
         handwrittenNES: 89.24)
+    /// W49.proc-kind-split-mac-fu: B1's Mac handwriting pick (`lightonocr-3-4b-mlx8`, `ocr-mac-local-hw.md`): 89.91 NES
+    /// on the owner's 16 handwritten pages (0.67 ahead of Qwen3-VL 8B's 89.24), 89.17 overall, 96/96 finished, 23.8 s
+    /// median a page, 7.9 GB whole-process peak on the 18 GB M3 Pro.
+    static let lightOnOCR3_4B8 = Pick(
+        name: "LightOnOCR-3 4B", precision: "8-bit", memoryGiB: 7.9,
+        summary: "Measured on an 18 GB M3 Pro: 89.91 NES on the owner's 16 handwritten test pages (89.17 overall, 0 "
+            + "failed), the best handwriting reader measured on a Mac; about 24 s a page, 7.9 GB in use.",
+        secondsPerPage: 23.8,
+        ids: [.mlxVLM: "prithivMLmods/LightOnOCR-3-4B-MLX/8bit", .ollama: "lightonocr-3:4b",
+              .lmStudio: "prithivmlmods/lightonocr-3-4b-mlx"],
+        handwrittenNES: 89.91,
+        plainOCRPrompt: true, maxImageSide: 2048)
 
     /// Apple Vision's NES on the same 16 handwritten pages (`apple-vision`'s `handwritten` figure, the same table): a
     /// local reader takes a free run's handwritten pages only when it reads them better than this.
     static let visionHandwrittenNES = 60.58
 
-    static let all = [qwen35_9B4, qwen3VL8B4]
+    static let all = [qwen35_9B4, qwen3VL8B4, lightOnOCR3_4B8]
+
+    /// The measured local pick matching `modelID` (from an app-managed model or LM Studio / Ollama / mlx-vlm server).
+    static func pick(forModelID modelID: String) -> Pick? {
+        let trimmed = modelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let lower = trimmed.lowercased()
+        if let exact = all.first(where: { $0.ids.values.contains { $0.lowercased() == lower } }) { return exact }
+        if lower == "prithivmlmods/lightonocr-3-4b-mlx" || lower == "lightonocr-3-4b-mlx8" { return lightOnOCR3_4B8 }
+        // mlx_vlm.server may serve a local snapshot path whose tail names the repo (or repo/8bit).
+        return all.first { pick in
+            pick.ids.values.contains { id in
+                let candidate = id.lowercased()
+                return lower.hasSuffix("/\(candidate)")
+            }
+        }
+    }
 
     /// Seconds a page for the time estimate of a run on `modelID`: its pick's figure, or the Qwen3-VL 8B's for a
     /// model the bench has no Mac figure for.
     static func secondsPerPage(modelID: String) -> Double {
-        all.first { $0.ids.values.contains(modelID) }?.secondsPerPage ?? qwen3VL8B4.secondsPerPage
+        pick(forModelID: modelID)?.secondsPerPage ?? qwen3VL8B4.secondsPerPage
     }
 
     /// The models to offer for a Mac with this much memory, the recommended one first: the rule table's laptop picks
     /// (`13-stage-rules/04-reading.md` §9, profile 1). With no fallback for a failed page (the default) the solver
-    /// ranks on strict NES, where Qwen3.5 9B leads. A 32 or 64 GB Mac gets the same picks (owner call 7.6, 2026-11-06):
+    /// ranks on strict NES, where Qwen3.5 9B leads, followed by Qwen3-VL 8B and LightOnOCR-3 4B (handwriting pick).
+    /// A 32 or 64 GB Mac gets the same picks (owner call 7.6, 2026-11-06):
     /// no 27B-class reader has been measured on a Mac, so none is offered until one is (`W46.ocr-mac-27b`). Empty below
     /// 16 GB, where no measured model leaves room for the rest of the Mac: Apple Vision is the local choice.
     static func picks(memoryGB: Double) -> [Pick] {
-        memoryGB < 16 ? [] : [qwen35_9B4, qwen3VL8B4]
+        memoryGB < 16 ? [] : [qwen35_9B4, qwen3VL8B4, lightOnOCR3_4B8]
     }
 
     /// This Mac's memory as Apple sells it: an "18 GB" Mac reports 18 GiB.

@@ -9,10 +9,17 @@ import Foundation
 enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
     case qwen35_9B = "mlx-community/Qwen3.5-9B-4bit"
     case qwen3VL8B = "mlx-community/Qwen3-VL-8B-Instruct-4bit"
+    case lightOnOCR3_4B = "prithivMLmods/LightOnOCR-3-4B-MLX/8bit"
 
     var id: String { rawValue }
     /// For accessibility identifiers.
-    var shortID: String { self == .qwen35_9B ? "qwen35-9b" : "qwen3vl-8b" }
+    var shortID: String {
+        switch self {
+        case .qwen35_9B: "qwen35-9b"
+        case .qwen3VL8B: "qwen3vl-8b"
+        case .lightOnOCR3_4B: "lightonocr3-4b"
+        }
+    }
 
     /// The address a managed gateway carries. Nothing is sent to it: the supervisor gives each request its worker's.
     static let baseURL = "app-managed://this-mac"
@@ -21,13 +28,15 @@ enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .qwen35_9B: LocalModelRoute.qwen35_9B4
         case .qwen3VL8B: LocalModelRoute.qwen3VL8B4
+        case .lightOnOCR3_4B: LocalModelRoute.lightOnOCR3_4B8
         }
     }
 
     /// Revisions as `ocr_mac_local.py` and `rotation_routes.py` read them; peaks the whole process's on the 18 GB M3
-    /// Pro (`ocr-mac-local*.md`, 99 full pages; in-app 4-line scratch proofs peaked at 7.95 GB for Qwen3.5 9B and
-    /// 7.71 GB for Qwen3-VL 8B); downloads measured on this Mac (Qwen3.5 9B: 5.98 GB / 5.57 GiB, W49.proc-managed-ocr-9b-check;
-    /// Qwen3-VL 8B: 5.8 GB / 5.4 GiB).
+    /// Pro (`ocr-mac-local*.md`, 99 full pages; in-app 4-line scratch proofs peaked at 7.95 GB for Qwen3.5 9B,
+    /// 7.71 GB for Qwen3-VL 8B, and 7.24 GB for LightOnOCR-3 4B); downloads measured on this Mac (Qwen3.5 9B: 5.98 GB /
+    /// 5.57 GiB, W49.proc-managed-ocr-9b-check; Qwen3-VL 8B: 5.8 GB / 5.4 GiB; LightOnOCR-3 4B 8-bit: 5.16 GB / 4.81 GiB,
+    /// W49.proc-kind-split-mac-fu).
     var model: LocalModelSupervisor.Model {
         switch self {
         case .qwen35_9B:
@@ -36,6 +45,10 @@ enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
         case .qwen3VL8B:
             LocalModelSupervisor.Model(name: "Qwen3-VL 8B", repo: rawValue,
                                        revision: "defcdea7cc7a4b0858fea563cbbce171d328e457", peakGB: 8.4, downloadGB: 5.8)
+        case .lightOnOCR3_4B:
+            LocalModelSupervisor.Model(name: "LightOnOCR-3 4B", repo: "prithivMLmods/LightOnOCR-3-4B-MLX",
+                                       revision: "e93084acf44a380776866b23b122f48fe47cab7f", peakGB: 7.9, downloadGB: 5.2,
+                                       subpath: "8bit")
         }
     }
 
@@ -47,6 +60,9 @@ enum ManagedOCRModel: String, CaseIterable, Identifiable, Sendable {
                 + "Vision's 83. Handwriting still reads better with an online reader."
         case .qwen3VL8B:
             "Close behind at 90 out of 100 on the same pages, but it gives up on more of them."
+        case .lightOnOCR3_4B:
+            "The best handwriting reader measured on a Mac (90 out of 100 on handwritten test pages, 89 overall, 0 "
+                + "failed), with a smaller download and memory footprint."
         }
     }
 

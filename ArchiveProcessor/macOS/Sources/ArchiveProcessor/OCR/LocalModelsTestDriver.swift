@@ -170,6 +170,17 @@ enum LocalModelsTestDriver {
             eq("2 local: the long timeout", request.timeoutInterval, LocalModelRoute.requestTimeout)
             eq("2 local: chat completions on the server", request.url?.path, "/v1/chat/completions")
         } else { check("2 local request sent", false) }
+        var lightOnLocal = local
+        lightOnLocal.modelID = ManagedOCRModel.lightOnOCR3_4B.rawValue
+        wire.reset(["local-mac": reply("Plain LightOnOCR line")])
+        let loRead = try? await OpenAICompatibleClient.gateway(lightOnLocal).ocr(imageURL: image)
+        if let req = wire.requests.first, let body = jsonBody(req),
+           let msgs = body["messages"] as? [[String: Any]],
+           let parts = msgs.first?["content"] as? [[String: Any]],
+           let textPart = parts.last?["text"] as? String {
+            check("2 LightOnOCR-3 4B sends empty prompt and reads plain text",
+                  textPart.isEmpty && loRead?.text == "Plain LightOnOCR line", "prompt='\(textPart)' text=\(String(describing: loRead?.text))")
+        } else { check("2 LightOnOCR-3 4B request sent", false) }
         wire.reset(["remote-gateway": reply("[document_start]\nHello archive")])
         _ = try? await OpenAICompatibleClient.gateway(remote).ocr(imageURL: image)
         if let request = wire.requests.first, let body = jsonBody(request) {
@@ -871,16 +882,17 @@ enum LocalModelsTestDriver {
     private static func memoryChecks() {
         func first(_ gb: Double) -> String? { LocalModelRoute.picks(memoryGB: gb).first?.id }
         check("1 under 16 GB: nothing offered", LocalModelRoute.picks(memoryGB: 8).isEmpty)
-        // W43.app-guide-refresh: the rule table's laptop picks at every size (owner call 7.6: no 27B-class reader
-        // measured on a Mac, so 32 and 64 GB pick from the 16 GB rows).
+        // W43.app-guide-refresh / W49.proc-kind-split-mac-fu: the rule table's laptop picks at every size (owner call 7.6:
+        // no 27B-class reader measured on a Mac, so 32 and 64 GB pick from the 16 GB rows).
         for gb in [16.0, 18, 32, 48, 64, 128] {
-            eq("1 \(Int(gb)) GB: Qwen3.5 9B 4-bit, then Qwen3-VL 8B 4-bit", LocalModelRoute.picks(memoryGB: gb).map(\.id),
-               [LocalModelRoute.qwen35_9B4.id, LocalModelRoute.qwen3VL8B4.id])
+            eq("1 \(Int(gb)) GB: Qwen3.5 9B 4-bit, Qwen3-VL 8B 4-bit, LightOnOCR-3 4B 8-bit",
+               LocalModelRoute.picks(memoryGB: gb).map(\.id),
+               [LocalModelRoute.qwen35_9B4.id, LocalModelRoute.qwen3VL8B4.id, LocalModelRoute.lightOnOCR3_4B8.id])
         }
         let reading = SettingsRouteTable.bundled?.stage("reading")?.routes ?? []
         func row(_ id: String) -> SettingsRouteTable.Route? { reading.first { $0.id == id } }
         check("1 the picks are the rule table's Mac rows", row("qwen3.5-9b-mlx4")?.family == .mac
-              && row("qwen3-vl-8b-mlx4")?.family == .mac)
+              && row("qwen3-vl-8b-mlx4")?.family == .mac && row("lightonocr-3-4b-mlx8")?.family == .mac)
         check("1 every pick fits the memory it is offered at", [16.0, 18, 24, 32, 36, 48, 64, 128].allSatisfy { gb in
             LocalModelRoute.picks(memoryGB: gb).allSatisfy { $0.memoryGiB < gb * 0.9 } })
         check("1 the 16 GB note warns about room", LocalModelRoute.recommendationNote(memoryGB: 16).contains("little else"))
@@ -888,6 +900,12 @@ enum LocalModelsTestDriver {
         eq("1 the measured MLX build is the bench's", LocalModelRoute.qwen3VL8B4.modelID(for: .mlxVLM),
            "mlx-community/Qwen3-VL-8B-Instruct-4bit")
         eq("1 the 9B's measured MLX build", LocalModelRoute.qwen35_9B4.modelID(for: .mlxVLM), "mlx-community/Qwen3.5-9B-4bit")
+        eq("1 LightOnOCR-3 4B's measured MLX build", LocalModelRoute.lightOnOCR3_4B8.modelID(for: .mlxVLM),
+           "prithivMLmods/LightOnOCR-3-4B-MLX/8bit")
+        check("1 pick(forModelID:) resolves managed and server model IDs",
+              LocalModelRoute.pick(forModelID: "qwen/qwen3-vl-8b") == LocalModelRoute.qwen3VL8B4
+              && LocalModelRoute.pick(forModelID: "lightonocr-3:4b") == LocalModelRoute.lightOnOCR3_4B8
+              && LocalModelRoute.pick(forModelID: "unknown-model") == nil)
         eq("1 an unknown model is timed at the 8B's like-for-like figure", LocalModelRoute.secondsPerPage(modelID: "x"), 35.09)
         check("1 Settings warns that whole newspaper pages pass the cap",
               LocalModelRoute.newspaperNote.contains("18 of 32") && LocalModelRoute.newspaperNote.contains("4096"))

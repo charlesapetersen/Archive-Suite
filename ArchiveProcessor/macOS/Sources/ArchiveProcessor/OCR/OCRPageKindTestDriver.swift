@@ -644,8 +644,13 @@ enum OCRPageKindTestDriver {
                                     displayName: ManagedOCRModel.qwen3VL8B.pick.displayName,
                                     inputCostPer1M: nil, outputCostPer1M: nil, localModel: true)
         PageKindRouting.managedGatewayOverride = { $0 == .qwen3VL8B ? localGW : nil }
+        PageKindRouting.externalLocalGatewayOverride = { nil }
         PageKindStore.localOverride = [q8]
-        defer { PageKindRouting.managedGatewayOverride = nil; PageKindStore.localOverride = nil }
+        defer {
+            PageKindRouting.managedGatewayOverride = nil
+            PageKindRouting.externalLocalGatewayOverride = nil
+            PageKindStore.localOverride = nil
+        }
         check("13 the candidates are the offered models whose download finished",
               PageKindRouting.localCandidates(offered: ManagedOCRModel.allCases) == [q8]
               && PageKindRouting.localCandidates(offered: []).isEmpty)
@@ -668,13 +673,24 @@ enum OCRPageKindTestDriver {
               macPlan.ocrCostDelta(runModel: visionModel, imageScale: 1) == 0
               && macPlan.routedCounts(runModel: visionModel).map { "\($0.0.displayName) \($0.1)" }
                 == ["\(ManagedOCRModel.qwen3VL8B.pick.displayName) 1"])
-        let plainTime = TimeEstimator.estimate(fileCount: 3, model: visionModel, enableTagging: false, useGateway: true)
+        let twoVisionTime = TimeEstimator.estimate(fileCount: 2, model: visionModel, enableTagging: false, useGateway: true)
         let splitTime = TimeEstimator.estimate(fileCount: 3, model: visionModel, enableTagging: false, useGateway: true,
-                                               routedLocalSeconds: macPlan.localSeconds)
-        check("13 the time estimate adds the model's measured pace for each page it reads",
+                                               routedLocalSeconds: macPlan.localSeconds,
+                                               routedLocalPageCount: macPlan.localPageCount)
+        let allLocalTime = TimeEstimator.estimate(fileCount: 1, model: visionModel, enableTagging: false, useGateway: true,
+                                                  routedLocalSeconds: macPlan.localSeconds,
+                                                  routedLocalPageCount: 1)
+        let vision99 = TimeEstimator.estimate(fileCount: 99, model: visionModel, enableTagging: false, useGateway: true)
+        let split100 = TimeEstimator.estimate(fileCount: 100, model: visionModel, enableTagging: false, useGateway: true,
+                                              routedLocalSeconds: macPlan.localSeconds, routedLocalPageCount: 1)
+        check("13 the time estimate runs local pages on a concurrent lane and counts them once",
               macPlan.localSeconds == ManagedOCRModel.qwen3VL8B.pick.secondsPerPage
-              && abs(splitTime.ocrSeconds - plainTime.ocrSeconds - macPlan.localSeconds) < 1e-9
-              && PageReaderPlan.empty.localSeconds == 0, "\(plainTime.ocrSeconds) \(splitTime.ocrSeconds)")
+              && macPlan.localPageCount == 1
+              && abs(splitTime.ocrSeconds - max(twoVisionTime.ocrSeconds, macPlan.localSeconds)) < 1e-9
+              && abs(allLocalTime.ocrSeconds - macPlan.localSeconds) < 1e-9
+              && abs(split100.ocrSeconds - max(vision99.ocrSeconds, macPlan.localSeconds)) < 1e-9
+              && PageReaderPlan.empty.localSeconds == 0 && PageReaderPlan.empty.localPageCount == 0,
+              "\(twoVisionTime.ocrSeconds) \(splitTime.ocrSeconds) \(allLocalTime.ocrSeconds) \(vision99.ocrSeconds) \(split100.ocrSeconds)")
         let macRow = PageKindRowLine(store: macStore, url: b, guidance: guide, runDefault: vision, runModel: visionModel)
         check("13 the row line names the model on this Mac",
               macRow.label?.text == "\(PageKind(kind: .handwritten, confidence: 0.9).summary) → \(ManagedOCRModel.qwen3VL8B.pick.displayName)"
@@ -760,6 +776,139 @@ enum OCRPageKindTestDriver {
         calls = await script.calls()
         check("13 a cloud run never sends a page to a model on this Mac", !calls.contains("kind-local.invalid")
               && calls.allSatisfy { $0.contains("anthropic") }, "\(calls)")
+
+        // 13b. W49.proc-kind-split-mac-fu: LightOnOCR-3 4B beats Qwen3-VL 8B on handwriting, user's own local server
+        // is offered to Vision runs with Vision fallback when stopped, and local pages run on a dedicated 1-worker lane.
+        let lo = PageKindRouting.Candidate(provider: .appleVision, modelID: ManagedOCRModel.lightOnOCR3_4B.rawValue)
+        check("13b LightOnOCR-3 4B (89.91) beats Qwen3-VL 8B (89.24) and Qwen3.5 9B (88.06) on handwriting",
+              choose(.handwritten, available: [q9, q8, lo], run: vision) == .init(provider: .appleVision, modelID: lo.modelID, reason: .kind)
+              && choose(.mixed, available: [q9, q8, lo], run: vision).modelID == lo.modelID)
+
+        let extSuite = "ocr-page-kind-ext-\(UUID().uuidString)"
+        let extDefaults = UserDefaults(suiteName: extSuite)!
+        defer { extDefaults.removePersistentDomain(forName: extSuite) }
+        PageKindRouting.externalLocalGatewayOverride = nil
+        extDefaults.set(true, forKey: DefaultsKeys.gatewayLocalModel)
+        extDefaults.set("http://127.0.0.1:1234/v1", forKey: DefaultsKeys.gatewayBaseURL)
+        extDefaults.set("qwen/qwen3-vl-8b", forKey: DefaultsKeys.gatewayModelID)
+        extDefaults.set("LM Studio Qwen", forKey: DefaultsKeys.gatewayDisplayName)
+        let extCand = PageKindRouting.Candidate(provider: .appleVision, modelID: "qwen/qwen3-vl-8b")
+        check("13b user's own local server with a measured pick is offered to a Vision run",
+              PageKindRouting.localCandidates(offered: [], defaults: extDefaults) == [extCand]
+              && PageKindRouting.bestLocal([extCand]) == extCand
+              && PageKindRouting.model(extCand)?.displayName == LocalModelRoute.qwen3VL8B4.displayName)
+        extDefaults.set("https://remote-server.invalid/v1", forKey: DefaultsKeys.gatewayBaseURL)
+        check("13b a non-loopback gateway is never offered to a Vision run",
+              PageKindRouting.localCandidates(offered: [], defaults: extDefaults).isEmpty)
+        extDefaults.set("http://127.0.0.1:1234/v1", forKey: DefaultsKeys.gatewayBaseURL)
+        extDefaults.set("unmeasured/random-model", forKey: DefaultsKeys.gatewayModelID)
+        check("13b an unmeasured local model ID is not offered to a Vision run",
+              PageKindRouting.localCandidates(offered: [], defaults: extDefaults).isEmpty)
+
+        let extGW = GatewayConfig(baseURL: "http://own-local-server.invalid:1234/v1", modelID: "lightonocr-3:4b",
+                                  displayName: "Ollama LightOnOCR", inputCostPer1M: nil, outputCostPer1M: nil,
+                                  localModel: true)
+        PageKindRouting.externalLocalGatewayOverride = { (LocalModelRoute.lightOnOCR3_4B8, extGW) }
+        defer { PageKindRouting.externalLocalGatewayOverride = nil }
+        let extPlan = macPlanFor(.init(provider: .appleVision, modelID: "lightonocr-3:4b", reason: .kind))
+        await script.set(["own-local-server": (200, #"{"choices":[{"finish_reason":"stop","message":{"content":"PLAIN-HAND-TEXT"}}]}"#)])
+        r = await visionOCR(extPlan)
+        calls = await script.calls()
+        check("13b Vision run reads handwritten page via user's own local server",
+              r.text == "PLAIN-HAND-TEXT" && calls == ["own-local-server.invalid"]
+              && r.pageReader?.provider == "Ollama LightOnOCR" && r.pageReader?.model == "lightonocr-3:4b"
+              && r.pageReader?.isRouted == true, "\(calls) \(String(describing: r.text)) \(String(describing: r.pageReader))")
+
+        // When the user's own local server is not running (connection refused), Vision reads the page instead.
+        let prevTransport = NetworkSession.testTransport
+        NetworkSession.testTransport = { request in
+            if request.url?.host == "own-local-server.invalid" { throw URLError(.cannotConnectToHost) }
+            return try await prevTransport!(request)
+        }
+        r = await visionOCR(extPlan)
+        NetworkSession.testTransport = prevTransport
+        check("13b stopped local server falls back to Apple Vision and records local_failed",
+              r.pageReader?.reason == .localFailed && r.pageReader?.provider == LLMProvider.appleVision.rawValue
+              && r.pageReader?.isRouted == false, "\(String(describing: r.pageReader)) \(r.errorMessage ?? "")")
+
+        // One-worker local lane: with 2 handwritten pages first and 2 typed pages after, typed pages complete on
+        // Vision workers while the first handwritten page is still in flight, and at most 1 local request runs at once.
+        let laneDir = root.appendingPathComponent("lane-test")
+        try? FileManager.default.createDirectory(at: laneDir, withIntermediateDirectories: true)
+        let laneOut = root.appendingPathComponent("lane-out")
+        try? FileManager.default.createDirectory(at: laneOut, withIntermediateDirectories: true)
+        let h1 = laneDir.appendingPathComponent("h1.jpg")
+        let h2 = laneDir.appendingPathComponent("h2.jpg")
+        let t1 = laneDir.appendingPathComponent("t1.jpg")
+        let t2 = laneDir.appendingPathComponent("t2.jpg")
+        for u in [h1, h2, t1, t2] { _ = makeJPEG(at: u) }
+        var lanePlan = PageReaderPlan()
+        lanePlan.pages[PageReaderPlan.key(h1)] = .init(kind: .init(kind: .handwritten, confidence: 0.95),
+                                                       choice: .init(provider: .appleVision, modelID: "lightonocr-3:4b", reason: .kind))
+        lanePlan.pages[PageReaderPlan.key(h2)] = .init(kind: .init(kind: .handwritten, confidence: 0.95),
+                                                       choice: .init(provider: .appleVision, modelID: "lightonocr-3:4b", reason: .kind))
+        lanePlan.pages[PageReaderPlan.key(t1)] = .init(kind: .init(kind: .typewritten, confidence: 0.95),
+                                                       choice: .init(provider: .appleVision, modelID: visionModel.id, reason: .same))
+        lanePlan.pages[PageReaderPlan.key(t2)] = .init(kind: .init(kind: .typewritten, confidence: 0.95),
+                                                       choice: .init(provider: .appleVision, modelID: visionModel.id, reason: .same))
+        final class LaneTracker: @unchecked Sendable {
+            let lock = NSLock()
+            var inFlightLocal = 0
+            var maxInFlightLocal = 0
+            var localRequests = 0
+            var releaseLocal = false
+        }
+        let tracker = LaneTracker()
+        let proc = OCRProcessor()
+        proc.jobs = [h1, h2, t1, t2].map { OCRJob(sourceURL: $0) }
+        let laneConfig = SessionProcessingConfig(
+            provider: .appleVision, model: visionModel, thinkingLevel: .low, apiKey: "",
+            taggingMode: .none, rotationMode: .off, mergeDocuments: false, outputDirectory: laneOut,
+            customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
+            gateway: nil, outputImageFile: false, pdfImageMB: 1.0, exportedImageMB: 1.0, textColumns: 1,
+            pageReaders: lanePlan)
+        let transportBeforeLane = NetworkSession.testTransport
+        NetworkSession.testTransport = { request in
+            if request.url?.host == "own-local-server.invalid" {
+                tracker.lock.withLock {
+                    tracker.inFlightLocal += 1
+                    tracker.localRequests += 1
+                    tracker.maxInFlightLocal = max(tracker.maxInFlightLocal, tracker.inFlightLocal)
+                }
+                // Wait briefly until both typed Vision pages finish (or 3 s timeout).
+                for _ in 0..<150 {
+                    if tracker.lock.withLock({ tracker.releaseLocal }) { break }
+                    try? await Task.sleep(nanoseconds: 20_000_000)
+                }
+                tracker.lock.withLock { tracker.inFlightLocal -= 1 }
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                let body = #"{"choices":[{"finish_reason":"stop","message":{"content":"HAND-OK"}}]}"#
+                return (Data(body.utf8), resp)
+            }
+            return try await transportBeforeLane!(request)
+        }
+        let watcher = Task { @MainActor in
+            for _ in 0..<150 {
+                if proc.jobs[2].result != nil && proc.jobs[3].result != nil {
+                    tracker.lock.withLock { tracker.releaseLocal = true }
+                    return true
+                }
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+            tracker.lock.withLock { tracker.releaseLocal = true }
+            return false
+        }
+        await proc.performOCRParallel(
+            fileURLs: [h1, h2, t1, t2], provider: .appleVision, model: visionModel,
+            thinkingLevel: nil, apiKey: "", outputDirectory: laneOut,
+            sendPreviousImage: false, runConfig: laneConfig)
+        let typedFinishedWhileLocalBlocked = await watcher.value
+        NetworkSession.testTransport = transportBeforeLane
+        let (maxInFlight, totalLocal) = tracker.lock.withLock { (tracker.maxInFlightLocal, tracker.localRequests) }
+        check("13b Vision typed pages finish while local handwritten page is blocked, and local lane runs 1 at a time",
+              typedFinishedWhileLocalBlocked && maxInFlight == 1 && totalLocal == 2
+              && proc.jobs[0].result?.text == "HAND-OK" && proc.jobs[1].result?.text == "HAND-OK",
+              "typedFirst=\(typedFinishedWhileLocalBlocked) maxLocal=\(maxInFlight) totalLocal=\(totalLocal)")
 
         finish(results)
     }

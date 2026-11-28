@@ -400,30 +400,10 @@ Advanced › Lower-scoring and experimental choices, off by default.
 
 ## ⚠️ LIMITATION (W49.proc-pipeline-prune-apply, 2026-11-25): what the owner's pipeline simplifications leave open
 
-- **The free Mac split sends handwriting to Qwen3-VL 8B, not the profile's LightOnOCR-3 4B.** Since
-  W49.proc-kind-split-mac an Apple Vision run sends a sure handwritten page to the downloaded model that reads handwriting
-  best (Qwen3-VL 8B 4-bit, 89.24 NES on the owner's 16 hand pages, over Qwen3.5 9B's 88.06 and Vision's 60.58). B1's
-  handwriting pick, LightOnOCR-3 4B 8-bit (89.91), is not an app download, and a model on the user's own local server
-  (the gateway's local-model field) is not offered to a Vision run (queued: W49.proc-kind-split-mac-fu).
-- **A Vision run's handwritten pages share its workers with the typed pages.** The model on this Mac reads one page at
-  a time (about 35 s), so a batch with many handwritten pages can hold every Vision worker while the typed pages wait;
-  the time estimate adds those pages serially and still counts them in Vision's share too, a slight overestimate
-  (queued: W49.proc-kind-split-mac-fu).
 - **A collection's day-first date order does not reach the trace and tagging calls.** (The Reader's folder-date
   confirmation reads it since W49.reader-folder-date-day-first.) Where the route finds a year
   but no dated form, the tagging call's month and day can still be a month-first reading (queued:
   W49.proc-metadata-unified-apply, which puts the order into the one metadata call).
-- **Live Capture dates in its output root's order even when filing into a collection that sets its own.** Its folder
-  and document dates read `numericDatesDayFirst` from the session's output root, and each Live run record keeps that
-  order (W49.proc-live-date-order-per-collection), so a new collection folder reads as Live dated it. An existing
-  collection chosen at Finish whose own settings give the other order still differs: the Reader reads the collection's
-  own value, so a folder `6/2/61` Live dated June is February in the Reader's offer (queued:
-  W49.proc-live-redate-chosen-collection).
-- **A direct key's rotation estimate leaves out a Gemini model's unbudgeted thinking.** Rotation on a direct Gemini,
-  Claude or OpenAI key asks the run's own OCR model (owner call 6). A Gemini model the catalog marks as not thinking
-  (Gemini 3.1 Pro, Gemini 3 Flash Preview) is sent no thinking budget, so whatever it thinks is not in the estimate;
-  a thinking Gemini model is held to its Low budget and an OpenAI reasoning model priced at its 2,048-token ceiling
-  (queued: W49.proc-rotation-thinking-price).
 
 ## FIXED (W40.fix-processor-merged-classification-stale, 2026-11-23) — The Files pane left merged PDF classifications stale
 
@@ -1225,13 +1205,15 @@ local run's escalated pages are priced in the pre-run cascade line, but the esti
 
 ## ⚠️ LIMITATION (W49.proc-managed-local-ocr, 2026-11-26): what the app-managed page readers do not yet cover
 
-Settings › Accounts › Local models on this Mac downloads **Qwen3.5 9B** (recommended) or **Qwen3-VL 8B**, both 4-bit
-MLX at the revisions the bench read, and the Reader menu then offers them under "This Mac". `LocalModelSupervisor`
+Settings › Accounts › Local models on this Mac downloads **Qwen3.5 9B** (recommended), **Qwen3-VL 8B** (4-bit MLX),
+or **LightOnOCR-3 4B** (8-bit MLX, handwriting pick) at the revisions the bench read, and the Reader menu then offers
+them under "This Mac". `LocalModelSupervisor`
 installs and runs them like the label reader, one model loaded at a time; the app's client for a model on this Mac
 reads through the worker's chat endpoint (`withEndpoint`), so the local route's cap, loop stop, second reading,
 reasoning switch and escalation setting all apply unchanged. Measured through the app on the 18 GB M3 Pro (`test-local-models.sh` with `LOCALMODELS_SCRATCH_OCR_ROOT`):
 - **Qwen3.5 9B** (`W49.proc-managed-ocr-9b-check`, 2026-11-27): fresh network install into an empty folder took 364 s (uv, Python 3.12.13, mlx-vlm 0.7.4, and 5.98 GB / 5.57 GiB of weights pinned at `8b2b98c00a6b4d291155e4890773ca8f769aee53`, after fixing `LocalModelWorker.py` `snapshot_download` `allow_patterns` to include `*.jinja` / `*.txt` so `chat_template.jinja` downloads), and the rendered four-line letter came back whole in 26 s, model load included, at a 7.95 GB peak (under the 10 GB ceiling; bench 99-page peak remains 9.1 GB).
 - **Qwen3-VL 8B** (`W49.proc-managed-local-ocr`, 2026-11-26): fresh install into an empty folder took 43 s (runtime from the network; weights checked against the pinned revision from a hard-linked copy of the bench's snapshot), and the rendered four-line letter came back whole in 27 s, model load included, at a 7.71 GB peak (bench 99-page peak 8.4 GB).
+- **LightOnOCR-3 4B** (`W49.proc-kind-split-mac-fu`, 2026-11-28): fresh install into an empty folder took 196 s (runtime from the network; `8bit/` subpath of `prithivMLmods/LightOnOCR-3-4B-MLX` pinned at `e93084acf44a380776866b23b122f48fe47cab7f`, 5.16 GB / 4.81 GiB checked from a hard-linked copy of the bench's snapshot), and the rendered four-line letter came back whole in 18 s, model load included, at a 7.24 GB peak (bench 99-page peak 7.9 GB).
 
 Open:
 - **The Mac item-field call's publication date still needs an mlx-vlm server.** Its page-image half (kind, byline) goes to

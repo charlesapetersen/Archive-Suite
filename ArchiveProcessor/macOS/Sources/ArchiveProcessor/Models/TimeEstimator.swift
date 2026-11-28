@@ -70,7 +70,8 @@ struct TimeEstimator {
         localSecondsPerPage: Double? = nil,
         gatewayRotation: Bool = false,
         usesLocalAgent: Bool = false,
-        routedLocalSeconds: Double = 0
+        routedLocalSeconds: Double = 0,
+        routedLocalPageCount: Int = 0
     ) -> TimeEstimate {
         let n = Double(fileCount)
         let speed = speedFactor(for: model)
@@ -89,10 +90,14 @@ struct TimeEstimator {
             // W41.app-local-models: a model on this Mac reads one page at a time, at its own measured pace.
             ocr = n * localSecondsPerPage
         } else {
-            ocr = ceil(n / w) * callSeconds(outputTokens: CostEstimator.estimatedOutputTokens, speed: speed)
+            // W49.proc-kind-split-mac-fu: local-routed pages run on their own one-worker lane concurrently with
+            // Vision's workers, so exclude them from Vision's share and count them once.
+            let primaryCount = routedLocalPageCount > 0 ? Double(max(0, fileCount - routedLocalPageCount)) : n
+            ocr = primaryCount > 0 ? ceil(primaryCount / w) * callSeconds(outputTokens: CostEstimator.estimatedOutputTokens, speed: speed) : 0
         }
-        // W49.proc-kind-split-mac: the pages a model on this Mac reads for an Apple Vision run, one at a time.
-        ocr += routedLocalSeconds
+        if routedLocalSeconds > 0 {
+            ocr = max(ocr, routedLocalSeconds)
+        }
 
         // Rotation — concurrent with each page's OCR (per image: `orderings` sequential comparisons).
         var rotation = 0.0
