@@ -66,7 +66,7 @@ final class NotesIndexer: ObservableObject {
 
     /// Inject the shared `NotesIndex` (app path) so this driver and `NotesModel` use **one** sqlite
     /// handle to the same file rather than two independent connections.
-    init(index: NotesIndex, diagnosticLog: @escaping @Sendable (String) -> Void = { NSLog("%@", $0) }) {
+    init(index: NotesIndex, diagnosticLog: @escaping @Sendable (String) -> Void = { NotesLog.index.error("\($0, privacy: .public)") }) {
         self.index = index
         self.diagnosticLog = diagnosticLog
     }

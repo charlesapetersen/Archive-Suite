@@ -45,6 +45,7 @@ struct ArchiveProcessorApp: App {
         .commands {
             ProcessorFileCommands()
             ProcessingCommands()
+            DiagnosticsCommands()
         }
 
         // Window ▸ Tags (W40.tag-window-processor): the shared Tags window over the Processor's two lists.

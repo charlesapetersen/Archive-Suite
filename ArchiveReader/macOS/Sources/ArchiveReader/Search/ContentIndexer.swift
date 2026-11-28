@@ -519,7 +519,14 @@ final class ContentIndexer: ObservableObject {
     /// Assign `failure` only when it actually changes — `@Published` republishes on every set, and the
     /// query paths run per keystroke.
     private func setFailure(_ new: Failure?) {
-        if failure != new { failure = new }
+        if failure != new {
+            if let new {
+                ReaderLog.index.error("Content index degraded: \(new.message, privacy: .public)")
+            } else {
+                ReaderLog.index.info("Content index healthy")
+            }
+            failure = new
+        }
     }
 
     /// Current catalogue-rule hits with each resolved owner's companion digest.

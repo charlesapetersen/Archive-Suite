@@ -271,7 +271,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
                 let dropped = (file.memberships.count - memberships.count)
                             + (file.assignments.count - assignments.count)
                 if dropped > 0 {
-                    NSLog("OrganizationStore: dropped \(dropped) organization.json edge(s) with no folder")
+                    NotesLog.organization.notice("Dropped \(dropped, privacy: .public) organization.json edge(s) with no folder")
                 }
                 try await index.replaceOrganization(
                     folders: folders, memberships: memberships, assignments: assignments)
@@ -301,7 +301,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         // against those folders, and report then remove only the remaining legacy ghosts.
         if let swept = try await index.sweepGhostMembershipsOnce() {
             if swept > 0 {
-                NSLog("OrganizationStore: swept %d membership(s) for folders no longer in the organization", swept)
+                NotesLog.organization.notice("Swept \(swept, privacy: .public) membership(s) for removed folders")
             }
             memberships = try await index.allMemberships()
         }
@@ -1216,7 +1216,7 @@ private struct MirrorSnapshot: Sendable {
                                         assignments: assignments, to: root)
             return nil
         } catch {
-            NSLog("OrganizationStore: organization.json export failed: \(error)")
+            NotesLog.organization.error("organization.json export failed: \(error.localizedDescription, privacy: .public)")
             return .writeFailed(detail: error.localizedDescription)
         }
     }

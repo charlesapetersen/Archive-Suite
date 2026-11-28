@@ -68,7 +68,10 @@ struct ArchiveReaderApp: App {
                     }
             }
         }
-        .commands { ArchiveReaderCommands(router: deepLinkRouter) }
+        .commands {
+            ArchiveReaderCommands(router: deepLinkRouter)
+            DiagnosticsCommands()
+        }
 
         WindowGroup(id: WindowID.document, for: DocumentSelection.self) { $selection in
             DocumentWindowView(selection: selection)

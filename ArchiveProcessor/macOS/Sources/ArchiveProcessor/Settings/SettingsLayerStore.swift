@@ -541,7 +541,9 @@ final class SettingsLayerStore: ObservableObject {
             catch { problem = "\(error)" }
         }
         lastProblem = problem ?? standingProblem
-        if let problem { NSLog("ArchiveProcessor: the collection's settings record was not written: %@", problem) }
+        if let problem {
+            ProcessorLog.settings.error("Collection settings record not written: \(problem, privacy: .public)")
+        }
         return problem
     }
 
@@ -694,7 +696,7 @@ final class SettingsLayerStore: ObservableObject {
             objectWillChange.send()
         } catch {
             // A failed reconciliation leaves the durable provisional row for a later poll or Resume.
-            NSLog("ArchiveProcessor: paid request reconciliation failed: %@", error.localizedDescription)
+            ProcessorLog.settings.error("Paid request reconciliation failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

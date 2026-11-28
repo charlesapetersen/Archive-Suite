@@ -175,6 +175,9 @@ ALLOW=(
   # archive is only read, through `CatalogueReadDirectory` (`CatalogueExportTests`).
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueExport.swift${SEP}defer { if !published { try? FileManager.default.removeItem(at: staging) } }"
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueExport.swift${SEP}try data.write(to: target, options: [.withoutOverwriting])"
+  # W49.suite-tester-diagnostics: Help ▸ Export Logs… writes one plain-text diagnostics log ONLY to the
+  # user-chosen NSSavePanel destination (never derived from any corpus or archive URL).
+  "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCoreUI/Support/AppDiagnostics.swift${SEP}try data.write(to: destination, options: .atomic)"
 
   # ── rule 4 (raw POSIX write) ────────────────────────────────────────────────────────────────────
   # The audit ledger's append handle (already audited above as the ledger's own file).

@@ -440,6 +440,7 @@ final class ArchiveLibrary: ObservableObject {
     /// recovery control for a journal-less volume and the operator's way to demand a full proof now.
     func rescan() {
         guard let root else { return }
+        ReaderLog.library.info("Manual archive rescan requested")
         refreshJPEGPartnerIndex(scope: root)
         retryWatcherIfNeeded(root: root)
         requestRootRescan(urgent: true)

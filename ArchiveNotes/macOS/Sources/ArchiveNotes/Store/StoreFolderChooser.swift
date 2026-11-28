@@ -284,7 +284,7 @@ final class StoreFolderChooser {
         do {
             try FileManager.default.createDirectory(at: picked, withIntermediateDirectories: false)
         } catch {
-            NSLog("StoreFolderChooser: could not make \(picked.path): \(error)")
+            NotesLog.store.error("Could not create library folder: \(error.localizedDescription, privacy: .public)")
             return finish(.refused(picked, .unreadable))
         }
         let outcome = remember(picked: picked, target: picked)
@@ -320,7 +320,7 @@ final class StoreFolderChooser {
         do {
             try rootStore.rememberRootAtQuit(target, then: relaunch)
         } catch {
-            NSLog("StoreFolderChooser: could not bookmark \(target.path): \(error)")
+            NotesLog.store.error("Could not bookmark chosen library: \(error.localizedDescription, privacy: .public)")
             return finish(.refused(picked, .cannotRemember))
         }
         // The pick is written, and the relaunch started, only once the quit is really happening

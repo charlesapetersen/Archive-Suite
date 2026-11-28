@@ -148,7 +148,7 @@ final class RootFolderStore: ObservableObject {
                               relativeTo: nil, bookmarkDataIsStale: &stale)
             // Must start scope; if that fails, leave root nil (user re-picks).
             guard url.startAccessingSecurityScopedResource() else {
-                NSLog("RootFolderStore(Notes): saved root is no longer accessible; user must re-pick.")
+                NotesLog.store.error("Saved library root is no longer accessible; user must re-pick")
                 savedRootUnavailable = true
                 return
             }
@@ -156,7 +156,7 @@ final class RootFolderStore: ObservableObject {
             // or files may have landed in the empty folder that was picked. A refused folder is not
             // opened, so no marker is written into it and no note is saved there.
             if case let .refused(refusal) = StoreFolderChooser.check(url, readerRoots: readerRoots) {
-                NSLog("RootFolderStore(Notes): saved root \(url.path) is no longer a store (\(refusal)).")
+                NotesLog.store.error("Saved library root refused (\(String(describing: refusal), privacy: .public))")
                 savedRootUnavailable = true
                 return
             }
@@ -171,7 +171,7 @@ final class RootFolderStore: ObservableObject {
             }
             ensureMarkerQuietly()
         } catch {
-            NSLog("RootFolderStore(Notes): could not resolve saved bookmark: \(error)")
+            NotesLog.store.error("Could not resolve saved library bookmark: \(error.localizedDescription, privacy: .public)")
             savedRootUnavailable = true
         }
     }
@@ -181,7 +181,7 @@ final class RootFolderStore: ObservableObject {
         do {
             marker = try RootMarkerStore.ensureMarker(at: root, kind: .notes)
         } catch {
-            NSLog("RootFolderStore(Notes): marker error: \(error)")
+            NotesLog.store.error("Library marker error: \(error.localizedDescription, privacy: .public)")
             marker = nil
         }
     }

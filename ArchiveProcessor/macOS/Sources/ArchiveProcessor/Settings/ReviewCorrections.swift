@@ -138,7 +138,7 @@ enum ReviewCorrections {
                                      owner: owner(settings: r.settings, in: r.outputDirectory),
                                      approach: r.approach, partner: r.partner, pages: pages.count, gaps: gaps)
         do { try write(record, in: r.outputDirectory) } catch {
-            NSLog("ArchiveProcessor: the run's reviewed gaps were not recorded: %@", "\(error)")
+            ProcessorLog.settings.error("Run reviewed gaps not recorded: \(error.localizedDescription, privacy: .public)")
             return "\(error)"
         }
         return nil

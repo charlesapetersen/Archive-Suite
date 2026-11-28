@@ -294,14 +294,14 @@ final class ReaderRootStore: ObservableObject {
             do {
                 minted = try mintBookmark(target)
             } catch {
-                NSLog("ReaderRootStore: could not bookmark \(target.path): \(error)")
+                NotesLog.links.error("Could not bookmark archive folder: \(error.localizedDescription, privacy: .public)")
                 return .refused(.couldNotBookmark(url, "\(error)"))
             }
             do {
                 // Created once, under coordination, and read back; an existing one is never rewritten.
                 marker = try RootMarker.ensure(at: target, kind: .reader, name: target.lastPathComponent)
             } catch {
-                NSLog("ReaderRootStore: could not create an identity at \(target.path): \(error)")
+                NotesLog.links.error("Could not create archive identity: \(error.localizedDescription, privacy: .public)")
                 return .refused(.couldNotCreateIdentity(url, "\(error)"))
             }
         } else {
@@ -432,7 +432,7 @@ final class ReaderRootStore: ObservableObject {
                     refreshBookmark(guid: guid, url: url)
                 }
             } catch {
-                NSLog("ReaderRootStore: could not resolve bookmark for \(guidStr): \(error)")
+                NotesLog.links.error("Could not resolve archive bookmark for \(guidStr, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         }
     }

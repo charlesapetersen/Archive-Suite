@@ -92,6 +92,7 @@ struct CorpusWatchRequest: Sendable, Equatable {
                 || has(eventFlags, FSEventStreamEventFlags(kFSEventStreamEventFlagHistoryDone))
                 || has(eventFlags, FSEventStreamEventFlags(kFSEventStreamEventFlagUserDropped))
                 || has(eventFlags, FSEventStreamEventFlags(kFSEventStreamEventFlagKernelDropped)) {
+                ReaderLog.watcher.notice("FSEvents requested full rescan (flags=\(eventFlags, privacy: .public))")
                 request.fullRescan = true
                 continue
             }

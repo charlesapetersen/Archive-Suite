@@ -546,7 +546,7 @@ final class NotesModel: ObservableObject {
                 folderLine = reason
             }
         } catch {
-            NSLog("NotesModel: failed to reload organization.json: \(error)")
+            NotesLog.organization.error("Failed to reload organization.json: \(error.localizedDescription, privacy: .public)")
             folderLine = "organization.json couldn't be read into the library, so the folders were left as they were."
         }
 
@@ -2237,7 +2237,7 @@ final class NotesModel: ObservableObject {
             for id in ids {
                 do { try await noteStore.delete(id, formerFolders: formerFolders[id] ?? []); removed.append(id) }
                 catch {
-                    NSLog("NotesModel: could not move note \(id) to Trash: \(error)")
+                    NotesLog.store.error("Could not move note to Trash: \(error.localizedDescription, privacy: .public)")
                     // Ask the disk instead of classifying the error: `delete` also throws when the
                     // directory was ALREADY gone (`StoreError.notFound`, e.g. the other window got
                     // there first), and keeping THAT row would strand a phantom note pointing at

@@ -676,7 +676,10 @@ final class LocalModelSupervisor {
 #if DEBUG
     /// What the supervisor did, in order, for the contract.
     private(set) var events: [String] = []
-    private func note(_ event: String) { events.append(event) }
+    private func note(_ event: String) {
+        events.append(event)
+        ProcessorLog.localModels.notice("\(event, privacy: .public)")
+    }
 
     /// A supervisor of its own for a contract: a scratch root, and a stand-in interpreter and worker if given.
     static func forTest(root: URL, interpreter: URL? = nil, script: URL? = nil) -> LocalModelSupervisor {
@@ -686,6 +689,8 @@ final class LocalModelSupervisor {
     var residentModel: Model? { resident?.model }
     func simulateMemoryPressure(critical: Bool) { memoryPressure(critical: critical) }
 #else
-    private func note(_ event: String) {}
+    private func note(_ event: String) {
+        ProcessorLog.localModels.notice("\(event, privacy: .public)")
+    }
 #endif
 }
