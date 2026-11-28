@@ -198,14 +198,15 @@ enum MarkdownBridge {
         // Pre-extract image references so Apple's parser doesn't strip them.
         let (cleaned, imageRefs) = extractImageReferences(markdown)
 
-        // Use Apple's CommonMark parser (AttributedString API) for semantic attributes
-        // Source lines only where the Styler needs them, to count blank lines past the first (W49.notes-keep-blank-lines).
+        // Use Apple's CommonMark parser (AttributedString API) for semantic attributes.
+        // Source positions are needed to count blank lines past the first (W49.notes-keep-blank-lines) and so Apple
+        // keeps adjacent CommonMark HTML blocks as distinct runs rather than coalescing them (W49.notes-html-block-starts).
         let countsBlankLines = hasTwoBlankLines(cleaned)
         let options = AttributedString.MarkdownParsingOptions(
             allowsExtendedAttributes: true,
             interpretedSyntax: .full,
             failurePolicy: .returnPartiallyParsedIfPossible,
-            appliesSourcePositionAttributes: countsBlankLines
+            appliesSourcePositionAttributes: countsBlankLines || cleaned.contains("<")
         )
 
         let semantic: AttributedString
@@ -904,33 +905,30 @@ enum MarkdownBridge {
     }
 
     /// Whether the HTML block ending at `last` is one a blank line ends (CommonMark kinds 6 and 7), or one whose own
-    /// end (`-->`, `?>`, `>`, `]]>`, `</pre>` …) its text holds. Apple gives adjacent HTML blocks as one run, without
-    /// the blank lines between them, so where each starts cannot be told: any line that opens one of the others with
-    /// no end after it counts as open, even inside a block a blank line would end. There the Returns are dropped.
+    /// end (`-->`, `?>`, `>`, `]]>`, `</pre>` …) its text holds (W49.notes-html-block-starts). `MarkdownStyler` stamps
+    /// each CommonMark HTML block with a distinct `.noteHTMLBlockID`, so this judges only the last block's opening
+    /// line rather than mistaking an opener line inside a `<div>` block for a separate unclosed block.
     private static func htmlBlockEndsAtABlankLine(_ storage: NSAttributedString, endingAt last: Int) -> Bool {
         var block = NSRange(location: 0, length: 0)
-        storage.attribute(.noteBlockHTML, at: last, longestEffectiveRange: &block,
-                          in: NSRange(location: 0, length: last + 1))
-        let html = (storage.string as NSString).substring(with: block).lowercased()
-        var rest = Substring(html)
-        while !rest.isEmpty {
-            let line = rest.drop(while: { $0 == " " || $0 == "\t" })
-            let next = line.firstIndex(where: \.isNewline).map { line.index(after: $0) } ?? line.endIndex
-            let type1 = ["script", "pre", "style", "textarea"]
-            let closers: [String]
-            if line.hasPrefix("<!--") { closers = ["-->"] }
-            else if line.hasPrefix("<![cdata[") { closers = ["]]>"] }
-            else if line.hasPrefix("<!"), line.dropFirst(2).first?.isLetter == true { closers = [">"] }
-            else if line.hasPrefix("<?") { closers = ["?>"] }
-            else if type1.contains(where: { name in
-                line.hasPrefix("<" + name) && line.dropFirst(name.count + 1).first.map { $0 == ">" || $0.isWhitespace } != false
-            }) { closers = type1.map { "</\($0)>" } }   // any of the four ends it
-            else { closers = [] }
-            // The end may share the opener's characters (`<!-->`, `<?>`).
-            if !closers.isEmpty, !closers.contains(where: { line.dropFirst(1).contains($0) }) { return false }
-            rest = line[next...]
+        let searchRange = NSRange(location: 0, length: last + 1)
+        if storage.attribute(.noteHTMLBlockID, at: last, longestEffectiveRange: &block, in: searchRange) == nil {
+            storage.attribute(.noteBlockHTML, at: last, longestEffectiveRange: &block, in: searchRange)
         }
-        return true
+        let html = (storage.string as NSString).substring(with: block).lowercased()
+        let content = Substring(html).drop(while: { $0 == " " || $0 == "\t" })
+        let type1 = ["script", "pre", "style", "textarea"]
+        let closers: [String]
+        if content.hasPrefix("<!--") { closers = ["-->"] }
+        else if content.hasPrefix("<![cdata[") { closers = ["]]>"] }
+        else if content.hasPrefix("<!"), content.dropFirst(2).first?.isLetter == true { closers = [">"] }
+        else if content.hasPrefix("<?") { closers = ["?>"] }
+        else if type1.contains(where: { name in
+            content.hasPrefix("<" + name) && content.dropFirst(name.count + 1).first.map { $0 == ">" || $0.isWhitespace } != false
+        }) { closers = type1.map { "</\($0)>" } }   // any of the four ends it
+        else { closers = [] }
+        guard !closers.isEmpty else { return true }
+        // The end may share the opener's characters (`<!-->`, `<?>`), or appear on a later line of the same block.
+        return closers.contains(where: { content.dropFirst(1).contains($0) })
     }
 
     /// `count` newlines ending a line of text, each a hard break; after an HTML block the first is the blank line that

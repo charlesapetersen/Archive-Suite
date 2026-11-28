@@ -65,11 +65,10 @@ Owner call 20: keep what I type. Returns typed after text ending in raw HTML rea
 - **Still dropped after an HTML block that a blank line does not end:** an unclosed `<!--`, `<pre>`, `<script>`, `<?`
   or `<![CDATA[`, or a headerless chip's opener. The block runs to the end of the text, so a Return cannot be written
   outside it. (accepted: platform fact, CommonMark ends these blocks only at their closing marker).
-- **Also dropped after a `<div>` block that holds such an opener line** (`<div>`, `<!-- x`, `</div>`), which a blank
-  line does end. Apple gives adjacent HTML blocks as one run, without the blank lines between them (measured), so the
-  editor cannot tell that block from a closed one followed by an open comment, and treats any opener line with no end
-  after it as open. Reading the block starts from the file's lines would lift it. (queued:
-  W49.notes-html-block-starts).
+- **A `<div>` block that holds an unclosed opener line (`<div>`, `<!-- x`, `</div>`) now keeps its Returns.**
+  Parsing with source positions whenever `<` is present keeps adjacent CommonMark HTML blocks as separate runs, and
+  `MarkdownStyler` stamps each HTML block with a distinct `.noteHTMLBlockID` so `htmlBlockEndsAtABlankLine` judges
+  only the last block's opening line. (accepted: fixed, W49.notes-html-block-starts).
 
 Evidence: `verification/evidence/notes/W49.notes-lines-after-html.md`.
 

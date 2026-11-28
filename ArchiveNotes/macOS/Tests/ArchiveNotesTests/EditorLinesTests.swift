@@ -669,8 +669,9 @@ struct EditorLinesTests {
             tv.insertNewline(nil)
             #expect(expectKept(tv, storage, file) == file + "\n\n&nbsp;")
         }
-        // Apple gives adjacent HTML blocks as one run, so an open comment after a closed block counts as open too.
-        for file in ["<!-- open\nx", "<pre>\nx", "<!-- block: freeform\nfoo", "<div>a</div>\n\n<!-- open\nx"] {
+        // Apple splits adjacent HTML blocks when source positions are requested, so only the last block is judged.
+        for file in ["<!-- open\nx", "<pre>\nx", "<!-- block: freeform\nfoo", "<div>a</div>\n\n<!-- open\nx",
+                     "<!-- c -->\n<!-- open\nx", "<!-- open\n<div>a</div>"] {
             let (tv, storage) = try editor(file)
             tv.insertNewline(nil)
             let saved = reselect(tv, storage)
@@ -678,6 +679,33 @@ struct EditorLinesTests {
                     "\(file.debugDescription): saved \(saved.debugDescription), reopened \(storage.string.debugDescription)")
             #expect(MarkdownBridge.serialize(storage) == saved, "\(file.debugDescription): a reopened note must save the same")
         }
+    }
+
+    /// W49.notes-html-block-starts: a `<div>` (or other kind-6) block that holds an unclosed opener line such as
+    /// `<!-- x` or `<pre>` still ends at a blank line, so Returns typed after it are kept.
+    @Test func divBlockHoldingUnclosedOpenerLineKeepsReturns() throws {
+        for file in ["<div>\n<!-- x\n</div>", "<div>\n<pre>\n</div>", "<div>\n<?php\n</div>",
+                     "<pre>\nx\n</pre>", "<!--\nx\n-->"] {
+            for count in 1...2 {
+                let (tv, storage) = try editor(file)
+                for _ in 0..<count { tv.insertNewline(nil) }
+                let expected = file + "\n\n" + String(repeating: "\\\n", count: count - 1) + "&nbsp;"
+                let saved = expectKept(tv, storage, "\(count) Return(s) after \(file.debugDescription)")
+                #expect(saved == expected, "\(file.debugDescription): saved \(saved.debugDescription)")
+                #expect(!storage.string.contains("\u{00A0}"))
+            }
+        }
+        // Inside a blockquote too.
+        let (qtv, qstorage) = try editor("> <div>\n> <!-- x\n> </div>")
+        qtv.insertNewline(nil)
+        #expect(expectKept(qtv, qstorage, "Return after quoted div holding unclosed opener")
+                == "> <div>\n> <!-- x\n> </div>\n>\n> &nbsp;")
+        // Adjacent blocks where the last block is a `<div>` holding an unclosed opener line still keep Returns.
+        let (atv, astorage) = try editor("<div>a</div>\n\n<div>\n<!-- b\n</div>")
+        atv.insertNewline(nil)
+        let saved = expectKept(atv, astorage, "Return after second div holding unclosed opener")
+        #expect(saved.hasSuffix("\n\n&nbsp;"), "saved \(saved.debugDescription)")
+        #expect(!astorage.string.contains("\u{00A0}"))
     }
 
     /// An HTML block is one newline from what follows it, as other blocks are: the blank line that ends it in the file

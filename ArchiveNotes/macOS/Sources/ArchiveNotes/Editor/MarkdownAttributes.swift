@@ -33,6 +33,11 @@ extension NSAttributedString.Key {
     /// (Bool, set beside `noteRawHTML`). Only a blank line ends such a block, so a line break after it would be its
     /// text (W49.notes-lines-after-html).
     static let noteBlockHTML = NSAttributedString.Key("an.blockHTML")
+    /// Distinct per-block ordinal stamped on each `.blockHTML` run (Int, W49.notes-html-block-starts). With source
+    /// positions on, Apple emits each CommonMark HTML block as its own run instead of coalescing adjacent ones, so
+    /// the serializer can inspect only the last block rather than mistaking an opener line inside a `<div>` block
+    /// for a separate unclosed HTML block.
+    static let noteHTMLBlockID = NSAttributedString.Key("an.htmlBlockID")
     /// The newline `MarkdownBridge.endLine` puts before a chip (Bool), which ends a block's text. Where text has
     /// come to follow it (typed above the chip, or the chip left out of a passage) it is a paragraph break, not
     /// a line break (W40.fix-notes-editor-lines).
@@ -215,10 +220,15 @@ enum MarkdownStyler {
         let bodyFont = NSFont.systemFont(ofSize: fontSize)
         var previous: (intent: PresentationIntent?, attrs: [NSAttributedString.Key: Any])?
         var previousEndLine: Int?
+        var htmlBlockID = 0
 
         for run in source.runs {
             let runText = String(source[run.range].characters)
-            let attrs = buildAttributes(run: run, fontSize: fontSize, bodyFont: bodyFont)
+            var attrs = buildAttributes(run: run, fontSize: fontSize, bodyFont: bodyFont)
+            if attrs[.noteBlockHTML] as? Bool == true {
+                htmlBlockID += 1
+                attrs[.noteHTMLBlockID] = htmlBlockID
+            }
 
             if let previous, previous.intent != run.presentationIntent {
                 dropRawHTMLLineEnd(result)
