@@ -344,12 +344,22 @@ enum SegmentationChooserTestDriver {
         check("6 no key, nothing saved: saves nothing",
               !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
         eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
-        // W46.seg-truth-audit: ChatGPT's 90.2 and GLM's 82.8 tie on the paired comparison (+7.4 [-1.0, +16.9] over 142
-        // documents; 7 documents only ChatGPT has right, 2 only GLM, sign test p 0.18), so the cheaper GLM is picked.
+        // W49.proc-pipeline-prune-ok 4 (2026-11-24): segmentation ties use the 2.0-point practical floor only.
+        // ChatGPT (90.2%) beats GLM-5.3 Flash (82.8%) by 7.38 points (no tie) and ties Claude (88.9%, delta 1.23) at
+        // a lower API list price ($14.51 vs $16.93 per 1,000 pages; an unverified `claude` CLI is not counted), so
+        // with an OpenAI key and no Gemini key the solver picks ChatGPT. Without an OpenAI key or ChatGPT plan, it
+        // never picks ChatGPT: Anthropic + OpenRouter picks Claude (88.9%, beating GLM by 6.15 points).
         // Gemini alone still picks text, which ties the image window at about half the price.
         check("6 no Gemini key, nothing saved: saves the solver's pick",
               SegmentationApproach.preselect(noGemini, defaults: d))
-        eq("6 no Gemini key, nothing saved: GLM-5.3 Flash", SegmentationApproach.stored(d), .glm)
+        eq("6 no Gemini key, nothing saved: ChatGPT (beats GLM past 2-point floor, cheaper than Claude)",
+           SegmentationApproach.stored(d), .openai)
+        d.removeObject(forKey: key)
+        let noGeminiNoOpenAI = SegmentationRoutes(hasAnthropicKey: true, hasOpenRouterKey: true)
+        check("6 no Gemini or OpenAI key, nothing saved: saves the solver's pick",
+              SegmentationApproach.preselect(noGeminiNoOpenAI, defaults: d))
+        eq("6 no Gemini or OpenAI key, nothing saved: Claude (never ChatGPT without key or plan)",
+           SegmentationApproach.stored(d), .claude)
         d.removeObject(forKey: key)
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
         eq("6 Gemini key, nothing saved: gemini-text", SegmentationApproach.stored(d), .geminiText)

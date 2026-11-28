@@ -308,7 +308,7 @@ extension OCRProcessor {
                 ?? ProcessorCatalogueRecord.documentFields(tags: tags, type: type, dateIsUserSet: false,
                                                            subjectsAreUserSet: false, dating: nil, itemFields: nil, entities: nil)
             if let segment {
-                fields.itemType = type.map { .init($0.rawValue, origin: "user") }
+                fields.itemType = type.map { .init($0.rawValue.lowercased(), origin: "user") }
                 if segment.isBox || segment.isFolder {
                     fields.sentWith = nil
                 }

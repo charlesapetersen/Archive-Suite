@@ -133,8 +133,8 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
         var fields = DocumentFields()
         if let date = tags.machineDate.flatMap(ArchiveDate.parse(wireValue:)) {
             let decisionDate = dating.flatMap { d in
-                d.decade.flatMap(ArchiveDate.init(decade:))
-                    ?? d.year.flatMap { ArchiveDate(year: $0, month: d.month, day: d.day) }
+                let full = d.year.flatMap { ArchiveDate(year: $0, month: d.month, day: d.day) }
+                return full ?? (d.year == nil ? d.decade.flatMap(ArchiveDate.init(decade:)) : nil)
             }
             let evidence = dating.map { reading in
                 [Evidence(source: reading.evidenceClass.rawValue,
@@ -148,7 +148,7 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
         if let date = tags.sentWith {
             fields.sentWith = Field(.init(date: date, uncertain: tags.sentWithUncertain), origin: "model")
         }
-        fields.itemType = type.map { Field($0.rawValue, origin: "user") }
+        fields.itemType = type.map { Field($0.rawValue.lowercased(), origin: "user") }
         fields.subjects = nonempty(tags.subjectTags).map { Field($0, origin: subjectsAreUserSet ? "user" : "model") }
 
         func item<Value>(_ key: ItemFieldPolicy.Field, _ value: Value?) -> Field<Value>? {
@@ -182,17 +182,17 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
     /// Copy Source Tags explicitly carries established tags onto the derivative. Interpret the
     /// same facets as Reader so its catalogue view agrees with the optional Finder projection.
     static func applySourceTags(_ tags: DocumentTags, document: inout DocumentFields, file: inout FileFields) {
-        let date = tags.decade.flatMap(ArchiveDate.init(decade:))
-            ?? tags.year.flatMap { ArchiveDate(year: $0, month: tags.month?.number, day: tags.day) }
-        document.documentDate = date.map { Field(.init(date: $0, uncertain: tags.dateUncertain), origin: "import") }
-        document.sentWith = tags.sentWith.map { Field(.init(date: $0, uncertain: tags.sentWithUncertain), origin: "import") }
-        document.subjects = nonempty(tags.subjects).map { Field($0, origin: "import") }
+        let full = tags.year.flatMap { ArchiveDate(year: $0, month: tags.month?.number, day: tags.day) }
+        let date = full ?? (tags.year == nil ? tags.decade.flatMap(ArchiveDate.init(decade:)) : nil)
+        document.documentDate = date.map { Field(.init(date: $0, uncertain: tags.dateUncertain), origin: "imported") }
+        document.sentWith = tags.sentWith.map { Field(.init(date: $0, uncertain: tags.sentWithUncertain), origin: "imported") }
+        document.subjects = nonempty(tags.subjects).map { Field($0, origin: "imported") }
         if let type = tags.itemType {
-            document.itemType = Field(type.rawValue, origin: "import")
+            document.itemType = Field(type.rawValue.lowercased(), origin: "imported")
         }
-        file.readState = tags.readState.map { Field($0.rawValue.lowercased(), origin: "import") }
-        file.quality = tags.quality.map { Field($0, origin: "import") }
-        file.ocrPoor = tags.hasPoorOCR ? Field(true, origin: "import") : nil
+        file.readState = tags.readState.map { Field($0.rawValue.lowercased(), origin: "imported") }
+        file.quality = tags.quality.map { Field($0, origin: "imported") }
+        file.ocrPoor = tags.hasPoorOCR ? Field(true, origin: "imported") : nil
     }
 
     private static func names(_ read: [EntityExtractor.Name], fallback: String?, route: String?) -> Field<[String]>? {

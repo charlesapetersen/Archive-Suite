@@ -451,6 +451,91 @@ enum TextLayerTestDriver {
         check("8 Process Files refuses a pre-OCR symlink without touching its target",
               processor.jobs.first?.status == .failed && processor.outputURLMap[alias] == nil
                 && (try? Data(contentsOf: source)) == original, processor.statusMessage)
+
+        // S-063 / S-064 / S-065: Copy Source Tags on a pre-OCRed PDF tagged with both a year and a decade, a Box
+        // item type, read state, quality and subject must write lowercase itemType ("box"), origin "imported"
+        // (editable by CatalogueWriter.save), and prefer Year over Decade.
+        let taggedSource = dir.appendingPathComponent("pre-ocr-copy-source.pdf")
+        try? original.write(to: taggedSource, options: .withoutOverwriting)
+        _ = try? CoordinatedTagWriter.write(taggedSource) { _, _ in
+            (["1957", "1950s", "Sent With 1958", "Box", "Unread", "Q2", "Trade", DocumentTags.poorOCRTag], nil)
+        }
+        let copyOut = dir.appendingPathComponent("filed copy-source", isDirectory: true)
+        try? fm.createDirectory(at: copyOut, withIntermediateDirectories: true)
+        let copyProcessor = OCRProcessor()
+        copyProcessor.taggingMode = .copySource
+        copyProcessor.passSourceTags = true
+        await copyProcessor.startProcessing(files: [taggedSource], provider: .appleVision,
+                                            model: LLMModel.appleVisionModels[0], thinkingLevel: nil, apiKey: "",
+                                            outputDirectory: copyOut, batchMode: false, enableTagging: false,
+                                            enableSegmentJSON: false, preOCRedInput: true, skipAlreadyProcessed: false,
+                                            segmentationContext: .init())
+        let copiedPDF = copyProcessor.outputURLMap[taggedSource]
+        let copiedRecord = catalogueRecord(at: copiedPDF)
+        let copiedDoc = copiedRecord?.documents.first
+        let copiedFields = copiedDoc?.fields
+        let copiedFileFields = copiedRecord?.fileFields
+        func fieldVal<T>(_ f: CatalogueRecord.Field<T>?) -> T? {
+            if case .value(let v) = f?.current { return v }
+            return nil
+        }
+        check("8 S-065 Copy Source Tags prefers Year (1957) over Decade (1950s)",
+              fieldVal(copiedFields?.documentDate)?.date == ArchiveDate(year: 1957),
+              "got \(String(describing: fieldVal(copiedFields?.documentDate)?.date))")
+        var dayWithoutMonthDoc = ProcessorCatalogueRecord.DocumentFields()
+        var dayWithoutMonthFile = ProcessorCatalogueRecord.FileFields()
+        ProcessorCatalogueRecord.applySourceTags(
+            DocumentTags.parse(raw: ["1957", "Day 15", "1950s"], labelNumber: nil),
+            document: &dayWithoutMonthDoc, file: &dayWithoutMonthFile)
+        check("8 S-065 Copy Source Tags never falls back to Decade when Year is present with unrepresentable day",
+              dayWithoutMonthDoc.documentDate == nil,
+              "got \(String(describing: dayWithoutMonthDoc.documentDate))")
+        check("8 S-063 Copy Source Tags writes lowercase itemType box",
+              fieldVal(copiedFields?.itemType) == "box",
+              "got \(String(describing: fieldVal(copiedFields?.itemType)))")
+        let copiedOrigins = [copiedFields?.documentDate?.origin, copiedFields?.sentWith?.origin,
+                             copiedFields?.itemType?.origin, copiedFields?.subjects?.origin,
+                             copiedFileFields?.readState?.origin, copiedFileFields?.quality?.origin,
+                             copiedFileFields?.ocrPoor?.origin]
+        check("8 S-064 Copy Source Tags writes origin imported on all 7 copied fields",
+              copiedOrigins.allSatisfy { $0 == "imported" },
+              "got \(copiedOrigins)")
+        if let copiedPDF, let docID = copiedDoc?.id, let year1958 = ArchiveDate(year: 1958) {
+            do {
+                let reader = try CatalogueReader(grantedRoot: copyOut, rootInstanceID: UUID(), mode: .adopted,
+                                                 identifyPDF: CataloguePDFIdentity.identify)
+                let rel = copiedPDF.lastPathComponent
+                let base = try reader.snapshot(.init(relativePDFPaths: [rel], isComplete: true)).facts(at: rel).file.get()
+                let updatedDate = CatalogueRecord.DateValue(date: year1958, uncertain: false)
+                let receipt = try CatalogueWriter(reader: reader).save([
+                    .init(.document(docID, .documentDate), .set(.date(updatedDate))),
+                    .init(.document(docID, .itemType), .set(.text("folder"))),
+                ], basedOn: base)
+                let saved = receipt.after.pair.record.documents.first?.fields
+                check("8 S-064 Copy Source Tags companion is editable via CatalogueWriter.save",
+                      fieldVal(saved?.documentDate)?.date == year1958
+                        && saved?.documentDate?.origin == "user"
+                        && fieldVal(saved?.itemType) == "folder"
+                        && saved?.itemType?.origin == "user",
+                      "saved \(String(describing: saved))")
+            } catch {
+                check("8 S-064 Copy Source Tags companion is editable via CatalogueWriter.save", false, "\(error)")
+            }
+        } else {
+            check("8 S-064 Copy Source Tags companion is editable via CatalogueWriter.save", false,
+                  "missing copied output: \(copyProcessor.statusMessage)")
+        }
+
+        // S-063: documentFields and fresh Process Files Box/Folder segment filing write lowercase "box"/"folder".
+        let boxFields = ProcessorCatalogueRecord.documentFields(tags: GeneratedTags(), type: .box, dateIsUserSet: false,
+                                                                subjectsAreUserSet: false, dating: nil, itemFields: nil,
+                                                                entities: nil)
+        let folderFields = ProcessorCatalogueRecord.documentFields(tags: GeneratedTags(), type: .folder,
+                                                                   dateIsUserSet: false, subjectsAreUserSet: false,
+                                                                   dating: nil, itemFields: nil, entities: nil)
+        check("8 S-063 documentFields spells itemType box and folder in lowercase",
+              boxFields.itemType?.value == "box" && folderFields.itemType?.value == "folder",
+              "box=\(String(describing: boxFields.itemType?.value)) folder=\(String(describing: folderFields.itemType?.value))")
     }
 
     private static func freshCatalogueChecks(dir: URL, inputs: [URL]) async {
@@ -513,6 +598,26 @@ enum TextLayerTestDriver {
                 }
             }
         }
+        let labelOut = dir.appendingPathComponent("fresh labels", isDirectory: true)
+        try? fm.createDirectory(at: labelOut, withIntermediateDirectories: true)
+        NetworkSession.testTransport = { _ in throw URLError(.unsupportedURL) }
+        defer { NetworkSession.testTransport = nil }
+        processor.mergeDocuments = false
+        processor.preGroupedBoundaries = [true, true]
+        processor.preGroupedTypes = [.box, .folder]
+        await processor.startProcessing(files: inputs, provider: .appleVision, model: model, thinkingLevel: nil,
+                                        apiKey: "", outputDirectory: labelOut, batchMode: false,
+                                        enableTagging: false, enableSegmentJSON: false, segmentationContext: .init())
+        let labelRecords = inputs.compactMap { processor.outputURLMap[$0] }.compactMap { catalogueRecord(at: $0) }
+        func itemTypeValue(_ record: CatalogueRecord) -> String? {
+            if case .value(let v) = record.documents.first?.fields?.itemType?.current { return v }
+            return nil
+        }
+        check("9 S-063 fresh Process Files Box/Folder segments file lowercase box and folder",
+              labelRecords.count == 2
+                && itemTypeValue(labelRecords[0]) == "box"
+                && itemTypeValue(labelRecords[1]) == "folder",
+              "got \(labelRecords.map { itemTypeValue($0) ?? "nil" })")
         check("9 fresh, split, merge and retry leave all original bytes intact",
               originals == inputs.map { try? Data(contentsOf: $0) })
     }

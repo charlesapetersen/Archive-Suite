@@ -1382,9 +1382,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   defaults domain with no Gemini key.
 - **Would clear it:** the check's expectation is stale (the measured table changed) and the preselection is the
   intended one; the driver is updated to the table.
-- **Status:** `open` — verification queued as `W49.proc-s054-verify`.
+- **Status:** `cleared` (driver updated to table) — verified independently by Gemini (`W49.proc-s054-verify`, 2026-11-27).
 - **History:**
   - 2026-11-25 W49.proc-settings-redesign-core — raised; the same failure on the item's branch and on pristine main.
+  - 2026-11-27 W49.proc-s054-verify (Gemini) — reproduced on pristine `origin/main` (`a1d2414b`): `scripts/test-segmentation-chooser.sh` failed only on check 6 (`got openai want glm`). Cleared: `noGemini` in check 6 sets `hasOpenAIKey: true` (so ChatGPT IS runnable), and commit `52d8295f` (`W49.proc-pipeline-prune-apply`, owner call `W49.proc-pipeline-prune-ok 4`) changed segmentation ties to the 2.0-point practical floor only (`settings-routes-app.json` has `chatgpt-gpt6.1-sol` 90.2% vs `glm5.3-flash` 82.8%, `delta: 7.38`, `tie: false`; vs `claude-sonnet5.5` 88.9%, `delta: 1.23`, `tie: true`, cheaper at `$14.51` vs `$16.93`/1,000 pages) without updating check 6's pre-prune expectation. Updated `SegmentationChooserTestDriver.swift` check 6 to expect `.openai` for `noGemini` and added a `noGeminiNoOpenAI` check verifying `.claude` is picked (never `.openai`) when no OpenAI key or ChatGPT plan exists. `scripts/test-segmentation-chooser.sh` now ALL PASS.
 
 ### S-055 · Notes publishes a change from within a view update
 
@@ -1527,13 +1528,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   be right, but a consumer that compares the catalogue value exactly (an export, Notes, Zotero, a filter) can treat
   Processor output and Reader edits as two different types.
 - **Where:** `ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ProcessorCatalogueRecord.swift` `documentFields`,
-  `applySourceTags`.
+  `applySourceTags`; `ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Catalogue.swift` L311.
 - **Would confirm it:** a Processor Box capture filed on a scratch root whose companion's `fields.itemType.value` is
   `Box`, and a consumer that compares it exactly and misses it.
 - **Would clear it:** every consumer compares case-insensitively and the SPEC says either spelling is valid.
-- **Status:** `open` — verification queued as `W49.proc-s063-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s063-verify`, 2026-11-27).
 - **History:**
   - 2026-11-27 W49.corpus-adoption-tool — raised. The adoption tool writes `box` / `folder`.
+  - 2026-11-27 W49.proc-s063-verify (Gemini) — reproduced on scratch pre-OCRed Copy Source Tags (`"Box"`), `ProcessorCatalogueRecord.documentFields` (`"Box"`/`"Folder"`), and fresh Process Files Box/Folder filing (`OCRProcessor+Catalogue.swift` L311, third site also writing `ItemType.rawValue`). Fixed all three sites to emit lowercased `"box"` / `"folder"` matching `SPEC/catalogue.md` and `CatalogueEdit`; regression checks added in `TextLayerTestDriver.swift` (checks 8 and 9).
 
 ### S-064 · Fields copied by Copy Source Tags have origin `import`, which no catalogue edit accepts
 
@@ -1547,9 +1549,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a pre-OCRed scratch PDF with a date tag filed with Copy Source Tags; a `CatalogueWriter.save`
   of a new date for it fails with `unsupportedFieldData`.
 - **Would clear it:** the save succeeds.
-- **Status:** `open` — verification queued as `W49.proc-s064-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s064-verify`, 2026-11-27).
 - **History:**
   - 2026-11-27 W49.corpus-adoption-tool — raised. The adoption tool writes `imported`.
+  - 2026-11-27 W49.proc-s064-verify (Gemini) — reproduced end-to-end on a scratch pre-OCRed PDF filed with Copy Source Tags: all copied fields had `origin: "import"` and `CatalogueWriter.save` failed with `unsupportedFieldData(document(..., documentDate))`. Changed all 7 origins in `ProcessorCatalogueRecord.applySourceTags` to `"imported"`; regression checks in `TextLayerTestDriver.swift` verify `origin == "imported"` and successful `CatalogueWriter.save` editing both `documentDate` and `itemType`.
 
 ### S-065 · Copy Source Tags takes a Decade over a Year
 
@@ -1560,9 +1563,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a scratch pre-OCRed PDF tagged `1957`, `1950s` filed with Copy Source Tags; its companion's
   `documentDate` is `1950s`.
 - **Would clear it:** the companion reads `1957`.
-- **Status:** `open` — verification queued as `W49.proc-s065-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s065-verify`, 2026-11-27).
 - **History:**
   - 2026-11-27 W49.corpus-adoption-tool — raised. The adoption tool reads the Year first.
+  - 2026-11-27 W49.proc-s065-verify (Gemini) — reproduced end-to-end on a scratch pre-OCRed PDF tagged `1957` and `1950s`: the filed companion recorded `ArchiveDate(year: 1950, precision: .decade)`. Fixed `ProcessorCatalogueRecord.applySourceTags` (and `documentFields` `decisionDate` for consistency) to prefer `year` before `decade`; regression check in `TextLayerTestDriver.swift` verifies `1957` supersedes `1950s`.
 
 ### S-066 · Pages of a pre-OCRed or adopted PDF cannot be rotated in the Reader
 
