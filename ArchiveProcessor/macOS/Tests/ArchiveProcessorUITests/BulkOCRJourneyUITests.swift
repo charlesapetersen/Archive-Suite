@@ -36,7 +36,6 @@ final class BulkOCRJourneyUITests: XCTestCase {
             .appendingPathComponent("w40d1-DONE-\(UUID().uuidString).txt")
         var launch: [String: String] = [
             "ARCHIVEPROC_HEADLESS": "1",
-            "ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS": "1",   // journey_bulk_ocr_check.py checks the filed PDFs' Finder tags
             "PROCESSFILES_TESTMODE": "1",
             "PROCESSFILES_TESTIN": dir.appendingPathComponent("in").path,
             "PROCESSFILES_TESTOUT": dir.appendingPathComponent("out").path,

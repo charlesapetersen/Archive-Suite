@@ -19,10 +19,11 @@ of 2026-07-06; treat the surrounding function, not the exact line, as the anchor
 Status: **settled / non-negotiable.** Reflects Processor + Reader source as merged into the
 Archive-Suite monorepo.
 
-**Where the vocabulary applies now (owner, 2026-11-27, `W49.storage-finder-owner-ok`).** A PDF the Processor files
-keeps its fields in its catalogue companion ([catalogue.md](catalogue.md)). It carries this Finder-tag vocabulary only
-when the archive mirrors its fields to Finder tags (the Processor's `mirrorFinderTags`, off by default). The rules
-below still govern a mirrored PDF, the working copies a run tags before filing, and the pre-app archive.
+**Where the vocabulary applies now (owner, 2026-11-27, `W49.storage-finder-drop-mirror`).** The suite no longer writes
+or mirrors Finder tags onto filed archive PDFs or Archive Notes `.md` files. A PDF the Processor files keeps its fields
+only in its catalogue companion ([catalogue.md](catalogue.md)), and Archive Notes keeps its metadata only in YAML front
+matter. The rules below govern one-way reading and adoption of pre-app legacy Finder-tagged folders (`W49.corpus-adoption-tool`
+and Reader's legacy tags mode) and the Processor's pre-filing working copies.
 
 ---
 
@@ -561,9 +562,8 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    typed only when the tag is new. A case-only rename (`lincoln` → `Lincoln`) is how a tag's spelling is
    changed; it re-spells every case of it. Undo and redo stay **exact** (the occurrence inverse restores
    each spelling the file had), and so does the §8 verify. Facet parsing (`DocumentTags.parse`) is
-   unchanged: its own case rules (Month name, `Read`/`Unread`, exact-case `Sent With`) stand. Notes'
-   managed-tag projection (`NotesTagProjector`) still matches its own ledger exactly, by design: it
-   removes only the tokens it wrote, so folding could take a nearby user tag.
+   unchanged: its own case rules (Month name, `Read`/`Unread`, exact-case `Sent With`) stand. Archive Notes keeps its
+   metadata in YAML front matter and does not write Finder tags onto `.md` files (`W49.storage-finder-drop-mirror`).
 5. **Lossless writes.** `new = (fresh − remove) + add`, every untouched token preserved verbatim; a
    no-op delta writes nothing (no mod-date churn). **Never** build the write array from any index or
    cache — not Spotlight's `kMDItemUserTags` (the Reader's discovery mechanism until `W26.walk2`), and
@@ -605,45 +605,16 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 
 ---
 
-## The suite's Finder mirror (W49.storage-finder-reader-mirror)
+## The suite's Finder mirror — retired (`W49.storage-finder-drop-mirror`, 2026-11-27)
 
-In an archive whose catalogue companions hold the fields (`SPEC/catalogue.md`), Finder tags are a **mirror**, off
-unless the archive turns it on (owner, 2026-11-27, `W49.storage-finder-owner-ok`: 1c, 2b, 3b). The archive's choice
-is `mirrorFinderTags` in its settings document (`SPEC/collection-settings.md` §"The archive's settings"); the Reader
-sets it, the Processor's filing follows it, and outside any archive the Processor's general setting decides.
+Finder tag mirroring is **retired** across Processor, Reader, and Archive Notes (owner, 2026-11-27 walkthrough,
+superseding `W49.storage-finder-owner-ok`). Filed PDFs keep their fields exclusively in their adjacent catalogue
+companions (`SPEC/catalogue.md`), and `CataloguePairFiler` always leaves working-copy Finder tags, Finder colour labels,
+and any historical `com.archivesuite.finder-mirror` extended attribute behind when filing. Archive Notes keeps note
+subjects, dates, and quality exclusively in YAML front matter and does not write Finder tags onto `.md` files.
 
-- **Projection.** `ArchiveCore.FinderMirror.projection` derives the tokens from one occurrence's file fields and the
-  fields of the document it shows: the own date (`TagEditing.dateTokens`, `Date Uncertain`), `Sent With …` and its
-  uncertain token, subjects verbatim, `Q1`–`Q3`, `Read`/`Unread`, `Box`/`Folder`, `OCR Poor`, `OCR Failed`, and a
-  `Checked <Field>` for each current check. The colour is the label plus its name token. A cleared or unassessed
-  field projects nothing. Every write goes through `CoordinatedTagWriter` (`writeMirror`).
-- **Ownership record.** The extended attribute `com.archivesuite.finder-mirror` on the PDF holds UTF-8 JSON
-  `{"v":1,"owned":[…],"ownedLabel":N,"baseline":[…],"baselineLabel":N}`: the tokens (with multiplicity) and label
-  the suite introduced, and the whole tag list and label right after its last write. It is written inside the same
-  coordination and per-path lock as the tags, after they verify; if it cannot be saved, the tags are put back as they
-  were and the write fails, so the tags and their record never part. A projected token already on the file stays
-  unowned; a hand-made tag is never owned. It travels with the tags: a filing that leaves the Finder tags behind
-  (`CataloguePairFiler.copyFile`) leaves it behind too. A record that is unreadable or has a larger `v` is unknown:
-  nothing counts as owned and it is replaced only by a deliberate Re-publish.
-- **Writing a change.** A projection removes owned tokens the record no longer gives, adds projected tokens the
-  file lacks, and keeps every other tag. A label the suite did not set is left, by Re-publish too. The record is never changed from
-  tags, and enabling the mirror never reads tags into it.
-- **A Finder edit (2b).** The tags *diverge* when, against the baseline, an owned token or a facet token is gone,
-  a facet token appeared, or the suite's label changed. A facet token is anything `DocumentTags.parse` claims as other
-  than a subject, a colour name, `OCR Poor` or `OCR Failed`. A tag added in Finder that reads as a subject is not a
-  divergence: it may be the user's own tag, which the suite cannot tell from a subject, so it stays an unowned tag
-  and the file goes on being mirrored (whether to offer it for Import is the owner's question,
-  `W49.reader-mirror-added-tags-owner-ok`). A hand-made tag removed in Finder is not a divergence either. A diverged
-  file is not written; the Reader offers **Import** (the Finder values of the touched facets become user edits of the
-  record in one operation; only when every planned record saved does the mirror take the Finder tags as its
-  baseline) or **Re-publish** (the record's values go back, removing the facet tokens that appeared).
-- **Turning it off (3b).** Writing stops; tags stay and can go stale. **Remove Suite Tags** removes, per file, only
-  owned tokens still present and the label if it is still the suite's, then drops the record; a file with no
-  readable record keeps every tag. Undo puts back each removed token the file lacks (and the label if it has none)
-  and records them as owned again.
-- **The Processor.** A mirrored filing claims the tags on its own working copy as owned just before the copy
-  (`FinderMirror.claim`), less any tag its sources already carried (a pre-OCRed PDF keeps its own); when a source's
-  tags cannot be read, nothing is claimed. A file whose ownership record is unknown is not claimed.
+One-way reading and adoption of pre-app legacy Finder-tagged folders (`W49.corpus-adoption-tool` and Reader's legacy
+tags-mode reading) remain supported; legacy tags-mode edits continue to use Reader's audited `TagWriter`.
 
 ---
 
@@ -654,8 +625,8 @@ sets it, the Processor's filing follows it, and outside any archive the Processo
 | Tag read/write primitives | `ArchiveProcessor/.../Tagging/MacOSTagger.swift` (via `ArchiveCore.CoordinatedTagWriter`) | `ArchiveCore` `Tags/TagReading.swift`, `Tags/TagWrite.swift`; Reader `Core/TagWriter.swift` |
 | Year / Month / Day / Date Uncertain | `Tagging/TagGenerator.swift` (`GeneratedTags`, prompt) | `ArchiveCore` `Tags/DocumentTags.swift` (`parseYear`/`parseMonth`/`parseDay`) |
 | Decade `NNNNs` | `Views/ManualTaggingSheet.swift` + `Views/ManualSegmentTagView.swift` (Year date field → verbatim via `GeneratedTags.allTags`/`MacOSTagger`) | `ArchiveCore` `Tags/DocumentTags.swift` (`parseDecade`/`sortDate`/`displayDate`) |
-| **Quality `Q1`–`Q3`** (the rating facet; supersedes Priority, W19) | user-set in the Live Capture tag card (`Views/LiveCaptureView.swift`) + Process Files manual tagging (`Views/ManualTaggingSheet.swift`, `ManualSegmentTagView.swift`) via `GeneratedTags`/`MacOSTagger`; **companions emit `Q`** (`net/MacClient` ↔ `Net/CaptureServer` route — SHARED HOTSPOT, change all sides together); never LLM-emitted | `ArchiveCore` `Tags/DocumentTags.swift` (`parseQuality`; **legacy `P8`–`P10`→`Q1`–`Q3` alias on read**) + Reader `Core/TagWriter.swift` (set/clear). **Also set by Notes** (`NotesTagProjector` ← front-matter `quality`). |
-| **Notes date facets** (Year/Month/Day/Decade/Sent With) | (n/a) | **Shipped (W19.date / W37.dual-date).** Notes projects front-matter `date`/`date_precision` and `additional_dates` via `NotesTagProjector` / `NotesTagVocabulary` using `ArchiveCore` date helpers (`DocumentTags.parseYear`/`parseDecade`/`sortDateKey`, `TagEditing.monthToken`, `SentWithTag`). |
+| **Quality `Q1`–`Q3`** (the rating facet; supersedes Priority, W19) | user-set in the Live Capture tag card (`Views/LiveCaptureView.swift`) + Process Files manual tagging (`Views/ManualTaggingSheet.swift`, `ManualSegmentTagView.swift`) via `GeneratedTags`/`MacOSTagger`; **companions emit `Q`** (`net/MacClient` ↔ `Net/CaptureServer` route — SHARED HOTSPOT, change all sides together); never LLM-emitted | `ArchiveCore` `Tags/DocumentTags.swift` (`parseQuality`; **legacy `P8`–`P10`→`Q1`–`Q3` alias on read**) + Reader `Core/TagWriter.swift` (legacy tags-mode set/clear). Notes keeps `quality` in YAML front matter only. |
+| **Notes date facets** (Year/Month/Day/Decade/Sent With) | (n/a) | Notes keeps `date`/`date_precision` and `additional_dates` in YAML front matter only (Finder-tag mirroring retired by `W49.storage-finder-drop-mirror`). |
 | Read/Unread + `Unread`-last | `Tagging/MacOSTagger.swift` (`stampUnread`) | `ArchiveCore` `Tags/DocumentTags.swift` (`ReadState`), Reader `Core/TagWriter.swift` (`setReadState`) |
 | Subjects | `Tagging/TagGenerator.swift` | `ArchiveCore` `Tags/DocumentTags.swift` (`subjects`) |
 | Item type (`Box`/`Folder`) + the user's colour | `Tagging/TagGenerator.swift`, `OCR/OCRProcessor+Tagging.swift` (`structureTag`, `authoritativeColor`), `Tagging/ItemTypeColourSetting.swift`, `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | `ArchiveCore` `Tags/ItemType.swift` (`ItemType`, `FinderLabel`, `ItemTypeColors`) + `DocumentTags.itemType`; Reader `Core/ItemTypePreferences.swift`, `Core/TagWriter.swift`, `Views/TagEditorView.swift` (Item type) |

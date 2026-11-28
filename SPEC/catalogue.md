@@ -261,14 +261,11 @@ journal containing their pending and final names, physical identities and SHA-25
 also binds the operation to the granted instance and the physical root and parent directory.
 The filer flushes the journal before claiming either final name. It claims each name exclusively, reopens and verifies the pair, then renames
 the journal to a completion receipt and flushes the directory before returning. The PDF's bytes and
-filesystem metadata travel with the staged file when its name changes. The copy leaves the working PDF's
-Finder tags and label (`com.apple.metadata:_kMDItemUserTags`, `com.apple.FinderInfo`) behind unless the producer
-asks for them (`carriesFinderTags`), and so does the Finder mirror's ownership record. Its other extended
-attributes are copied either way. Finder tags mirror the companion only when the archive turns that on (owner,
-2026-11-27, `W49.storage-finder-owner-ok`: off everywhere by default; adoption leaves an original's tags behind).
-The Processor asks for them when the destination's archive mirrors (its settings document), or outside any archive
-when its general setting `mirrorFinderTags` is on, frozen with each filing request
-([the suite's Finder mirror](tag-format.md#the-suites-finder-mirror-w49storage-finder-reader-mirror)).
+filesystem metadata travel with the staged file when its name changes. The copy always leaves any working-copy
+Finder tags, Finder colour label (`com.apple.metadata:_kMDItemUserTags`, `com.apple.FinderInfo`), and legacy
+`com.archivesuite.finder-mirror` extended attribute behind (`W49.storage-finder-drop-mirror`; owner, 2026-11-27:
+filed PDFs carry their fields only in their catalogue companions, and adoption leaves an original's tags behind).
+Its other extended attributes are copied.
 
 After interruption, use the same UUID and destination to recover the journaled operation. Recovery
 recognizes either exact member at its pending or final name and can finish a missing rename. A completed

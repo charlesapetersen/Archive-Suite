@@ -207,51 +207,6 @@ final class CatalogueRepairUITests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: intake), bytes)
     }
 
-    /// W49.storage-finder-reader-mirror: File ▸ Mirror Archive Fields to Finder Tags asks before writing anything, then
-    /// records the archive's choice and projects the record onto the PDF beside a hand-made tag.
-    func testMirroringAsksFirstThenProjectsTheRecordToFinderTags() throws {
-        continueAfterFailure = false
-        let root = try makeScratchRoot()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let pdf = root.appendingPathComponent("Letter.pdf")
-        let fileID = UUID(), contentID = UUID(), documentID = UUID()
-        try makePDF(at: pdf, fileID: fileID, contentID: contentID)
-        try (pdf as NSURL).setResourceValue(["ToPrint"], forKey: .tagNamesKey)
-        func field(_ value: String) -> String {
-            "{\"state\":\"value\",\"value\":\(value),\"fieldRevision\":\"\(UUID())\",\"origin\":\"user\"}"
-        }
-        try Data("""
-            {"schema":1,"fileID":"\(fileID)","contentRevision":"\(contentID)","revision":"\(UUID())",
-             "parents":[],"pages":[{"id":"\(UUID())","physicalIndex":0,"documentID":"\(documentID)","role":"searchable"}],
-             "documents":[{"id":"\(documentID)","ownerFileID":"\(fileID)","fields":{"subjects":\(field("[\"Berlin\"]"))}}],
-             "fileFields":{"readState":\(field("\"unread\""))}}
-            """.utf8).write(to: root.appendingPathComponent("Letter.pdf.archivesuite.json"))
-        func tags() -> Set<String> {
-            Set((try? URL(fileURLWithPath: pdf.path).resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? [])
-        }
-
-        let app = XCUIApplication.archiveUITestApp()
-        app.launchArguments += ["-ARUITestRootPath", root.path, "-ARUITestCatalogue", "YES"]
-        defer { app.terminate() }
-        app.launch()
-        app.activate()
-        XCTAssertTrue(app.tables["ar.table"].tableRows.firstMatch.waitForExistence(timeout: 20), "The pair is listed.")
-        let file = app.menuBars.menuBarItems["File"]
-        file.click()
-        let toggle = file.menuItems["Mirror Archive Fields to Finder Tags"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-        XCTAssertTrue(toggle.isEnabled, "open in catalogue mode once the records are read")
-        toggle.click()
-        let turnOn = app.buttons["ar.finderMirror.turnOn"]
-        XCTAssertTrue(turnOn.waitForExistence(timeout: 10), "Turning on asks first.")
-        _ = captureScreenshot("finder-mirror-turn-on")
-        XCTAssertEqual(tags(), ["ToPrint"], "Asking writes nothing.")
-        turnOn.click()
-        waitFor("the record is mirrored beside the hand-made tag") { tags() == ["ToPrint", "Berlin", "Unread"] }
-        let settings = root.appendingPathComponent(".archivesuite/archive-settings.json")
-        XCTAssertTrue((try? String(contentsOf: settings, encoding: .utf8))?.contains("\"mirrorFinderTags\" : true") == true)
-    }
-
     private func makeScratchRoot() throws -> URL {
         let parent = URL(fileURLWithPath: FixtureUITestCase.canonicalFixturePath, isDirectory: true)
         let values = try parent.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])

@@ -404,8 +404,6 @@ extension OCRProcessor {
         if let exportOriginals = pending.exportOriginals {
             runConfig.outputImageFile = exportOriginals
         }
-        // The Finder-tag mirror the batch started with (W49.storage-finder); a manifest without it mirrors nothing.
-        runConfig.mirrorFinderTags = pending.resolvedSettings?.run?.mirrorFinderTags
         return runConfig
     }
 
@@ -3438,8 +3436,6 @@ extension OCRProcessor {
             ?? (preOCRedInput ? [:] : Self.keyedSubfolders(plannedSubfolders))
         var runConfig = SessionProcessingConfig.fromProcessFilesRunStart(primaryAPIKey: apiKey, visionTextAPIKey: visionTextAPIKey)
         runConfig.keepPreservationCopies = keepsPreservationCopies
-        runConfig.mirrorFinderTags = resumingMixedPDF.map { $0.runtimeConfig.mirrorFinderTags }
-            ?? SettingsLayerStore.shared.mirrorsFinderTags
         // The Process Files controller/arguments are the authoritative run input (headless drivers
         // intentionally configure them without mutating UserDefaults), so every explicitly-threaded
         // consumer observes this exact start-time snapshot.

@@ -4,9 +4,10 @@ import AppKit
 import ArchiveCore
 @testable import ArchiveNotes
 
-/// Extends the audited projector safety suite through the real model/store editing path.
+/// Exercises the real model/store editing path (YAML front matter authoritative; no Finder-tag mirroring).
+@Suite("NoteMetadataEditingTests")
 @MainActor
-extension NotesTagProjectorSafetyTests {
+struct NoteMetadataEditingTests {
     private struct MetadataEnv {
         let root: URL
         let store: NoteStore
@@ -50,17 +51,19 @@ extension NotesTagProjectorSafetyTests {
         try await withMetadataScratch { env in
             #expect(await env.model.setTags([" history ", "History", "economics"], to: env.id))
             let before = try await env.store.mdURL(for: env.id)
-            try (before as NSURL).setResourceValue(["History", "Economics", "Do Not Sync"], forKey: .tagNamesKey)
+            #expect(try await metadataTags(env).isEmpty, "Notes does not write Finder tags onto .md files")
+            try (before as NSURL).setResourceValue(["Do Not Sync"], forKey: .tagNamesKey)
             try (before as NSURL).setResourceValue(6, forKey: .labelNumberKey)
             #expect(await env.model.renameNote(env.id, to: "  Renamed Note  "))
             let after = try await env.store.mdURL(for: env.id)
             #expect(after.lastPathComponent == "Renamed Note.md")
             #expect(after.deletingLastPathComponent() == before.deletingLastPathComponent())
             #expect(!FileManager.default.fileExists(atPath: before.path))
-            #expect(try await metadataTags(env) == ["History", "Economics", "Do Not Sync"])
+            #expect(try await metadataTags(env) == ["Do Not Sync"])
             #expect(try after.resourceValues(forKeys: [.labelNumberKey]).labelNumber == 6)
             let saved = try await env.store.load(env.id)
             #expect(saved.title == "Renamed Note" && saved.id == env.id)
+            #expect(saved.tags == ["History", "Economics"])
             #expect(saved.trailingBodyRaw == "Keep body\n")
             #expect(env.model.allItems.first(where: { $0.id == env.id })?.title == "Renamed Note")
             #expect(await env.model.renameNote(env.id, to: " \n ") == false)
@@ -68,55 +71,23 @@ extension NotesTagProjectorSafetyTests {
         }
     }
 
-    @Test("subject replacement removes old subjects, not current facets or unrelated tags")
+    @Test("subject, date, and quality edits stay in front matter and leave unrelated Finder tags untouched")
     func subjectEditsRespectFacets() async throws {
         try await withMetadataScratch { env in
             await env.model.setDate("1968", precision: .year, for: env.id)
             await env.model.setQuality(2, for: env.id)
             #expect(await env.model.setTags(["1968", "Q2", "old subject"], to: env.id))
             let url = try await env.store.mdURL(for: env.id)
-            let tags = try url.resourceValues(forKeys: [.tagNamesKey]).tagNames ?? []
-            try (url as NSURL).setResourceValue(tags + ["Unrelated"], forKey: .tagNamesKey)
+            try (url as NSURL).setResourceValue(["Unrelated"], forKey: .tagNamesKey)
             #expect(await env.model.setTags(["new subject", "new subject", ""], to: env.id))
-            #expect(try await metadataTags(env) == ["New Subject", "1968", "Q2", "Unrelated"])
+            #expect(try await metadataTags(env) == ["Unrelated"])
             #expect(try await env.store.load(env.id).tags == ["New Subject"])
             await env.model.setDate(nil, precision: nil, for: env.id)
             await env.model.setQuality(nil, for: env.id)
-            #expect(try await metadataTags(env) == ["New Subject", "Unrelated"], "date ownership was retained")
-            #expect(await env.model.removeTag("New Subject", from: env.id))
             #expect(try await metadataTags(env) == ["Unrelated"])
-        }
-    }
-
-    @Test("projection failure retains removal ownership across restart and identical retry")
-    func subjectProjectionRetry() async throws {
-        try await withMetadataScratch { env in
-            #expect(await env.model.setTags(["Old Subject"], to: env.id))
-            let tx = try await env.store.withItem(env.id, projectSubjects: { _, _, _ in
-                throw NoteStore.StoreError.writeFailed("injected projector failure")
-            }) { $0.tags = ["New Subject"] }
-            #expect(tx.subjectProjectionError != nil)
-            #expect(try await metadataTags(env) == ["Old Subject"])
-            #expect(try await env.store.load(env.id).tags == ["New Subject"])
-            let reopened = NoteStore(root: env.root)
-            let org = OrganizationStore(index: env.index)
-            try await org.load(storeRoot: env.root)
-            let model = NotesModel(organization: org, index: env.index, noteStore: reopened)
-            #expect(await model.setTags(["New Subject"], to: env.id))
-            #expect(try await metadataTags(env) == ["New Subject"])
-        }
-    }
-
-    @Test("removing a subject transfers its matching date token to date ownership")
-    func subjectBecomesDateFacet() async throws {
-        try await withMetadataScratch { env in
-            #expect(await env.model.setTags(["1968"], to: env.id))
-            await env.model.setDate("1968", precision: .year, for: env.id)
-            #expect(await env.model.setTags([], to: env.id))
-            #expect(try await metadataTags(env) == ["1968"])
-            await env.model.setDate(nil, precision: nil, for: env.id)
-            let finalTags = try await metadataTags(env)
-            #expect(finalTags.isEmpty)
+            #expect(await env.model.removeTag("New Subject", from: env.id))
+            #expect(try await env.store.load(env.id).tags.isEmpty)
+            #expect(try await metadataTags(env) == ["Unrelated"])
         }
     }
 
@@ -153,17 +124,14 @@ extension NotesTagProjectorSafetyTests {
         }
     }
 
-    @Test("removing a manually entered padded subject removes its original Finder token")
+    @Test("removing a manually entered padded subject removes it from front matter")
     func removePaddedSubject() async throws {
         try await withMetadataScratch { env in
             _ = try await env.store.withItem(env.id) { $0.tags = [" history "] }
-            let url = try await env.store.mdURL(for: env.id)
-            try (url as NSURL).setResourceValue([NotesTagVocabulary.titleCased(" history ")], forKey: .tagNamesKey)
             #expect(await env.model.removeTag(" history ", from: env.id))
             let finalItem = try await env.store.load(env.id)
-            let finalTags = try await metadataTags(env)
             #expect(finalItem.tags.isEmpty)
-            #expect(finalTags.isEmpty)
+            #expect(try await metadataTags(env).isEmpty)
         }
     }
 
@@ -179,7 +147,7 @@ extension NotesTagProjectorSafetyTests {
             let item = try await env.store.load(env.id)
             #expect(Set(item.tags) == ["First", "Second"])
             #expect(item.title == "Concurrent Title" && item.trailingBodyRaw == "Concurrent body\n")
-            #expect(try await metadataTags(env) == ["First", "Second"])
+            #expect(try await metadataTags(env).isEmpty)
         }
     }
 }

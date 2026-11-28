@@ -89,8 +89,7 @@ struct NotesTagRenameTests {
         #expect(Set(outcome.changed.keys) == [a, x])
         #expect(try await tags(env, a) == ["Civil Rights Movement", "Labor"], "renamed where it stood")
         #expect(try await tags(env, x) == ["Civil Rights Movement"])
-        #expect(try await finderTags(env, a).isSuperset(of: ["Civil Rights Movement", "Labor"]))
-        #expect(!(try await finderTags(env, a).contains("Civil Rights")), "the mirror follows the front matter")
+        #expect(try await finderTags(env, a).isEmpty, "Notes does not mirror subjects to Finder tags")
         #expect(try await env.store.load(c).modified == untouched, "a note without the subject is not rewritten")
         #expect(env.model.statusMessage?.contains("on 2 notes") == true)
     }
@@ -140,7 +139,7 @@ struct NotesTagRenameTests {
         await env.nav.deleteHistorySettled()
         #expect(Set(try await tags(env, a)) == ["Draft", "Labor", "Oil"])
         #expect(Set(try await tags(env, b)) == ["Draft", "Final"], "Final was already there, so it stays")
-        #expect(try await finderTags(env, a).contains("Draft"))
+        #expect(try await finderTags(env, a).isEmpty)
         #expect(log(env).map(\.withdrawn) == [true])
         #expect(log(env).first?.id == outcome.recorded.first)
 

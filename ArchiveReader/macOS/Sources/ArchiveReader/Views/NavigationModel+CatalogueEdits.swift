@@ -352,10 +352,6 @@ extension NavigationModel {
                 self.catalogueEditFailures = result.failures
                 self.catalogueLastSaveChanged = result.changed
                 self.reportCatalogue(result.message(verb: verb, pending: heads.uncertainCount))
-                // The archive's Finder mirror follows each saved record (W49.storage-finder-reader-mirror).
-                if self.finderMirrorOn, !result.changedPaths.isEmpty {
-                    self.projectFinderMirror(changedRecords: result.changedPaths)
-                }
                 // A recorded tag change follows the Undo or Redo that changed something (W40.tag-window-reader).
                 if let r = result.reversal, result.changed > 0 {
                     self.tagChangeReversed(group: r.group, by: r.by, redo: r.redo)

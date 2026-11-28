@@ -88,9 +88,6 @@ struct SettingsOutputTab: View {
             LayeredToggle(key: .keepPreservationCopies) {
                 HelpLabel("Keep full-resolution originals in a Preservation folder", help: "The exact originals are kept beside your reading PDFs, in a Preservation folder. This uses extra space. Archive Reader can show the originals; when you share only a PDF, they stay behind.")
             }
-            LayeredToggle(key: .mirrorFinderTags) {
-                HelpLabel("Mirror archive fields to Finder tags", help: "Each PDF's dates, subjects, quality, read state and colour are kept in its catalogue record beside it. Turn this on to also show them as Finder tags on the PDF, for searching in Finder. Off, the PDFs get no Finder tags. Inside an archive opened in Archive Reader, the archive's own choice applies instead (Reader: File › Mirror Archive Fields to Finder Tags).")
-            }
             VStack(alignment: .leading, spacing: 2) {
                 Picker(selection: pdfForm) {
                     Text("Image + separate text page").tag(PDFForm.imageAndText)

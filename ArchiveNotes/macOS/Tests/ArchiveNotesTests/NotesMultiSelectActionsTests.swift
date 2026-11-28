@@ -183,7 +183,7 @@ struct NotesMultiSelectActionsTests {
 
     // MARK: Quality and tags
 
-    @Test("Set Quality on several notes writes each note's front matter and exactly its Q tag")
+    @Test("Set Quality on several notes writes each note's front matter without Finder tags")
     func bulkSetQuality() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let a = try await makeNote(env, "Alpha", quality: 1)
@@ -191,13 +191,12 @@ struct NotesMultiSelectActionsTests {
         await env.nav.setQuality(3, for: [a, b])
         for id in [a, b] {
             #expect(try await env.store.load(id).quality == 3)
-            #expect(try await finderTags(env, id).contains("Q3"))
-            #expect(!(try await finderTags(env, id).contains("Q1")))
+            #expect(try await finderTags(env, id).isEmpty)
         }
         await env.nav.setQuality(nil, for: [a, b])
         for id in [a, b] {
             #expect(try await env.store.load(id).quality == nil)
-            #expect(try await finderTags(env, id).isDisjoint(with: ["Q1", "Q2", "Q3"]))
+            #expect(try await finderTags(env, id).isEmpty)
         }
     }
 
@@ -211,15 +210,15 @@ struct NotesMultiSelectActionsTests {
         #expect(failedAdd.isEmpty)
         #expect(Set(try await env.store.load(a).tags) == ["Labor", "Intel"])
         #expect(try await env.store.load(b).tags == ["Intel"])
-        #expect(try await finderTags(env, a).isSuperset(of: ["Labor", "Intel"]))
-        #expect(try await finderTags(env, b).contains("Intel"))
+        #expect(try await finderTags(env, a).isEmpty)
+        #expect(try await finderTags(env, b).isEmpty)
 
         let untouched = try await env.store.load(c).modified
         let failedRemove = await env.nav.removeTag("Intel", from: [a, b, c])
         #expect(failedRemove.isEmpty)
         #expect(try await env.store.load(a).tags == ["Labor"])
         #expect(try await env.store.load(b).tags.isEmpty)
-        #expect(!(try await finderTags(env, a).contains("Intel")))
+        #expect(try await finderTags(env, a).isEmpty)
         #expect(try await env.store.load(c).modified == untouched, "a note without the tag is not rewritten")
         #expect(try await env.store.load(c).tags == ["Oil"])
     }

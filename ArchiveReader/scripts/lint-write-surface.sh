@@ -142,10 +142,6 @@ ALLOW=(
   # unit-test host or for other fixture roots). The directory is fixed when `ArchiveLibrary` is made and the name
   # is a UUID, so no scanned corpus URL can reach it. A disposable cache: replaced whole, never read as truth.
   "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Search/ReaderCatalogueScan.swift${SEP}try encoder.encode(next).write(to: url, options: .atomic)"
-  # W49.storage-finder-reader-mirror: what the last Remove Suite Tags took off, so Put Back can undo it. The Reader's
-  # own Application Support folder (`FinderMirrorRemovals`), keyed by the root's identity; never inside an archive.
-  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+FinderMirror.swift${SEP}try JSONEncoder().encode(removals).write(to: url, options: .atomic)"
-  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+FinderMirror.swift${SEP}try FileManager.default.removeItem(at: url)"
 
   # AuditLedger (Safety §12, W40.audit-ledger): the Reader's append-only record of its own tag writes,
   # one JSON line per verified write. The file is `audit-ledger.jsonl` in the Reader's Application
@@ -250,23 +246,7 @@ ALLOW=(
   # cannot read costs an under-counted byte total in a cache that is rebuilt on demand — not a
   # corpus file, and not an absence anything reports to the user.
   "enumerator${SEP}packages/ArchiveCore/Sources/ArchiveCore/Thumbnails/PDFThumbnailer.swift${SEP}guard let enumerator = fm.enumerator("
-  # W49.storage-finder-reader-mirror: the Finder mirror's ownership record (`FinderMirror.ledgerAttribute`), written and
-  # removed only by `CoordinatedTagWriter.writeMirror` inside the same metadata-only coordination block and per-path
-  # lock as the tag write, after the tags verify; re-read after writing. It never touches file bytes.
-  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}return data.withUnsafeBytes { setxattr(rawPath, FinderMirror.ledgerAttribute, \$0.baseAddress, data.count, 0, 0) }"
-  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}return removexattr(rawPath, FinderMirror.ledgerAttribute, 0)"
-  # …and when that record cannot be saved after the tags were written, the same block puts the tags back as they were
-  # (`TagXattr.writeRawEntries` with the before-entries, then this label restore) and re-reads them, so the tags and
-  # their ownership record never part.
   "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}(try? (target as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)) != nil,"
-  # W49.storage-finder-reader-mirror: the archive's settings document (SPEC/collection-settings.md §"The archive's
-  # settings"), at the root's hidden `.archivesuite` folder only. `mkdirat` makes only that folder; every later step
-  # goes through its O_NOFOLLOW descriptor. The temporary is created O_EXCL, removed only if the rename did not
-  # happen, and renamed over the document, which is refused when it is a link or not an ordinary file.
-  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}guard mkdirat(directory, folderName, 0o755) == 0 || errno == EEXIST else {"
-  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}let file = openat(folder, temporary, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)"
-  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}if !renamed { unlinkat(folder, temporary, 0) }"
-  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Collections/ArchiveSettings.swift${SEP}guard renameat(folder, temporary, folder, fileName) == 0 else { throw Failure.io(String(cString: strerror(errno))) }"
 )
 
 is_allowed() {   # <rule> <path> <trimmed line>

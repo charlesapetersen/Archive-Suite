@@ -98,7 +98,7 @@ struct NotesTagsWindowTests {
         #expect(w.renamePlan(civil, to: "civil rights movement")?.target == "Civil Rights Movement")
     }
 
-    @Test("Rename writes every spelling on notes and extracts, front matter and mirror, recorded; one Undo and Redo")
+    @Test("Rename writes every spelling on notes and extracts to front matter, recorded; one Undo and Redo")
     func renameUndoRedo() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let a = try await makeItem(env, "Alpha", tags: ["Civil Rights", "Labor"])
@@ -115,8 +115,7 @@ struct NotesTagsWindowTests {
         #expect(outcome == .init(changed: 2, failed: 0))
         #expect(try await tags(env, a) == ["Movement", "Labor"], "renamed where it stood")
         #expect(try await tags(env, x) == ["Movement"])
-        #expect(try await finderTags(env, a).contains("Movement"))
-        #expect(!(try await finderTags(env, a).contains("Civil Rights")))
+        #expect(try await finderTags(env, a).isEmpty)
         #expect(log(env).map { "\($0.app):\($0.from)→\($0.to)" } == ["notes:Civil Rights→Movement"])
         #expect(w.status?.contains("on 2 notes") == true)
         #expect(undo.undoActionName == "Rename Tag")

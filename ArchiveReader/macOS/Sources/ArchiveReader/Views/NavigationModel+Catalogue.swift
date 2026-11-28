@@ -33,7 +33,6 @@ extension NavigationModel {
         configureContentIndex(for: url)
         let resolved = resolvedLibraryRoot(url)
         library.start(scope: url, markerGUID: resolved.markerGUID, catalogueInstance: resolved.catalogueInstance)
-        loadFinderMirrorSetting()
     }
 
     func setCatalogueMode(_ enabled: Bool) {

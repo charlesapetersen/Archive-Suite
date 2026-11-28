@@ -2173,13 +2173,16 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let noteURL = URL(fileURLWithPath: itemsDir).appendingPathComponent(id)
                 .appendingPathComponent("Metadata Test Note.md")
             func finderTags() -> [String] { (try? noteURL.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? [] }
+            let initialFinderTags = finderTags()
+            @MainActor func rawFrontMatter() -> String { self.rawMarkdown(inItemDir: id) ?? "" }
             XCTAssertTrue(pollUntil(timeout: 10) {
-                finderTags().contains("Ui Subject")
-                    && (self.rawMarkdown(inItemDir: id) ?? "").contains("Ui Subject")
+                rawFrontMatter().contains("Ui Subject")
             }, "Return should add the typed tag")
+            XCTAssertEqual(finderTags(), initialFinderTags, "Notes does not mirror tags to Finder tags")
+            XCTAssertFalse(finderTags().contains("Ui Subject"), "added subject must not be written as a Finder tag")
             app.typeText("second subject")
             app.typeKey(.return, modifierFlags: [])
-            XCTAssertTrue(pollUntil(timeout: 10) { finderTags().contains("Second Subject") },
+            XCTAssertTrue(pollUntil(timeout: 10) { rawFrontMatter().contains("Second Subject") },
                           "the field should keep the keyboard after Return, so the next tag needs no click")
             // Autocomplete: "silicon valley" is on another fixture note; Tab takes the suggestion.
             for ch in "Sil" { app.typeText(String(ch)); Thread.sleep(forTimeInterval: 0.15) }
@@ -2189,9 +2192,9 @@ final class NotesGUITests: NotesFixtureUITestCase {
             try completionShot.pngRepresentation.write(to: completionPath)
             print("[shot] notes-tag-completion: wrote \(completionPath.path)")
             app.typeKey(.tab, modifierFlags: [])
-            XCTAssertTrue(pollUntil(timeout: 10) { finderTags().contains("Silicon Valley") },
-                          "the tag field should autocomplete from other notes' tags, and Tab take the suggestion; tags \(finderTags())")
-            XCTAssertFalse(finderTags().contains("Sil"), "Tab should take the whole suggestion")
+            XCTAssertTrue(pollUntil(timeout: 10) { rawFrontMatter().contains("Silicon Valley") },
+                          "the tag field should autocomplete from other notes' tags, and Tab take the suggestion")
+            XCTAssertFalse(rawFrontMatter().contains("- Sil\n"), "Tab should take the whole suggestion")
             let remove = mainWindow.buttons["an.detail.tags.remove.Ui Subject"]
             XCTAssertTrue(remove.waitForExistence(timeout: 5))
             let shot = mainWindow.screenshot()
@@ -2200,10 +2203,9 @@ final class NotesGUITests: NotesFixtureUITestCase {
             print("[shot] notes-title-tags: wrote \(path.path)")
             remove.click()
             XCTAssertTrue(pollUntil(timeout: 10) {
-                let tags = (try? noteURL.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
-                return !tags.contains("Ui Subject")
-                    && !(self.rawMarkdown(inItemDir: id) ?? "").contains("Ui Subject")
+                !rawFrontMatter().contains("Ui Subject")
             })
+            XCTAssertEqual(finderTags(), initialFinderTags, "Notes leaves existing Finder tags untouched")
             let after = try XCTUnwrap(rawMarkdown(inItemDir: id))
             XCTAssertTrue(after.contains("id: \(id)"))
             XCTAssertEqual(after.components(separatedBy: "\n---\n").last,

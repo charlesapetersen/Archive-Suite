@@ -23,7 +23,7 @@ struct NotesScalePerfTests {
         let manifest = Manifest(itemCount: 100_000, wordsPerItem: 20, wordCount: 2_000_000,
                                 lastItemID: UUID(uuidString: try String(contentsOf: root.appendingPathComponent("scale-manifest-last-id"), encoding: .utf8))!,
                                 uniqueQuery: "scaleunique100000")
-        #expect(NotesTagProjector.isScratchPath(root.path), "scale fixture must stay under a scratch prefix")
+        #expect(Self.isScratchPath(root.path), "scale fixture must stay under a scratch prefix")
         let realStore = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/ArchiveNotes/Store", isDirectory: true)
             .resolvingSymlinksInPath().standardizedFileURL
@@ -80,12 +80,19 @@ struct NotesScalePerfTests {
         await index.close()
     }
 
+    private static func isScratchPath(_ path: String) -> Bool {
+        let p = URL(fileURLWithPath: path).standardizedFileURL.path
+        let tmp = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().standardizedFileURL.path
+        return p.hasPrefix("/tmp/") || p.hasPrefix("/private/tmp/") || p.hasPrefix("/var/folders/")
+            || p.hasPrefix("/private/var/folders/") || p.hasPrefix(tmp + "/")
+    }
+
     private func makeScaleFixture() throws -> URL {
         let fileManager = FileManager.default
         let tempRoot = fileManager.temporaryDirectory.resolvingSymlinksInPath().standardizedFileURL
         let root = tempRoot.appendingPathComponent("archive-notes-scale-\(UUID().uuidString)", isDirectory: true)
         let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL
-        guard resolvedRoot.path.hasPrefix(tempRoot.path + "/"), NotesTagProjector.isScratchPath(resolvedRoot.path) else {
+        guard resolvedRoot.path.hasPrefix(tempRoot.path + "/"), Self.isScratchPath(resolvedRoot.path) else {
             throw CocoaError(.fileWriteNoPermission)
         }
         let realStore = fileManager.homeDirectoryForCurrentUser

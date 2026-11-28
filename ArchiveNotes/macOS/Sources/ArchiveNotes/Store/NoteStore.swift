@@ -23,16 +23,11 @@ struct ItemRef: Sendable {
 }
 
 /// The outcome of one atomic item transaction (`NoteStore.withItem`/`withTemplate`): the item
-/// exactly as it was written, the exact date facets that Notes has previously added to this item's
-/// Finder metadata, and its on-disk ref. Callers index/publish `item` rather than re-reading the
-/// store, so what they show is what landed; the projector never mistakes a matching third-party
-/// Finder tag for a Notes-owned facet.
+/// exactly as it was written and its on-disk ref. Callers index/publish `item` rather than re-reading
+/// the store, so what they show is what landed.
 struct ItemTransaction: Sendable {
-    let ownedDateFacetTokens: Set<String>
     let item: Item
     let ref: ItemRef
-    /// YAML saved successfully, but its independent Finder-subject mirror needs a retry.
-    var subjectProjectionError: String? = nil
 }
 
 /// A note waiting in the store's Trash (W40.fix-notes-delete-undo).
@@ -55,22 +50,8 @@ struct TrashedNote: Sendable, Identifiable, Equatable {
 /// delete-last-membership guard (00-overview section 3.6) is enforced by the caller (W6 UI),
 /// not here -- this is the low-level primitive that assumes the guard already passed.
 actor NoteStore {
-    typealias SubjectProjection = @Sendable (Item, ItemRef, Set<String>) throws -> Void
-    private static let pendingSubjectsName = ".archivenotes-pending-subjects.json"
-
-    /// Each successful item/template content save advances its local revision. Finder metadata writes
-    /// do not, so a projection can prove it still belongs to the exact front-matter save that queued it.
-    /// This actor-local token is necessary because `replaceItemAt` may preserve a filesystem object's
-    /// resource identifier while replacing its YAML bytes.
+    /// Each successful item/template content save advances its local revision.
     private var revisions: [UUID: UInt64] = [:]
-
-    /// Per-item, sidecar-persisted provenance for date facets the Notes projector actually introduced.
-    /// YAML is still authoritative; this is only the conservative removal ledger. A missing/corrupt
-    /// ledger is treated as empty, which can leave a stale facet but can never remove a third-party tag.
-    private struct FacetProjectionState: Codable {
-        let dateTokens: [String]
-    }
-    private static let facetProjectionStateName = ".archivenotes-finder-facets.json"
 
     enum StoreError: Error, Sendable {
         case writeFailed(String)
@@ -173,8 +154,7 @@ actor NoteStore {
                                                itemRoot: itemDir(id).resolvingSymlinksInPath())
                     }
                     let ref = try create(draft)
-                    return BodySave(current: current, recoveredDraft: ItemTransaction(
-                        ownedDateFacetTokens: [], item: draft, ref: ref))
+                    return BodySave(current: current, recoveredDraft: ItemTransaction(item: draft, ref: ref))
                 }
                 // An identical already-landed body needs no replacement (or modified-time change).
                 if body == markdown { return BodySave(current: current, recoveredDraft: nil) }
@@ -207,7 +187,7 @@ actor NoteStore {
                                    itemRoot: itemDir(id).resolvingSymlinksInPath())
         }
         let ref = try create(copy)
-        return ItemTransaction(ownedDateFacetTokens: [], item: copy, ref: ref)
+        return ItemTransaction(item: copy, ref: ref)
     }
 
     nonisolated static func copyTitle(_ title: String) -> String {
@@ -293,9 +273,9 @@ actor NoteStore {
     /// caller's stale copy) and must be synchronous, which is what makes the transaction atomic —
     /// do the async part (asset copies, parsing, clock reads) *before* the call and capture the
     /// result. A throwing `mutate` aborts the transaction and leaves the `.md` untouched.
-    func withItem(_ id: UUID, projectSubjects: SubjectProjection? = nil,
+    func withItem(_ id: UUID,
                   _ mutate: @Sendable (inout Item) throws -> Void) throws -> ItemTransaction {
-        try withEntry(id, in: itemDir(id), projectSubjects: projectSubjects, mutate)
+        try withEntry(id, in: itemDir(id), mutate)
     }
 
     /// `withItem` for a template (same atomicity, `Templates/<uuid>/` container).
@@ -308,44 +288,11 @@ actor NoteStore {
     /// to this function** — its atomicity IS the absence of a suspension point between the read and the
     /// write, so one `await` here silently re-opens W23.h2 with no test failing anywhere obvious.
     private func withEntry(_ id: UUID, in dir: URL,
-                           projectSubjects: SubjectProjection? = nil,
                            _ mutate: (inout Item) throws -> Void) throws -> ItemTransaction {
         var item = try loadEntry(id, in: dir)
-        var ownedDateFacetTokens = persistedOwnedDateFacetTokens(in: dir)
-        var pendingSubjects = Set<String>()
-        let pendingURL = dir.appendingPathComponent(Self.pendingSubjectsName)
-        if projectSubjects != nil {
-            // Preserve removal ownership BEFORE YAML changes. A failed projection followed by an
-            // identical edit (even after relaunch) must still know the old subjects to remove.
-            if FileManager.default.fileExists(atPath: pendingURL.path) {
-                pendingSubjects = Set(try JSONDecoder().decode([String].self, from: Data(contentsOf: pendingURL)))
-            }
-            pendingSubjects.formUnion(item.tags.map { NotesTagVocabulary.titleCased($0) })
-        }
         try mutate(&item)
-        if projectSubjects != nil {
-            try JSONEncoder().encode(pendingSubjects.sorted()).write(to: pendingURL, options: [.atomic])
-            // A subject can become a date facet: once the subject is removed, its still-current date
-            // must inherit removal ownership, or clearing that date later would strand the token.
-            let removedSubjects = pendingSubjects.subtracting(item.tags.map { NotesTagVocabulary.titleCased($0) })
-            ownedDateFacetTokens.formUnion(removedSubjects.intersection(NotesTagVocabulary.dateFacetTokens(for: item)))
-        }
         let ref = recordRevision(try saveEntry(item, in: dir))
-        var tx = ItemTransaction(ownedDateFacetTokens: ownedDateFacetTokens, item: item, ref: ref)
-        if let projectSubjects {
-            do {
-                // Persist transferred ownership before clearing the retry journal (also on projection
-                // failure), so a subsequent date edit can remove a formerly subject-owned token.
-                try completeFacetProjection(ref, ownedDateFacetTokens: ownedDateFacetTokens)
-                // No await: title/body replacements cannot interleave between save and projection.
-                try projectSubjects(item, ref, pendingSubjects)
-                try JSONEncoder().encode([String]()).write(to: pendingURL, options: [.atomic])
-            } catch {
-                // Keep the pending ledger and publish the saved source of truth, not stale UI/index data.
-                tx.subjectProjectionError = error.localizedDescription
-            }
-        }
-        return tx
+        return ItemTransaction(item: item, ref: ref)
     }
 
     func allItemIDs() -> [UUID] {
@@ -367,44 +314,9 @@ actor NoteStore {
         let mtime = (try? FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date)?
             .timeIntervalSinceReferenceDate ?? Date().timeIntervalSinceReferenceDate
         return ItemTransaction(
-            ownedDateFacetTokens: persistedOwnedDateFacetTokens(in: itemDir(id)),
             item: item,
             ref: ItemRef(id: id, url: url, mtime: mtime,
                          revision: revisions[id] ?? 0, identity: FileIdentity.capture(url)))
-    }
-
-    /// Execute a synchronous metadata operation only while `ref` is still this item's most recent
-    /// NoteStore save. The actor remains isolated for the entire operation, so another Notes edit
-    /// cannot replace the YAML file between the revision check and its Finder-tag reconciliation.
-    /// Returns false when a newer save already exists; callers fresh-read and reconcile that revision
-    /// rather than writing stale metadata or index rows.
-    func performIfCurrent(
-        _ ref: ItemRef,
-        _ operation: @Sendable (ItemRef) throws -> Void
-    ) throws -> Bool {
-        guard (revisions[ref.id] ?? 0) == ref.revision else { return false }
-        try operation(ref)
-        return true
-    }
-
-    /// The typed counterpart for a Finder facet projection. Returning `nil` is a stale-revision
-    /// refusal; a non-nil result is the exact date-facet ledger to persist for that admitted write.
-    func performFacetProjectionIfCurrent(
-        _ ref: ItemRef,
-        _ operation: @Sendable (ItemRef) throws -> Set<String>
-    ) throws -> Set<String>? {
-        guard (revisions[ref.id] ?? 0) == ref.revision else { return nil }
-        return try operation(ref)
-    }
-
-    /// Persist exactly the date facets that this successful projection itself added. A stale ref may
-    /// never overwrite newer provenance. The ledger lives beside the `.md` inside Notes' own item dir;
-    /// it never reaches a corpus file and is deliberately not front-matter authority.
-    func completeFacetProjection(_ ref: ItemRef, ownedDateFacetTokens: Set<String>) throws {
-        guard (revisions[ref.id] ?? 0) == ref.revision else { return }
-        let state = FacetProjectionState(dateTokens: ownedDateFacetTokens.sorted())
-        let data = try JSONEncoder().encode(state)
-        try data.write(to: facetProjectionStateURL(in: ref.url.deletingLastPathComponent()), options: [.atomic])
     }
 
     /// Every on-disk item as an `ItemRef` (id + `.md` URL + mtime) for a full index (re)build. Items
@@ -576,19 +488,6 @@ actor NoteStore {
         revisions[ref.id] = revision
         return ItemRef(id: ref.id, url: ref.url, mtime: ref.mtime,
                        revision: revision, identity: ref.identity)
-    }
-
-    private func facetProjectionStateURL(in dir: URL) -> URL {
-        dir.appendingPathComponent(Self.facetProjectionStateName)
-    }
-
-    /// Read only valid, exact date facets from the ledger. Any absent, unreadable, or malformed state
-    /// means no date tag is removable — lossless degradation beats guessing ownership.
-    private func persistedOwnedDateFacetTokens(in dir: URL) -> Set<String> {
-        let url = facetProjectionStateURL(in: dir)
-        guard let data = try? Data(contentsOf: url),
-              let state = try? JSONDecoder().decode(FacetProjectionState.self, from: data) else { return [] }
-        return Set(state.dateTokens.filter(DocumentTags.isDateFacetLike))
     }
 
     private func createEntry(_ item: Item, in dir: URL) throws -> ItemRef {

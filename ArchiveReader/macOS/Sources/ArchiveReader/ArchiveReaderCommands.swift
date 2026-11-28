@@ -213,20 +213,6 @@ struct ArchiveReaderCommands: Commands {
                 set: { nav?.setCatalogueMode($0) }
             ))
             .disabled(nav?.rootStore.root == nil || nav?.catalogueEditSaving == true)
-            // W49.storage-finder-reader-mirror: the archive's own choice, shared with the Processor; off by default.
-            Toggle("Mirror Archive Fields to Finder Tags", isOn: Binding(
-                get: { nav?.finderMirrorOn ?? false },
-                set: { nav?.requestFinderMirror($0) }
-            ))
-            .disabled(nav?.canChangeFinderMirror != true)
-            if nav?.finderMirrorBackfillPending == true {
-                Button("Resume Mirroring to Finder Tags") { nav?.startFinderMirrorBackfill() }
-                    .disabled(nav?.canChangeFinderMirror != true)
-            }
-            if nav?.finderMirrorRemovalsAvailable == true, nav?.finderMirrorOn == false {
-                Button("Put Back Suite Tags") { nav?.putBackSuiteFinderTags() }
-                    .disabled(nav?.finderMirrorTask != nil)
-            }
             Button(ReaderCommand.saveSearch.title) { nav?.showingSaveDialog = true }
                 .disabled(nav == nil)
             Button(ReaderCommand.containerLevels.title) { nav?.openContainerLevels() }

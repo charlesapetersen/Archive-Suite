@@ -67,11 +67,12 @@ final class LiveCaptureJourneyUITests: XCTestCase {
         XCTAssertEqual(pdfs.count, 3, "three captured photos must file three PDFs; found \(pdfs.map(\.lastPathComponent))")
         var report: [String] = []
         for pdf in pdfs {
-            let tags = finderTags(of: pdf)
+            XCTAssertTrue(finderTags(of: pdf).isEmpty, "filed PDFs must not carry Finder tags: \(pdf.lastPathComponent)")
+            let tags = catalogueTags(of: pdf)
             report.append("\(pdf.lastPathComponent): \(tags)")
         }
-        print("[w40d5] live tags:\n" + report.joined(separator: "\n"))
-        let tagSets = pdfs.map { Set(finderTags(of: $0).map { $0.lowercased() }) }
+        print("[w40d5] live catalogue fields:\n" + report.joined(separator: "\n"))
+        let tagSets = pdfs.map { Set(catalogueTags(of: $0).map { $0.lowercased() }) }
         let alpha = tagSets.filter { $0.contains("w40d5 dean alpha") }
         let bravo = tagSets.filter { $0.contains("w40d5 dean bravo") }
         XCTAssertEqual(alpha.count, 1, "exactly one PDF carries card 1's subject: \(report)")
@@ -180,7 +181,6 @@ final class LiveCaptureJourneyUITests: XCTestCase {
         ])
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",          // keychain quiet (KeychainHelper); the window still draws
-            "ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS": "1",   // the journey checks the filed PDFs' Finder tags
             "ARCHIVEPROC_TEST_BACKUP_ROOT": backup.path,
             "LIVECAPTURE_AUTOSTART": "1",
             "LIVECAPTURE_TRANSPORT": "lan",
@@ -301,6 +301,38 @@ final class LiveCaptureJourneyUITests: XCTestCase {
               let list = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String]
         else { return [] }
         return list.map { $0.components(separatedBy: "\n").first ?? $0 }
+    }
+
+    /// The filed PDF's fields read from its adjacent `.archivesuite.json` catalogue companion.
+    private func catalogueTags(of pdf: URL) -> [String] {
+        let companion = pdf.appendingPathExtension("archivesuite.json")
+        guard let data = try? Data(contentsOf: companion),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return [] }
+        var out: [String] = []
+        if let fileFields = root["fileFields"] as? [String: Any] {
+            if let rs = (fileFields["readState"] as? [String: Any])?["value"] as? String {
+                out.append(rs.capitalized)
+            }
+            if let q = (fileFields["quality"] as? [String: Any])?["value"] as? Int {
+                out.append("Q\(q)")
+            }
+        }
+        if let docs = root["documents"] as? [[String: Any]],
+           let fields = docs.first(where: { $0["fields"] is [String: Any] })?["fields"] as? [String: Any] {
+            if let it = (fields["itemType"] as? [String: Any])?["value"] as? String {
+                out.append(it.capitalized)
+            }
+            if let subjects = (fields["subjects"] as? [String: Any])?["value"] as? [String] {
+                out.append(contentsOf: subjects)
+            }
+            if let docDate = (fields["documentDate"] as? [String: Any])?["value"] as? [String: Any],
+               let raw = docDate["date"] as? String {
+                out.append(raw)
+                if docDate["uncertain"] as? Bool == true { out.append("Date Uncertain") }
+            }
+        }
+        return out
     }
 
     private func element(_ identifier: String) -> XCUIElement {

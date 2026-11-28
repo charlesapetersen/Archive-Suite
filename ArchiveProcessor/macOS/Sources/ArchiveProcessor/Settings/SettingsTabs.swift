@@ -55,7 +55,7 @@ enum SettingsTabOwnership {
             SettingsKey.monthCeilingUSD.rawValue, SettingsKey.batchCeilingUSD.rawValue, SettingsKey.cluster.rawValue,
         ] + LLMProvider.allCases.map { ModelSelectionStore.modelKey(for: $0) })
         add(.output, [
-            SettingsKey.keepPreservationCopies.rawValue, SettingsKey.mirrorFinderTags.rawValue,
+            SettingsKey.keepPreservationCopies.rawValue,
             SettingsKey.straightenReadingCopy.rawValue,
             SettingsKey.searchableFor.rawValue,   // the PDF form; Advanced holds its per-format editor
             DefaultsKeys.pdfImageSizeMB, DefaultsKeys.textColumns, DefaultsKeys.outputImageFile,

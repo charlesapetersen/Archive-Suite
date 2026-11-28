@@ -86,7 +86,6 @@ enum NotesTagVocabulary {
     static func facetProjectionTokens(for item: Item) -> Set<String> {
         var tokens = Set(item.tags.map { titleCased($0) }.filter {
             qualityTokens.contains($0) || DocumentTags.isDateFacetLike($0)
-                || NotesTagProjector.retiredTokens.contains($0)
         })
         tokens.formUnion(dateFacetTokens(for: item))
         if let quality = qualityToken(for: item.quality) {

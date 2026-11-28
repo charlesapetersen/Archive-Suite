@@ -15,7 +15,7 @@ Shared Swift package consumed by **Archive Processor**, **Archive Reader**, and 
   - `PDF/` — shared page-2 / XMP header parser (`PDFHeaderParser`) and format status
   - `Preservation/` — preservation-copy payload paths and manifest helpers (`PreservationCopy`)
   - `Search/` — shared Advanced Search rule types, FTS5 query builder, and date-range parsing (`AdvancedSearchRules`)
-  - `Tags/` — canonical Finder tag grammar (`DocumentTags`), `ArchiveDate`, `CoordinatedTagWriter` (`TagWrite.swift`), `FinderMirror`, `FieldStatusPolicy`, `TagChangeLog`, `TagVocabulary`, and `UserItemFields`
+  - `Tags/` — canonical Finder tag grammar (`DocumentTags`), `ArchiveDate`, `CoordinatedTagWriter` (`TagWrite.swift`), `FieldStatusPolicy`, `TagChangeLog`, `TagVocabulary`, and `UserItemFields`
   - `Text/` — shared title-casing helpers (`TitleCase`)
   - `Thumbnails/` — shared PDF thumbnail rendering and cache-key helpers (`PDFThumbnailer`, `ThumbnailCacheKey`)
   - `Zotero/` — Zotero metadata and export helpers

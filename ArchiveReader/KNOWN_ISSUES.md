@@ -7,19 +7,17 @@ Fixed and closed entries, and the July–October 2026 fix logs, are archived in
 keeps the open limits, measured costs, verified facts, deferred hardening, open risks and environment notes,
 and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 
-## Finder tags are no longer mirrored by default (W49.storage-finder, 2026-11-27)
+## Finder tags are no longer written or mirrored (W49.storage-finder-drop-mirror, 2026-11-28)
 
-- **New Processor output carries no Finder tags unless mirroring is on.** The owner's call (W49.storage-finder-owner-ok:
-  off everywhere by default) means a PDF the Processor files has its fields, read state included, only in its catalogue
-  record. A folder read without File ▸ Use Catalogue Companions for This Folder lists only Read- or Unread-tagged PDFs.
+- **New Processor output carries no Finder tags.** Owner call (2026-11-27 walkthrough, `W49.storage-finder-drop-mirror`,
+  superseding `W49.storage-finder-owner-ok`): Finder-tag writing and mirroring are removed across Processor, Reader, and
+  Archive Notes. A PDF the Processor files keeps its fields, read state included, only in its catalogue companion. A
+  folder read without File ▸ Use Catalogue Companions for This Folder lists only legacy Read- or Unread-tagged PDFs.
   When such a folder lists nothing, the empty list says how many PDFs keep catalogue records and offers that mode; a
   folder that also lists tagged PDFs says so at the foot of the list (W49.storage-finder-reader-mirror). A companion
-  filed while the folder is open counts as soon as the file watcher reports it (W49.reader-mirror-followups)
-  (accepted: the owner's call, W49.storage-finder-owner-ok).
-- **With mirroring on, a tag added in Finder that reads as a subject is kept as the user's own tag and not offered
-  for Import.** The suite cannot tell "ToPrint" from a subject typed in Finder, so it neither imports nor removes such
-  a tag and goes on mirroring the PDF; every other Finder edit of a mirrored tag is offered as Import or Re-publish
-  (queued: W49.storage-finder-drop-mirror).
+  filed while the folder is open counts as soon as the file watcher reports it (W49.reader-mirror-followups). One-way
+  reading and adopting of pre-app legacy Finder-tagged folders remain intact (accepted: owner call,
+  `W49.storage-finder-drop-mirror`).
 
 ## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
 

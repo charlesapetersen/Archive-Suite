@@ -49,10 +49,6 @@ struct ResolvedRunConfig: Codable, Equatable, Sendable {
     var textColumns: Int              // number of text columns on the OCR text page (1 = single-column)
     /// The general layer's `keepPreservationCopies`, read with the rest so a run keeps the answer it started with.
     var keepPreservationCopies = true
-    /// The general layer's `mirrorFinderTags`, frozen the same way: whether filed PDFs carry their fields as Finder
-    /// tags (W49.storage-finder). Absent, as in a run saved before the setting, means off.
-    var mirrorFinderTags: Bool? = nil
-
     /// The direct model an Apple Vision run hands its text to, without the key.
     struct VisionTextRoute: Codable, Equatable, Sendable {
         var provider: LLMProvider

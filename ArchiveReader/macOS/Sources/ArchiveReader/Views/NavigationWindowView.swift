@@ -121,25 +121,6 @@ struct NavigationWindowView: View {
             Button("Cancel", role: .cancel) { model.renamingSearch = nil }
         }
         .onChange(of: model.renamingSearch) { _, s in if let s { renameText = s.name } }
-        .alert(FinderMirrorWords.promptTitle(model.finderMirrorPrompt), isPresented: Binding(
-            get: { model.finderMirrorPrompt != nil },
-            set: { if !$0 { model.finderMirrorPrompt = nil } })) {
-            switch model.finderMirrorPrompt {
-            case .turnOn?:
-                Button("Turn On") { model.confirmFinderMirror(on: true) }
-                    .accessibilityIdentifier("ar.finderMirror.turnOn")
-            case .turnOff?:
-                Button("Turn Off") { model.confirmFinderMirror(on: false) }
-                    .accessibilityIdentifier("ar.finderMirror.turnOff")
-                Button("Turn Off and Remove Suite Tags") { model.confirmFinderMirror(on: false, removingSuiteTags: true) }
-                    .accessibilityIdentifier("ar.finderMirror.turnOffRemove")
-            case nil:
-                EmptyView()
-            }
-            Button("Cancel", role: .cancel) { model.finderMirrorPrompt = nil }
-        } message: {
-            Text(FinderMirrorWords.promptMessage(model.finderMirrorPrompt))
-        }
         .alert(model.savedScope.map { SmartFolderReplace.title($0.name) } ?? "",
                isPresented: $confirmingSaveFiltersToScope) {
             Button("Replace") { model.saveFiltersToScope() }.accessibilityIdentifier("ar.filter.saveTo.replace")
@@ -370,9 +351,8 @@ struct NavigationWindowView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         } else {
             switch model.emptyListState {
-            case .none where !model.library.usesCatalogue && !model.finderMirrorOn && model.library.catalogueCompanionsSeen > 0:
-                // W49.storage-finder-reader-mirror: a listed folder that also holds catalogue output, whose PDFs carry no
-                // Finder tags unless the archive mirrors them (then this is not shown), says so at the foot of the list.
+            case .none where !model.library.usesCatalogue && model.library.catalogueCompanionsSeen > 0:
+                // A listed folder that also holds catalogue output (whose PDFs carry no Finder tags) says so at the foot of the list.
                 let records = model.library.catalogueCompanionsSeen
                 VStack {
                     Spacer()

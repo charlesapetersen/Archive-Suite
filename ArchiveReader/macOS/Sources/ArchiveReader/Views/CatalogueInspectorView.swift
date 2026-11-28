@@ -41,18 +41,6 @@ struct CatalogueInspectorView: View {
                         }
                     }
                     if model.catalogueEditSaving { ProgressView().controlSize(.small) }
-                    if model.finderMirrorOn, rows.count == 1, let row = rows.first,
-                       let rootPath = model.rootStore.discoveredPathPrefix,
-                       let relative = ReaderCatalogueScan.relativePath(of: row.url, under: rootPath) {
-                        FinderMirrorDivergenceSection(model: model, relativePath: relative)
-                    }
-                    if let progress = model.finderMirrorProgress {
-                        HStack {
-                            ProgressView().controlSize(.small)
-                            Text(progress).font(.caption).foregroundStyle(.secondary)
-                            Button("Stop") { model.cancelFinderMirrorJob() }.controlSize(.small)
-                        }
-                    }
                     if let unavailable = facts.compactMap({ failure($0.file) }).first {
                         Label(message(unavailable), systemImage: "exclamationmark.circle")
                             .foregroundStyle(.secondary)

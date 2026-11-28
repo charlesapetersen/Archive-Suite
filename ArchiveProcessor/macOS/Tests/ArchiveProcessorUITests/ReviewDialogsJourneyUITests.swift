@@ -361,7 +361,10 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
 
             let pdfs = filedPDFs(in: out)
             XCTAssertEqual(pdfs.count, 6)
-            let tags = pdfs.map { finderTags(of: $0).sorted() }
+            for pdf in pdfs {
+                XCTAssertTrue(finderTags(of: pdf).isEmpty, "filed PDFs must not carry Finder tags: \(pdf.lastPathComponent)")
+            }
+            let tags = pdfs.map { catalogueTags(of: $0).sorted() }
             print("[s034] \(mode): \(tags)")
             let documentTags = mode == "copySource" ? sourceTags : []
             XCTAssertEqual(tags.filter { $0 == (documentTags + ["Box"]).sorted() }.count, 1)
@@ -511,8 +514,9 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         }
         XCTAssertEqual(pdfs.count, 6)
         XCTAssertTrue(pdfs.allSatisfy { $0.deletingLastPathComponent().lastPathComponent == "Scratch Papers" })
-        XCTAssertTrue(pdfs.allSatisfy { finderTags(of: $0).contains("Unread") })
-        XCTAssertEqual(pdfs.filter { finderTags(of: $0).contains("Resume Scratch Subject") }.count, 4)
+        XCTAssertTrue(pdfs.allSatisfy { finderTags(of: $0).isEmpty }, "filed PDFs must not carry Finder tags")
+        XCTAssertTrue(pdfs.allSatisfy { catalogueTags(of: $0).contains("Unread") })
+        XCTAssertEqual(pdfs.filter { catalogueTags(of: $0).contains("Resume Scratch Subject") }.count, 4)
     }
 
     private func filedPDFs(in root: URL) -> [URL] {
@@ -769,7 +773,6 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         ] + inputs + settings)
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",   // keychain quiet; the window still draws
-            "ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS": "1",   // these journeys check the filed PDFs' Finder tags
             "FAKE_AGENT_CLASS_CYCLE": classificationCycle ? "1" : "0",
             "FAKE_AGENT_CLASS": agentClass ?? "document_start",
             "FAKE_AGENT_LOG": scratchRoot.appendingPathComponent("\(name)-agent.log").path
@@ -897,7 +900,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
                 .map { $0.dropFirst("Classification:".count).trimmingCharacters(in: .whitespaces) } ?? "(none)"
             let box = page1.bounds(for: .mediaBox)
             XCTAssertNil(result[n + 1], "photo \(n + 1) has one output")
-            result[n + 1] = Output(pdf: pdf, classification: cls, tags: finderTags(of: pdf), size: box.size,
+            XCTAssertTrue(finderTags(of: pdf).isEmpty, "filed PDFs must not carry Finder tags: \(pdf.lastPathComponent)")
+            result[n + 1] = Output(pdf: pdf, classification: cls, tags: catalogueTags(of: pdf), size: box.size,
                                    rotation: page1.rotation, imageShape: drawnShape(of: page1))
         }
         return result
@@ -940,6 +944,43 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
               let list = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String]
         else { return [] }
         return list.map { $0.components(separatedBy: "\n").first ?? $0 }
+    }
+
+    /// The filed PDF's fields read from its adjacent `.archivesuite.json` catalogue companion as tag-style tokens.
+    private func catalogueTags(of pdf: URL) -> [String] {
+        let companion = pdf.appendingPathExtension("archivesuite.json")
+        guard let data = try? Data(contentsOf: companion),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return [] }
+        var out: [String] = []
+        if let fileFields = root["fileFields"] as? [String: Any] {
+            if let rs = (fileFields["readState"] as? [String: Any])?["value"] as? String {
+                out.append(rs.capitalized)
+            }
+            if let q = (fileFields["quality"] as? [String: Any])?["value"] as? Int {
+                out.append("Q\(q)")
+            }
+        }
+        if let docs = root["documents"] as? [[String: Any]],
+           let fields = docs.first(where: { $0["fields"] is [String: Any] })?["fields"] as? [String: Any] {
+            if let it = (fields["itemType"] as? [String: Any])?["value"] as? String {
+                out.append(it.capitalized)
+            }
+            if let subjects = (fields["subjects"] as? [String: Any])?["value"] as? [String] {
+                out.append(contentsOf: subjects)
+            }
+            if let docDate = (fields["documentDate"] as? [String: Any])?["value"] as? [String: Any],
+               let raw = docDate["date"] as? String {
+                out.append(raw)
+                if docDate["uncertain"] as? Bool == true { out.append("Date Uncertain") }
+            }
+            if let sentWith = (fields["sentWith"] as? [String: Any])?["value"] as? [String: Any],
+               let raw = sentWith["date"] as? String {
+                out.append("Sent With \(raw)")
+                if sentWith["uncertain"] as? Bool == true { out.append("Sent With Date Uncertain") }
+            }
+        }
+        return out
     }
 
     // MARK: Evidence

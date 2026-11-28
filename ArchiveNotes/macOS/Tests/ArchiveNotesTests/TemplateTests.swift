@@ -423,8 +423,8 @@ struct NotesModelTemplateTests {
         #expect(cleared.date == nil && cleared.datePrecision == nil && cleared.dateUncertain == false)
     }
 
-    @Test("a note made from a tagged template gets its subjects, date and Q tags in Finder; the template file gets none")
-    func newNoteFromTemplateMirrorsTags() async throws {
+    @Test("a note made from a tagged template keeps its subjects, date and quality in front matter with no Finder tags")
+    func newNoteFromTemplateKeepsMetadataInFrontMatterOnly() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let tid = try #require(await env.model.createTemplate(name: "Tagged", kind: .note))
         await env.model.addTemplateTag("labor", to: tid)
@@ -436,10 +436,9 @@ struct NotesModelTemplateTests {
         let note = try await env.store.load(newID)
         let url = try await env.store.mdURL(for: newID)
         let tags = Set(try url.resourceValues(forKeys: [.tagNamesKey]).tagNames ?? [])
-        let subjects = Set(note.tags.map { NotesTagVocabulary.titleCased($0) })
-        #expect(subjects.count == 2 && subjects.isSubset(of: tags))
-        #expect(Set(NotesTagVocabulary.dateFacetTokens(for: note)).isSubset(of: tags))
-        #expect(tags.contains("Q3"))
+        #expect(Set(note.tags) == Set(NotesTagVocabulary.normalizedSubjects(["labor", "oral history"])))
+        #expect(note.date == "1968" && note.datePrecision == .year && note.quality == 3)
+        #expect(tags.isEmpty)
 
         let tplFiles = try FileManager.default.contentsOfDirectory(
             at: await env.store.templateDir(tid), includingPropertiesForKeys: nil)

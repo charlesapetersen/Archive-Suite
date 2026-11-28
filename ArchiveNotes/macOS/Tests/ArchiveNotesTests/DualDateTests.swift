@@ -296,54 +296,45 @@ struct DualDateTests {
         await fresh.close()
     }
 
-    // MARK: Projection
+    // MARK: Persistence without Finder-tag mirroring
 
-    @Test("the sent-with tokens project onto the note's own .md and only Notes-owned ones are removed")
-    func projectsSentWithLosslessly() async throws {
+    @Test("sent-with edits persist to front matter and leave existing Finder tags untouched")
+    func sentWithEditsStayInFrontMatterWithoutFinderTags() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let note = item(tags: ["Sent With 1960"])
         _ = try await env.store.create(note)
         let url = try await env.store.mdURL(for: note.id)
-        #expect(NotesTagProjector.isScratchPath(url.path))
-        // A third-party sent-with lookalike and an unrelated tag already on the file.
-        try (url as NSURL).setResourceValue(["Sent With 1960", "Sent With 1980", "Do Not Sync"],
-                                            forKey: .tagNamesKey)
+        try (url as NSURL).setResourceValue(["Do Not Sync"], forKey: .tagNamesKey)
 
         await env.model.setDate("1957-11-03", precision: .day, for: note.id)
         #expect(await env.model.setSentWith("1958-03-12", precision: .day, for: note.id))
-        var tags = try await finderTags(env, note.id)
-        #expect(Set(tags) == ["Sent With 1960", "Sent With 1980", "Do Not Sync",
-                              "1957", "11 November", "Day 3", "Sent With 1958-03-12"])
-        let parsed = DocumentTags.parse(raw: tags, labelNumber: nil)
-        #expect(parsed.sentWith == ArchiveDate(year: 1958, month: 3, day: 12),
-                "the authoritative token is appended last, so it wins over lookalike subjects")
-        #expect(parsed.year == 1957 && parsed.day == 3, "the own date never cross-pairs with the sent-with date")
+        var reloaded = try await env.store.load(note.id)
+        #expect(reloaded.date == "1957-11-03" && reloaded.sentWith == ArchiveDate(year: 1958, month: 3, day: 12))
+        #expect(try await finderTags(env, note.id) == ["Do Not Sync"])
 
         await env.model.setSentWithUncertain(true, for: note.id)
-        tags = try await finderTags(env, note.id)
-        #expect(tags.contains(SentWithTag.uncertainToken))
+        #expect(try await env.store.load(note.id).sentWithUncertain == true)
+        #expect(try await finderTags(env, note.id) == ["Do Not Sync"])
 
         #expect(await env.model.setSentWith("1958", precision: .year, for: note.id))
-        tags = try await finderTags(env, note.id)
-        #expect(tags.contains("Sent With 1958") && !tags.contains("Sent With 1958-03-12"))
-        #expect(tags.contains(SentWithTag.uncertainToken))
+        reloaded = try await env.store.load(note.id)
+        #expect(reloaded.sentWith == ArchiveDate(year: 1958) && reloaded.sentWithUncertain == true)
+        #expect(try await finderTags(env, note.id) == ["Do Not Sync"])
 
         #expect(await env.model.setSentWith(nil, precision: nil, for: note.id))
-        tags = try await finderTags(env, note.id)
-        #expect(Set(tags) == ["Sent With 1960", "Sent With 1980", "Do Not Sync", "1957", "11 November", "Day 3"],
-                "clearing removes only the Notes-owned sent-with tokens; the subject and the third-party tag stay")
-        let reloaded = try await env.store.load(note.id)
+        reloaded = try await env.store.load(note.id)
         #expect(reloaded.sentWith == nil && !reloaded.sentWithUncertain && reloaded.date == "1957-11-03")
+        #expect(try await finderTags(env, note.id) == ["Do Not Sync"])
     }
 
-    @Test("an uncertainty flag cannot be stored or projected without a sent-with date")
+    @Test("an uncertainty flag cannot be stored without a sent-with date")
     func uncertaintyNeedsAValue() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let note = item()
         _ = try await env.store.create(note)
         await env.model.setSentWithUncertain(true, for: note.id)
         #expect(try await env.store.load(note.id).sentWithUncertain == false)
-        #expect(!(try await finderTags(env, note.id)).contains(SentWithTag.uncertainToken))
+        #expect(try await finderTags(env, note.id).isEmpty)
         #expect(NotesTagVocabulary.sentWithFacetTokens(for: item(sentWithUncertain: true)).isEmpty)
     }
 }

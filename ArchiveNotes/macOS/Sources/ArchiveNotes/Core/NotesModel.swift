@@ -195,9 +195,6 @@ final class NotesModel: ObservableObject {
     private var didBootstrap = false
 
     #if DEBUG
-    /// Test-only scheduling seam for actor-revision reconciliation. Production builds contain no
-    /// hook; the test pauses the first quality edit after its atomic save to force the stale order.
-    var qualityProjectionTestHook: (@Sendable (ItemTransaction) async -> Void)?
     /// Test-only seam to force index projections to arrive in the opposite order from their writes.
     /// Production builds contain no hook.
     var indexProjectionTestHook: (@Sendable (NoteIndexRow) async -> Void)?
@@ -1147,7 +1144,7 @@ final class NotesModel: ObservableObject {
                                                     : OrganizationStore.inboxFolderId)
         do {
             let ref = try await noteStore.create(item)
-            try await file(ItemTransaction(ownedDateFacetTokens: [], item: item, ref: ref), into: [target],
+            try await file(ItemTransaction(item: item, ref: ref), into: [target],
                            noteStore: noteStore, tagSource: "the template's")
             return item.id
         } catch { report(error, "create the note"); return nil }
@@ -1172,26 +1169,14 @@ final class NotesModel: ObservableObject {
         } catch { report(error, "duplicate the note"); return nil }
     }
 
-    /// File a note just written to the store: mirror its subject tags to Finder, project its date facets, add it
-    /// to `folders` and index it, then refresh the lists. Shared by New and Duplicate.
+    /// File a note just written to the store: add it to `folders` and index it, then refresh the lists.
+    /// Shared by New and Duplicate. (W49.storage-finder-drop-mirror: front-matter YAML is the sole home; no Finder
+    /// tags are mirrored onto `.md` files.)
     private func file(_ written: ItemTransaction, into folders: [UUID], noteStore: NoteStore,
                       tagSource: String) async throws {
+        _ = (noteStore, tagSource)
         let item = written.item
-        var created = written
-        // A template's tags are subjects like any note's: mirror them as the tag bar does, through the same
-        // journalled transaction, so the new note's Finder tags match its front matter from the start
-        // (W40.fix-notes-template-fields). A failed mirror keeps the journal; the next tag edit retries it.
-        // Its own catch: the note is already written, so a failure here must not leave it unfiled and unindexed.
-        if !item.tags.isEmpty {
-            let action = "mirror \(tagSource) tags to the new note in Finder (edit its tags to retry)"
-            do {
-                created = try await noteStore.withItem(item.id, projectSubjects: Self.projectSubjectTags) { _ in }
-                if let failure = created.subjectProjectionError {
-                    report(NoteStore.StoreError.writeFailed(failure), action)
-                }
-            } catch { report(error, action) }
-        }
-        let tx = try await reconcileFacetProjection(from: created, noteStore: noteStore)
+        let tx = written
         for folder in folders { try await organization.addMembership(item: item.id, folder: folder) }
         // W9.e2-zotero: upsert the new row inline, as createExtract does. Nothing watches the store,
         // so without it the new note stayed out of every list until the next launch's index build.
@@ -1248,8 +1233,7 @@ final class NotesModel: ObservableObject {
         guard !refuseWhileFoldersReadOnly("make the extract") else { return nil }
         do {
             let created = try await ExtractBuilder(store: noteStore).createExtract(from: passages)
-            let projectionTx = try await reconcileFacetProjection(
-                from: noteStore.currentItemTransaction(created.id), noteStore: noteStore)
+            let projectionTx = try await noteStore.currentItemTransaction(created.id)
             try await organization.addMembership(item: created.id,
                                                  folder: folderId ?? organization.extractsHomeFolderId)
             if let index {
@@ -1301,11 +1285,10 @@ final class NotesModel: ObservableObject {
 
     // MARK: Metadata edits (W6-S7 — dates & quality, §16.1)
     //
-    // Front-matter is authoritative (00-overview D2/D9): a note's date + quality live in its own `.md`
-    // YAML. Each edit additionally mirrors its existing ArchiveCore date facets and canonical Q1...Q3
-    // Quality facet onto that same `.md` file through `NotesTagProjector` (never the archive corpus). Each edit
-    // atomically writes the front-matter, re-indexes that one row, and refreshes shared `allItems` so
-    // both windows' lists + the detail header update live.
+    // Front-matter is authoritative (00-overview D2/D9): a note's subjects, date, and quality live in its own `.md`
+    // YAML (no Finder-tag mirroring since W49.storage-finder-drop-mirror). Each edit atomically writes the
+    // front-matter, re-indexes that one row, and refreshes shared `allItems` so both windows' lists + the detail
+    // header update live.
 
     @discardableResult
     func setTitle(_ title: String, to id: UUID) async -> Bool {
@@ -1322,14 +1305,14 @@ final class NotesModel: ObservableObject {
     @discardableResult
     func setTags(_ tags: [String], to id: UUID) async -> Bool {
         let tags = NotesTagVocabulary.normalizedSubjects(tags)
-        return await mutateItem(id, "set the note's tags", projectSubjects: true) { $0.tags = tags }
+        return await mutateItem(id, "set the note's tags") { $0.tags = tags }
     }
 
     /// UI operations are deltas, so two windows adding/removing different tags cannot erase each other.
     @discardableResult
     func addTag(_ tag: String, to id: UUID) async -> Bool {
         guard let tag = NotesTagVocabulary.normalizedSubjects([tag]).first else { return false }
-        return await mutateItem(id, "add the note's tag", projectSubjects: true) {
+        return await mutateItem(id, "add the note's tag") {
             $0.tags = NotesTagVocabulary.normalizedSubjects($0.tags + [tag])
         }
     }
@@ -1337,16 +1320,14 @@ final class NotesModel: ObservableObject {
     @discardableResult
     func removeTag(_ tag: String, from id: UUID) async -> Bool {
         guard let token = NotesTagVocabulary.normalizedSubjects([tag]).first else { return false }
-        return await mutateItem(id, "remove the note's tag", projectSubjects: true) {
+        return await mutateItem(id, "remove the note's tag") {
             $0.tags = NotesTagVocabulary.normalizedSubjects($0.tags).filter { $0 != token }
         }
     }
 
-    /// Rewrites `id`'s subjects with `transform` in one atomic transaction on its latest front matter, then mirrors
-    /// them, as the tag bar's edits do; for a rename or merge across notes (`NotesModel+TagRename`). `transform` sees
-    /// the subjects as they are on disk and must be pure; a note it leaves as it was is not rewritten. Returns the
-    /// subjects before and after once the front matter is saved (even when the Finder mirror then failed, which it
-    /// reports, since the front matter is the truth an Undo must put back); nil when nothing was saved.
+    /// Rewrites `id`'s subjects with `transform` in one atomic transaction on its latest front matter; for a rename or
+    /// merge across notes (`NotesModel+TagRename`). `transform` sees the subjects as they are on disk and must be pure;
+    /// a note it leaves as it was is not rewritten.
     func rewriteSubjects(of id: UUID, _ action: String,
                          _ transform: @escaping @Sendable ([String]) -> [String])
         async -> (before: [String], after: [String], mirrored: Bool)? {
@@ -1358,7 +1339,7 @@ final class NotesModel: ObservableObject {
             if NotesTagVocabulary.normalizedSubjects(transform(current.tags)) == current.tags {
                 return (current.tags, current.tags, true)
             }
-            tx = try await noteStore.withItem(id, projectSubjects: Self.projectSubjectTags) { item in
+            tx = try await noteStore.withItem(id) { item in
                 seen.value = item.tags
                 item.tags = NotesTagVocabulary.normalizedSubjects(transform(item.tags))
                 item.modified = Date()
@@ -1367,33 +1348,15 @@ final class NotesModel: ObservableObject {
             report(error, action)
             return nil
         }
-        // Saved from here on: a later failure is reported, never taken for an unsaved note.
         do {
-            let indexTx = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
-            if let index { try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)]) }
+            if let index { try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)]) }
         } catch { report(error, action) }
-        if let failure = tx.subjectProjectionError {
-            report(NoteStore.StoreError.writeFailed(failure), "project the note's tags (retry the tag edit)")
-        }
-        return (seen.value, tx.item.tags, tx.subjectProjectionError == nil)
+        return (seen.value, tx.item.tags, true)
     }
 
     /// What `rewriteSubjects`' transaction saw; written once, inside it, and read after it returns.
     private final class SubjectsSeen: @unchecked Sendable {
         var value: [String] = []
-    }
-
-    nonisolated private static func projectSubjectTags(
-        item: Item, ref: ItemRef, previous: Set<String>
-    ) throws {
-        // A date/Q token can simultaneously be a subject. Removing that subject must not remove a
-        // still-current facet, nor add a date facet behind the exact ownership ledger's back.
-        let facets = Set(NotesTagVocabulary.dateFacetTokens(for: item))
-            .union(NotesTagVocabulary.qualityToken(for: item.quality).map { [$0] } ?? [])
-        _ = try NotesTagProjector.project(
-            Set(item.tags.map { NotesTagVocabulary.titleCased($0) }),
-            previouslyManaged: previous.subtracting(facets), to: ref.url,
-            itemDir: ref.url.deletingLastPathComponent(), expectedIdentity: ref.identity)
     }
 
     /// Set the item's date + precision (a `nil`/blank date clears the date entirely). The pair is
@@ -1477,10 +1440,9 @@ final class NotesModel: ObservableObject {
         } catch { report(error, "set round-up status"); return false }
     }
 
-    /// Set the quality rating on the canonical 0...3 scale. `nil`, 0, and invalid inputs are unrated;
-    /// the front-matter therefore has no quality key and the Finder mirror has no Q token. A valid
-    /// 1...3 value is durable front-matter plus exactly its matching Q1/Q2/Q3 tag on this note's own
-    /// `.md` file. The archive corpus is never touched.
+    /// Set the quality rating on the canonical 0...3 scale. `nil`, 0, and invalid inputs are unrated
+    /// (no quality key in front-matter). A valid 1...3 value is stored in front-matter YAML only
+    /// (no Finder-tag mirroring since W49.storage-finder-drop-mirror). The archive corpus is never touched.
     func setQuality(_ quality: Int?, for id: UUID) async {
         guard let noteStore else { return }
         let canonical = quality.flatMap { (1...3).contains($0) ? $0 : nil }
@@ -1489,90 +1451,11 @@ final class NotesModel: ObservableObject {
                 item.quality = canonical
                 item.modified = Date()
             }
-
-            #if DEBUG
-            if let qualityProjectionTestHook {
-                await qualityProjectionTestHook(tx)
-            }
-            #endif
-
-            // Keep the front-matter source of truth visible even if the independent Finder metadata
-            // operation fails. The projector itself fresh-reads, coordinates, and verifies the tag
-            // write; its facet-token ownership is exact and cannot remove a current Q- or date-looking
-            // subject because `desired` protects every token still named by front-matter.
-            let indexTx = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
-
             if let index {
-                try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
+                try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)])
             }
             await reloadItems()
         } catch { report(error, "set the quality") }
-    }
-
-    /// Project only date/Quality facets Notes has actually added before. Current facet-looking subjects
-    /// are in `desired` so a literal `Q1` or `1984` subject survives, while an equal third-party Finder
-    /// token remains outside the exact date-facet ledger. Ordinary subject removal stays on its own
-    /// future edit path; this metadata action never claims ownership of arbitrary subject tokens.
-    nonisolated private static func projectFacetTags(
-        for item: Item,
-        ownedDateFacetTokens: Set<String>,
-        ref: ItemRef
-    ) throws -> Set<String> {
-        let url = ref.url
-        let orderedDateFacetTokens = NotesTagVocabulary.dateFacetTokens(for: item)
-        let dateFacetTokens = Set(orderedDateFacetTokens)
-        let result = try NotesTagProjector.projectWithDelta(
-            NotesTagVocabulary.facetProjectionTokens(for: item),
-            previouslyManaged: ownedDateFacetTokens.union(NotesTagVocabulary.qualityTokens),
-            to: url,
-            itemDir: url.deletingLastPathComponent(),
-            orderedFacetTokens: orderedDateFacetTokens
-                + (NotesTagVocabulary.qualityToken(for: item.quality).map { [$0] } ?? []),
-            expectedIdentity: ref.identity)
-        return ownedDateFacetTokens.intersection(dateFacetTokens)
-            .union(result.newlyAdded.intersection(dateFacetTokens))
-    }
-
-    /// Reconcile the date/Quality projection to a transaction's exact saved revision. A second Notes edit
-    /// may replace the same `.md` while this `@MainActor` method is awaiting the store; NoteStore's
-    /// monotonic revision admits the projection only while that saved YAML is still current, then this
-    /// helper fresh-reads and projects the newer authoritative revision. Every ordinary Notes mutation
-    /// calls this too, so a body/date autosave cannot leave a just-written date or Q value absent merely
-    /// because it overtook the original metadata edit.
-    /// The retry is deliberately bounded: sustained edits still each run their own reconciliation, and
-    /// an honest error is better than an unbounded UI task under a continuously-changing file.
-    private func reconcileFacetProjection(
-        from initial: ItemTransaction,
-        noteStore: NoteStore
-    ) async throws -> ItemTransaction {
-        var current = initial
-        for attempt in 0..<2 {
-            do {
-                let candidate = current
-                let ownedDateFacets = try await noteStore.performFacetProjectionIfCurrent(candidate.ref) { ref in
-                    try Self.projectFacetTags(
-                        for: candidate.item, ownedDateFacetTokens: candidate.ownedDateFacetTokens, ref: ref)
-                }
-                if let ownedDateFacets {
-                    try await noteStore.completeFacetProjection(
-                        candidate.ref, ownedDateFacetTokens: ownedDateFacets)
-                    return candidate
-                }
-
-                // Don't index/publish the older ItemTransaction. Read both YAML and its current
-                // revision atomically through NoteStore, then give that revision one fair projection
-                // attempt. A later ordinary mutation also reaches this same helper.
-                current = try await noteStore.currentItemTransaction(current.item.id)
-                if attempt == 1 {
-                    report(NoteStore.StoreError.writeFailed(
-                        "date/quality projection was superseded twice by newer edits"), "project date/quality tags")
-                }
-            } catch {
-                report(error, "project date/quality tags")
-                return current
-            }
-        }
-        return current
     }
 
     // MARK: Note body load / save (W7-S1a — the editor↔item wiring that gates W7 Extracts)
@@ -1701,12 +1584,7 @@ final class NotesModel: ObservableObject {
             // retrying an old baseline after that would manufacture another conflict draft.
             for tx in transactions {
                 do {
-                    var indexed = tx
-                    // A conflict leaves the original entirely alone, including its Finder metadata.
-                    if tx.item.id != id || saved.recoveredDraft == nil {
-                        indexed = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
-                    }
-                    if let index { try await index.upsertBatch([NoteIndexRow(item: indexed.item, mtime: indexed.ref.mtime)]) }
+                    if let index { try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)]) }
                 } catch { report(error, "index the saved note") }
             }
             await reloadItems()
@@ -1836,9 +1714,8 @@ final class NotesModel: ObservableObject {
             }
             item.modified = Date()
         }
-        let indexTx = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
         if let index {
-            try await index.upsertBatch([NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)])
+            try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)])
         }
         await reloadItems()
     }
@@ -1867,28 +1744,22 @@ final class NotesModel: ObservableObject {
     /// load the same old item and the later save would silently drop the other's field. `mutate` must
     /// therefore stay synchronous — that is what makes the transaction atomic.
     @discardableResult
-    private func mutateItem(_ id: UUID, _ action: String, projectSubjects: Bool = false,
+    private func mutateItem(_ id: UUID, _ action: String,
                             _ mutate: @Sendable (inout Item) -> Void) async -> Bool {
         guard let noteStore else { return false }
         do {
-            let projection: NoteStore.SubjectProjection? = projectSubjects ? Self.projectSubjectTags : nil
-            let tx = try await noteStore.withItem(id, projectSubjects: projection) { item in
+            let tx = try await noteStore.withItem(id) { item in
                 mutate(&item)
                 item.modified = Date()
             }
-            let indexTx = try await reconcileFacetProjection(from: tx, noteStore: noteStore)
             if let index {
-                let row = NoteIndexRow(item: indexTx.item, mtime: indexTx.ref.mtime)
+                let row = NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)
                 #if DEBUG
                 if let indexProjectionTestHook { await indexProjectionTestHook(row) }
                 #endif
                 try await index.upsertBatch([row])
             }
             await reloadItems()
-            if let failure = tx.subjectProjectionError {
-                report(NoteStore.StoreError.writeFailed(failure), "project the note's tags (retry the tag edit)")
-                return false
-            }
             return true
         } catch { report(error, action); return false }
     }

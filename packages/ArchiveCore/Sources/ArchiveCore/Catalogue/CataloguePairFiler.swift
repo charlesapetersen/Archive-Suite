@@ -76,15 +76,14 @@ public struct CataloguePairFiler: Sendable {
     /// If provided and staging is absent, copy the prepared working PDF under the destination lock.
     /// A record with a preservation digest requires the caller's verifier for every attempt, under
     /// the same pinned parent and before a completed receipt is durably issued.
-    /// `carriesFinderTags`: the prepared PDF's Finder tags and label are copied only when the archive mirrors
-    /// its fields to Finder tags (owner, 2026-11-27, W49.storage-finder-owner-ok: off unless switched on). Its
-    /// other extended attributes are copied either way.
+    /// Finder tags, Finder labels, and legacy mirror xattrs are never copied onto filed output
+    /// (W49.storage-finder-drop-mirror); other extended attributes are copied.
     public func filePair(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence,
                          record: CatalogueRecord, preparedPDF: URL? = nil,
-                         destination: Destination? = nil, carriesFinderTags: Bool = false,
+                         destination: Destination? = nil,
                          verifyPreservation: ((Int32) throws -> Void)? = nil) throws -> Receipt {
         try run(operationID: operationID, at: occurrence, initialRecord: record,
-                preparedPDF: preparedPDF, destination: destination, carriesFinderTags: carriesFinderTags,
+                preparedPDF: preparedPDF, destination: destination,
                 verifyPreservation: verifyPreservation)
     }
 
@@ -92,7 +91,7 @@ public struct CataloguePairFiler: Sendable {
     /// changed or obstructed files withhold a receipt and keep every available artifact in place.
     public func recoverPair(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence) throws -> Receipt {
         try run(operationID: operationID, at: occurrence, initialRecord: nil, preparedPDF: nil, destination: nil,
-                carriesFinderTags: false, verifyPreservation: nil)
+                verifyPreservation: nil)
     }
 
     private typealias Directory = CatalogueReadDirectory
@@ -163,7 +162,7 @@ public struct CataloguePairFiler: Sendable {
 
     private func run(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence,
                      initialRecord: CatalogueRecord?, preparedPDF: URL?, destination: Destination?,
-                     carriesFinderTags: Bool, verifyPreservation: ((Int32) throws -> Void)?) throws -> Receipt {
+                     verifyPreservation: ((Int32) throws -> Void)?) throws -> Receipt {
         if let initialRecord, (initialRecord.preservationManifestSHA256 != nil) != (verifyPreservation != nil) {
             throw Failure.operationMismatch
         }
@@ -191,7 +190,7 @@ public struct CataloguePairFiler: Sendable {
                     journalName = scope.pendingJournal
                     if pending == nil {
                         guard let initialRecord else { throw Failure.journalMissing }
-                        try prepare(initialRecord, preparedPDF: preparedPDF, carriesFinderTags: carriesFinderTags, in: scope)
+                        try prepare(initialRecord, preparedPDF: preparedPDF, in: scope)
                     }
                 }
                 let (journal, stamp) = try readJournal(journalName, in: scope)
@@ -207,13 +206,13 @@ public struct CataloguePairFiler: Sendable {
         }
     }
 
-    private func prepare(_ record: CatalogueRecord, preparedPDF: URL?, carriesFinderTags: Bool, in scope: Scope) throws {
+    private func prepare(_ record: CatalogueRecord, preparedPDF: URL?, in scope: Scope) throws {
         let paths = scope.paths
         for name in [paths.finalPDF, paths.finalCompanion] {
             guard try version(name, in: scope) == nil else { throw Failure.occupied(name) }
         }
         let copied = try preparedPDF.flatMap { source in
-            try version(paths.pendingPDF, in: scope) == nil ? copyPreparedPDF(source, record: record, carriesFinderTags: carriesFinderTags, in: scope) : nil
+            try version(paths.pendingPDF, in: scope) == nil ? copyPreparedPDF(source, record: record, in: scope) : nil
         }
         let pdf = try verifiedPDF(paths.pendingPDF, record: record, flush: true, in: scope).member
         if let copied {
@@ -245,14 +244,14 @@ public struct CataloguePairFiler: Sendable {
 
     /// Populate the reserved PDF name from a read-only working copy under the destination directory lock.
     /// A crash during the copy leaves a unique incomplete file, before any reserved or final name is claimed.
-    private func copyPreparedPDF(_ source: URL, record: CatalogueRecord, carriesFinderTags: Bool,
+    private func copyPreparedPDF(_ source: URL, record: CatalogueRecord,
                                  in scope: Scope) throws -> Member {
         let name = ".archivesuite-pdf-copy-" + UUID().uuidString.lowercased()
         let parent = scope.parent.descriptor
         let output = try writer.createExclusive(name, in: scope.parent)
         defer { close(output) }
         let size = try withPreparedPDF(source) { input, before in
-            guard Self.copyFile(input, to: output, carriesFinderTags: carriesFinderTags) == 0 else {
+            guard Self.copyFile(input, to: output) == 0 else {
                 throw CatalogueWriter.Failure.io(operation: "copy working PDF", code: errno)
             }
             return before.st_size
@@ -269,20 +268,17 @@ public struct CataloguePairFiler: Sendable {
         return verified.member
     }
 
-    /// The Finder tag list, the Finder info that holds the label colour, and the record of which of those tags the
-    /// suite wrote (`FinderMirror.ledgerAttribute`), which must never arrive without the tags it describes.
+    /// The Finder tag list, the Finder info that holds the label colour, and the retired Finder-mirror ledger xattr.
     static let finderTagAttributes: Set<String> = ["com.apple.metadata:_kMDItemUserTags", "com.apple.FinderInfo",
-                                                   FinderMirror.ledgerAttribute]
+                                                   "com.archivesuite.finder-mirror"]
 
-    /// `fcopyfile` with `COPYFILE_ALL` between two open descriptors, leaving the Finder tags and label behind unless
-    /// `carriesFinderTags`. Returns `fcopyfile`'s result; `errno` explains a failure. Also used for a producer's
-    /// optional exports beside a filed pair (W49.storage-finder).
-    public static func copyFile(_ input: Int32, to output: Int32, carriesFinderTags: Bool) -> Int32 {
+    /// `fcopyfile` with `COPYFILE_ALL` between two open descriptors, always leaving Finder tags, labels, and retired
+    /// mirror xattrs behind (W49.storage-finder-drop-mirror). Returns `fcopyfile`'s result; `errno` explains a failure.
+    public static func copyFile(_ input: Int32, to output: Int32) -> Int32 {
         guard let state = copyfile_state_alloc() else { return -1 }
         var result: Int32 = -1
         let callback: copyfile_callback_t = leaveFinderTagsBehind
-        if carriesFinderTags
-            || copyfile_state_set(state, UInt32(COPYFILE_STATE_STATUS_CB), unsafeBitCast(callback, to: UnsafeRawPointer.self)) == 0 {
+        if copyfile_state_set(state, UInt32(COPYFILE_STATE_STATUS_CB), unsafeBitCast(callback, to: UnsafeRawPointer.self)) == 0 {
             result = fcopyfile(input, output, state, copyfile_flags_t(COPYFILE_ALL))
         }
         let code = errno   // freeing the state must not replace the copy's reason

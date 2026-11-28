@@ -172,10 +172,9 @@ enum AdoptionConversion {
         try bytes.write(to: prepared, options: .withoutOverwriting)
         try ProcessorCatalogueRun.flushFileAndParent(prepared)
 
-        // Adoption leaves the old Finder tags behind on the original (owner, 2026-11-27, W49.storage-finder-owner-ok 2b).
+        // Adoption leaves the old Finder tags behind on the original (W49.storage-finder-drop-mirror).
         let filing = try ProcessorCatalogueFiling(operationID: operationID, root: root,
-                                                  rootInstanceID: ledger.rootInstanceID, destination: destination,
-                                                  carriesFinderTags: false)
+                                                  rootInstanceID: ledger.rootInstanceID, destination: destination)
         let item = AdoptionLedger.Item(operationID: operationID, sourceByteCount: entry.byteCount,
                                        sourceSHA256: sourceDigest, filing: filing, preservation: preservation,
                                        record: record, completed: false)

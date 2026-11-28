@@ -154,20 +154,14 @@ extension OCRProcessor {
                                                  written: written)
                 let workingRoot = run.workingRoot
                 let outputRoot = run.outputRoot
-                let generalMirrors = activeRunConfig?.mirrorFinderTags == true
                 let captureCandidates: [URL: PreservationCopy.Fingerprint] = run.captureHandoffPhotos.map { snapshot in
                     let read = Set(jobs.lazy.filter { $0.status == .succeeded }.map(\.sourceURL))
                     let warnings = Set(placeholderOutputs)
                     return snapshot.filter { read.contains($0.key) && !warnings.contains($0.key.lastPathComponent) }
                 } ?? [:]
                 let prepared = try await PDFGenerator.runWorker(priority: .utility) {
-                    // The archive the output folder belongs to decides; outside one, the general setting
-                    // (W49.storage-finder-reader-mirror). Frozen in each filing request from here on.
-                    let carriesFinderTags = ProcessorCatalogueFiling.mirrorsFinderTags(inFolder: outputRoot,
-                                                                                       general: generalMirrors)
                     return try Self.prepareCatalogueFiles(drafts, workingRoot: workingRoot, outputRoot: outputRoot,
-                                                          captureSources: Set(captureCandidates.keys),
-                                                          carriesFinderTags: carriesFinderTags)
+                                                          captureSources: Set(captureCandidates.keys))
                 }
                 run.files = prepared.files
                 run.captureHandoffPhotos = captureCandidates.filter { prepared.completedCapture.contains($0.key) }
@@ -443,7 +437,7 @@ extension OCRProcessor {
     }
 
     nonisolated private static func prepareCatalogueFiles(_ drafts: [DraftFile], workingRoot: URL, outputRoot: URL,
-                                                          captureSources: Set<URL>, carriesFinderTags: Bool)
+                                                          captureSources: Set<URL>)
         throws -> (files: [ProcessorCatalogueRun.File], completedCapture: Set<URL>) {
         let rootInstance = UUID()
         var completedCapture = Set<URL>()
@@ -505,8 +499,7 @@ extension OCRProcessor {
             try OutputFileSafety.copyExtendedAttributes(from: draft.pdf, to: prepared)
             try ProcessorCatalogueRun.flushFileAndParent(prepared)
             let filing = try ProcessorCatalogueFiling(operationID: draft.identity.fileID, root: outputRoot,
-                                                      rootInstanceID: rootInstance, destination: draft.destination,
-                                                      carriesFinderTags: carriesFinderTags)
+                                                      rootInstanceID: rootInstance, destination: draft.destination)
             return ProcessorCatalogueRun.File(workingPDF: draft.pdf, prepared: prepared, sources: draft.sources,
                                               destination: draft.destination, record: data, filing: filing, exports: draft.exports,
                                               preservation: preservation)

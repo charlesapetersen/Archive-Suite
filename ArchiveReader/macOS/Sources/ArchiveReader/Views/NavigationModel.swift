@@ -227,20 +227,6 @@ final class NavigationModel: ObservableObject {
     @Published var catalogueEditFailures: [String] = []
     @Published var catalogueHistory = CatalogueEditJournal.Heads()
     var catalogueHistoryRootID: UUID?
-    /// W49.storage-finder-reader-mirror (`NavigationModel+FinderMirror`): whether the open archive mirrors its fields
-    /// to Finder tags, the PDFs whose mirrored tags were changed in Finder, the running mirror job, its queue and
-    /// progress, the menu's question, and whether a Remove Suite Tags can be put back.
-    @Published var finderMirrorOn = false
-    @Published var finderMirrorDivergences: [String: FinderMirror.Divergence] = [:]
-    @Published var finderMirrorTask: Task<Void, Never>?
-    var finderMirrorJob: UUID?
-    @Published var finderMirrorProgress: String?
-    /// Queued projections, each with whether it accepts the Finder tags (Re-publish, or an Import that saved).
-    var finderMirrorQueue: [String: Bool] = [:]
-    var finderMirrorBackfill: [String] = []
-    var finderMirrorBackfillTotal = 0
-    @Published var finderMirrorPrompt: FinderMirrorPrompt?
-    @Published var finderMirrorRemovalsAvailable = false
     /// W40.reader-item-field-edit: why the last item-field edit was refused, for the Inspector's Checks.
     @Published var itemFieldEditError: String?
     /// W47.ct-folder-date-reader: the offer to date a folder run's undated documents by its confirmed date.

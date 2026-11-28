@@ -9,14 +9,11 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
     let rootInstanceID: UUID
     let relativePath: String
     let destination: CataloguePairFiler.Destination
-    /// Frozen with the request so a retry after relaunch files the PDF as the run began (W49.storage-finder).
-    /// Absent means the archive does not mirror its fields to Finder tags.
-    let carriesFinderTags: Bool?
     private var occurrence: CatalogueAssociation.Occurrence {
         CatalogueAssociation.Occurrence(rootInstanceID: rootInstanceID, relativePath: relativePath)
     }
 
-    init(operationID: UUID, root: URL, rootInstanceID: UUID, destination: URL, carriesFinderTags: Bool) throws {
+    init(operationID: UUID, root: URL, rootInstanceID: UUID, destination: URL) throws {
         let directory = root.standardizedFileURL
         let relative = try Self.relativeComponents(destination, in: directory)
         guard !relative.isEmpty else { throw ItemFacts.Unavailable.invalid(.root) }
@@ -29,22 +26,13 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         self.rootInstanceID = rootInstanceID
         relativePath = path
         self.destination = try filer.destination(at: occurrence)
-        self.carriesFinderTags = carriesFinderTags
     }
 
-    /// Whether output filed into `folder` carries Finder tags: the archive the folder belongs to decides (its settings
-    /// document, off when it has none), and outside any archive the general setting, `general` (W49.storage-finder-reader-mirror).
-    static func mirrorsFinderTags(inFolder folder: URL, general: Bool) -> Bool {
-#if DEBUG
-        // The scratch tests' switch (`scripts/test-finder-mirror.sh`, the journeys that check filed tags) means "on".
-        if ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_MIRROR_FINDER_TAGS"] == "1" { return true }
-#endif
-        return ArchiveSettings.mirrorsFinderTags(inFolder: folder, outsideArchive: general)
-    }
-
-    /// `sources`: the inputs the working copy was made from, whose own Finder tags are never claimed as the suite's.
+    /// Files the prepared PDF and its catalogue companion; Finder tags are never carried onto filed output
+    /// (W49.storage-finder-drop-mirror).
     func file(preparedPDF: URL, record data: Data, preservation: ProcessorPreservationFiling? = nil, sources: [URL] = [])
         throws -> CataloguePairFiler.Receipt {
+        _ = sources
         let record = try CatalogueRecord(json: data)
         guard try preservation?.manifest.digest() == record.preservationManifestSHA256 else {
             throw PreservationCopy.Failure.unverified
@@ -52,20 +40,10 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         let verify: ((Int32) throws -> Void)? = preservation.map { preservation in
             { parent in try preservation.file(in: parent, record: record) }
         }
-        // The tags on the Processor's own working copy are ones it wrote, less any its sources already carried (a
-        // pre-OCRed PDF keeps its own): a mirrored filing records those as the suite's (`FinderMirror`), so the Reader
-        // may later replace or remove exactly them. A source whose tags cannot be read (or that is gone) leaves nothing claimed
-        // (W49.storage-finder-reader-mirror).
-        if carriesFinderTags == true {
-            let sourceTags = sources.map { TagReading.read($0) }
-            if !sourceTags.contains(where: { $0.tagNames == nil }) {
-                try FinderMirror.claim(preparedPDF, excluding: sourceTags.flatMap { $0.tagNames ?? [] })
-            }
-        }
         let filer = try Self.filer(root: root, instance: rootInstanceID)
         return try filer.filePair(operationID: operationID, at: occurrence, record: record,
                                   preparedPDF: preparedPDF, destination: destination,
-                                  carriesFinderTags: carriesFinderTags == true, verifyPreservation: verify)
+                                  verifyPreservation: verify)
     }
 
     private static func filer(root: URL, instance: UUID) throws -> CataloguePairFiler {
@@ -115,8 +93,7 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         let filer = try Self.filer(root: root, instance: rootInstanceID)
         try filer.withDestinationDirectory(at: occurrence, matching: destination) { parent in
             guard let child else {
-                try Self.copyExport(source, to: export.lastPathComponent, in: parent,
-                                    carriesFinderTags: carriesFinderTags == true)
+                try Self.copyExport(source, to: export.lastPathComponent, in: parent)
                 return
             }
             guard mkdirat(parent, child, 0o755) == 0 || errno == EEXIST else { throw Self.ioError() }
@@ -124,14 +101,13 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
             guard directory >= 0 else { throw Self.ioError() }
             defer { close(directory) }
             try Self.requireLocal(directory)
-            try Self.copyExport(source, to: export.lastPathComponent, in: directory,
-                                carriesFinderTags: carriesFinderTags == true)
+            try Self.copyExport(source, to: export.lastPathComponent, in: directory)
             guard fsync(parent) == 0 else { throw Self.ioError() }
         }
     }
 
-    /// An exported image leaves its working copy's Finder tags behind like the PDF it belongs to (W49.storage-finder).
-    private static func copyExport(_ source: URL, to name: String, in parent: Int32, carriesFinderTags: Bool) throws {
+    /// An exported image leaves its working copy's Finder tags behind like the PDF it belongs to.
+    private static func copyExport(_ source: URL, to name: String, in parent: Int32) throws {
         let input = open(source.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
         guard input >= 0 else { throw ioError() }
         defer { close(input) }
@@ -150,7 +126,7 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
             }
             close(output)
         }
-        guard CataloguePairFiler.copyFile(input, to: output, carriesFinderTags: carriesFinderTags) == 0 else {
+        guard CataloguePairFiler.copyFile(input, to: output) == 0 else {
             throw ioError()
         }
 

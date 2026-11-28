@@ -171,7 +171,7 @@ enum ReOCRImageInputTestDriver {
         let prepared = work.appendingPathComponent("working.derivative")
         try PDFGenerator().mergeDocumentPDFs(sourcePDFs: parts, outputURL: prepared, catalogueIdentity: identity)
         let filing = try ProcessorCatalogueFiling(operationID: identity.fileID, root: dir, rootInstanceID: UUID(),
-                                                  destination: target, carriesFinderTags: false)
+                                                  destination: target)
         _ = try filing.file(preparedPDF: prepared, record: record, preservation: preservation)
         try fm.removeItem(at: work)
         let folder = dir.appendingPathComponent(PreservationCopy.directoryName)
