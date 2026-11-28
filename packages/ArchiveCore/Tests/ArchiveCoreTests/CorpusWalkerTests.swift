@@ -28,6 +28,22 @@ final class CorpusWalkerTests: XCTestCase {
         try? FileManager.default.removeItem(at: tempDir)
     }
 
+    /// W49.storage-finder: the walk counts catalogue companions, matched or not, so a folder of untagged catalogue
+    /// output can say why its tags-mode list is empty. A file merely named like the suffix is not one.
+    func testScanCountsCatalogueCompanions() throws {
+        try makeFile("a.pdf")
+        try makeFile("a.pdf.archivesuite.json")
+        try makeFile("sub/b.PDF")
+        try makeFile("sub/b.PDF.archivesuite.json")
+        try makeFile(".archivesuite.json")
+        try makeFile("c.pdf", tags: ["Unread"])
+        let result = CorpusWalker.scan(root: tempDir)
+        XCTAssertEqual(result.catalogueCompanionsSeen, 2)
+        XCTAssertEqual(result.entries.map(\.url.lastPathComponent), ["c.pdf"])
+        XCTAssertTrue(CatalogueRecord.isCompanionFilename("x.pdf.archivesuite.json"))
+        XCTAssertFalse(CatalogueRecord.isCompanionFilename(".archivesuite.json"))
+    }
+
     // MARK: - Fixture helpers
 
     /// A fresh `URL` for `path`. `URL.resourceValues` caches on the backing `NSURL`, so reusing a URL

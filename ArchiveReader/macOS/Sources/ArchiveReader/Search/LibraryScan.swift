@@ -117,7 +117,10 @@ enum LibraryScan {
                                          filesSeen: fingerprints.filesSeen,
                                          vanishedMidScan: vanished,
                                          rootUnreadable: fingerprints.rootUnreadable,
-                                         cancelled: cancelled),
+                                         cancelled: cancelled,
+                                         catalogueCompanionsSeen: fingerprints.entries.reduce(0) {
+                                             $0 + (CatalogueRecord.isCompanionFilename($1.url.lastPathComponent) ? 1 : 0)
+                                         }),
                 rootStability: .between(before, after)
             )
         }

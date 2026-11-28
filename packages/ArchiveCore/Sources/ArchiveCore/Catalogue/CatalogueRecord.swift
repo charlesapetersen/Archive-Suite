@@ -163,8 +163,15 @@ public struct CatalogueRecord: Sendable {
     public var fileFields: FileFields { payload.fileFields }
     public var preservationManifestSHA256: Data? { payload.preservationManifestSHA256 }
 
+    public static let companionSuffix = ".archivesuite.json"
+
     public static func companionFilename(forPDFFilename filename: String) -> String {
-        filename + ".archivesuite.json"
+        filename + companionSuffix
+    }
+
+    /// Whether a file's name is a catalogue companion's (`<PDF filename>.archivesuite.json`).
+    public static func isCompanionFilename(_ filename: String) -> Bool {
+        filename.count > companionSuffix.count && filename.hasSuffix(companionSuffix)
     }
 
     public func document(id: UUID) -> Document? { documentsByID[id] }

@@ -11,10 +11,12 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 
 - **New Processor output carries no Finder tags unless mirroring is on.** The owner's call (W49.storage-finder-owner-ok:
   off everywhere by default) means a PDF the Processor files has its fields, read state included, only in its catalogue
-  record. A folder read without File ▸ Use Catalogue Companions for This Folder lists only Read- or Unread-tagged PDFs,
-  so such output does not appear there until that mode is turned on or the Processor's Settings ▸ Output ▸ Mirror
-  archive fields to Finder tags is on. The Reader's own mirroring, Import or Re-publish of a Finder edit and an undoable
-  Remove Suite Tags follow in the same item (queued: W49.storage-finder).
+  record. A folder read without File ▸ Use Catalogue Companions for This Folder lists only Read- or Unread-tagged PDFs.
+  When such a folder lists nothing, the empty list says how many PDFs keep catalogue records and offers that mode. A
+  folder that also holds tagged PDFs lists those and gives no such notice, and the count is taken when a scan
+  finishes, so a companion filed while the folder is open is counted at the next scan. The Reader's own mirroring,
+  Import or Re-publish of a Finder edit and an undoable Remove Suite Tags follow in the same item
+  (queued: W49.storage-finder).
 
 ## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
 

@@ -382,6 +382,25 @@ struct NavigationWindowView: View {
             // only listed (tagged) documents; both offer the way out (W40.fix-reader-visual-polish).
             // The button sits outside the combined element, which UI tests read as one sentence, so it stays
             // its own pressable control.
+            case .nothingTagged where !model.library.usesCatalogue && model.library.catalogueCompanionsSeen > 0:
+                // W49.storage-finder: new Processor output keeps its fields in catalogue records, with no Finder tags.
+                let records = model.library.catalogueCompanionsSeen
+                VStack(spacing: 0) {
+                    ContentUnavailableView(
+                        "No tagged documents", systemImage: "doc.text.magnifyingglass",
+                        description: Text("\(records) PDF\(records == 1 ? " here keeps its" : "s here keep their") fields in "
+                                          + "a catalogue companion file, not in Finder tags. Use the catalogue companions "
+                                          + "to list " + (records == 1 ? "it." : "them.")))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("ar.empty.catalogueRecords")
+                    HStack {
+                        Button("Use Catalogue Companions for This Folder") { model.setCatalogueMode(true) }
+                            .accessibilityIdentifier("ar.empty.useCatalogue")
+                        chooseFolderButton
+                    }
+                    .padding(.bottom, 16)
+                }
+                .emptyStateBackdrop()
             case let .nothingTagged(scanned):
                 VStack(spacing: 0) {
                     ContentUnavailableView(

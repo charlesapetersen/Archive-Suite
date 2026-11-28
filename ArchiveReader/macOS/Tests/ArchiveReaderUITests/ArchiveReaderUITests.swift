@@ -69,4 +69,30 @@ final class ArchiveReaderUITests: XCTestCase {
         XCTAssertTrue(app.buttons["ar.empty.chooseFolder"].exists,
                       "the empty state should offer the way out: another folder (W40.fix-reader-visual-polish)")
     }
+
+    /// W49.storage-finder — new Processor output keeps its fields only in catalogue companions, with no Finder tags,
+    /// so a tags-mode folder of it lists nothing; the empty list says why and offers the catalogue mode.
+    func testUntaggedCatalogueOutputOffersCatalogueCompanions() throws {
+        let root = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/ArchiveReader", isDirectory: true)
+            .appendingPathComponent("AR-GUI-Companions-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for name in ["one.pdf", "two.pdf"] {
+            try Data("untagged scratch output".utf8).write(to: root.appendingPathComponent(name))
+            try Data("{}".utf8).write(to: root.appendingPathComponent(name + ".archivesuite.json"))
+        }
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+
+        app.terminate()
+        app.launchArguments = UITestLaunch.arguments(["-ARUITestRootPath", root.path])
+        app.launch()
+        app.activate()
+
+        let offer = app.descendants(matching: .any)["ar.empty.catalogueRecords"]
+        XCTAssertTrue(offer.waitForExistence(timeout: 10), "the empty list must say the PDFs keep catalogue records")
+        XCTAssertTrue(offer.accessibilityText.contains("2 PDFs here keep their fields"), offer.accessibilityText)
+        XCTAssertTrue(app.buttons["ar.empty.useCatalogue"].exists, "and offer the catalogue companions")
+        XCTAssertFalse(app.descendants(matching: .any)["ar.empty.nothingTagged"].exists,
+                       "the plain untagged sentence is replaced, not stacked")
+    }
 }

@@ -203,7 +203,8 @@ are kept. Network mounts are refused. Provider synchronization and multi-device 
 own verification.
 
 File ▸ Use Catalogue Companions for This Folder selects catalogue mode for the open physical root on
-this Mac. In that mode Reader lists PDFs independently of Finder tags. Reader records each attempted
+this Mac. In that mode Reader lists PDFs independently of Finder tags. Outside it, a scan counts the companions it
+sees, and an empty list in a folder that has some offers the mode. Reader records each attempted
 companion change in local application support before saving and records
 its verified result afterward. One user action groups distinct companion occurrences. Document field
 edits address their resolved owner and document ID once even if several selected PDFs refer to it.

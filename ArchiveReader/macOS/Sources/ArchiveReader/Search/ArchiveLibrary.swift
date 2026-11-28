@@ -83,6 +83,10 @@ final class ArchiveLibrary: ObservableObject {
     /// its PDF or in `JSON Output`), so the model reads those folders' sidecar names into the index again rather
     /// than at the next pass. The folders wait in `touchedSidecarFolders` until the model takes them.
     @Published private(set) var sidecarRevision: UInt64 = 0
+    /// Catalogue companions the last finished tags-mode pass saw (W49.storage-finder). The Processor files new output
+    /// with no Finder tags unless mirroring is on, so a folder of it lists nothing here and the empty list offers
+    /// catalogue mode instead. Zero in catalogue mode and until a pass finishes.
+    @Published private(set) var catalogueCompanionsSeen = 0
     private var touchedSidecarFolders: Set<String> = []
 
     /// The root being walked, so `rescan()` needs no argument.
@@ -339,6 +343,7 @@ final class ArchiveLibrary: ObservableObject {
         clock &+= 1
         currentScan = clock
         self.catalogueInstance = scope == nil ? nil : catalogueInstance
+        catalogueCompanionsSeen = 0
         catalogueReader = nil
         catalogueSnapshot = nil
         cataloguePass = nil
@@ -959,6 +964,7 @@ final class ArchiveLibrary: ObservableObject {
         cancelScanStallDeadline()
         let next = DiscoveryHealth.phase(after: pass.result, root: pass.rootStability,
                                          finishedAt: Date(), lastSettled: lastSettled)
+        if pass.result.completed { catalogueCompanionsSeen = pass.result.catalogueCompanionsSeen }
 
         guard let indexScan, let index = libraryIndex else {
             let nextFiles = merged(pass: pass, generation: generation,
