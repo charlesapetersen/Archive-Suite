@@ -288,6 +288,11 @@ rule. The canonical record works on a filesystem that does not preserve macOS at
 
 ### Finder tags
 
+Shipped (W49.storage-finder, W49.storage-finder-reader-mirror, 2026-11-27): off by default, the archive's choice in
+`.archivesuite/archive-settings.json`, an ownership record on each PDF, Import or Re-publish of a Finder edit, and
+Remove Suite Tags with Put Back. Contract: `SPEC/tag-format.md` §"The suite's Finder mirror". The text below is the
+design it followed.
+
 Proposed label: **“Mirror archive fields to Finder tags.”** It changes publishing, not where fields are saved.
 Recommend off for a newly created archive under S, subject to the owner's choice; keep today's behavior until a
 choice is made. Store the archive's intent with its collection/root settings so the three apps do not disagree;

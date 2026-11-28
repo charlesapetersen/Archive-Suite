@@ -629,12 +629,14 @@ sets it, the Processor's filing follows it, and outside any archive the Processo
   file lacks, and keeps every other tag. A label the suite did not set is left, by Re-publish too. The record is never changed from
   tags, and enabling the mirror never reads tags into it.
 - **A Finder edit (2b).** The tags *diverge* when, against the baseline, an owned token or a facet token is gone,
-  any tag appeared, or the suite's label changed. A facet token is anything `DocumentTags.parse` claims as other than
-  a subject, a colour name, `OCR Poor` or `OCR Failed`. A diverged file is not written; the Reader offers **Import**
-  (the Finder values of the touched facets become user edits of the record, a tag that appeared and reads as a
-  subject is added to the subjects, then the mirror is re-projected) or **Re-publish** (the record's values go back,
-  removing the facet tokens that appeared; a tag that appeared and reads as a subject could be the user's own, so it
-  stays as an unowned tag). A hand-made tag removed in Finder is not a divergence.
+  a facet token appeared, or the suite's label changed. A facet token is anything `DocumentTags.parse` claims as other
+  than a subject, a colour name, `OCR Poor` or `OCR Failed`. A tag added in Finder that reads as a subject is not a
+  divergence: it may be the user's own tag, which the suite cannot tell from a subject, so it stays an unowned tag
+  and the file goes on being mirrored (whether to offer it for Import is the owner's question,
+  `W49.reader-mirror-added-tags-owner-ok`). A hand-made tag removed in Finder is not a divergence either. A diverged
+  file is not written; the Reader offers **Import** (the Finder values of the touched facets become user edits of the
+  record in one operation; only when every planned record saved does the mirror take the Finder tags as its
+  baseline) or **Re-publish** (the record's values go back, removing the facet tokens that appeared).
 - **Turning it off (3b).** Writing stops; tags stay and can go stale. **Remove Suite Tags** removes, per file, only
   owned tokens still present and the label if it is still the suite's, then drops the record; a file with no
   readable record keeps every tag. Undo puts back each removed token the file lacks (and the label if it has none)

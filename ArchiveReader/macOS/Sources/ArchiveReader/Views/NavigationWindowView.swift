@@ -370,15 +370,15 @@ struct NavigationWindowView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         } else {
             switch model.emptyListState {
-            case .none where !model.library.usesCatalogue && model.library.catalogueCompanionsSeen > 0:
+            case .none where !model.library.usesCatalogue && !model.finderMirrorOn && model.library.catalogueCompanionsSeen > 0:
                 // W49.storage-finder-reader-mirror: a listed folder that also holds catalogue output, whose PDFs carry no
-                // Finder tags unless the archive mirrors them, says so at the foot of the list.
+                // Finder tags unless the archive mirrors them (then this is not shown), says so at the foot of the list.
                 let records = model.library.catalogueCompanionsSeen
                 VStack {
                     Spacer()
                     HStack(spacing: 10) {
-                        Text("\(records) PDF\(records == 1 ? " here has" : "s here have") a catalogue companion file; "
-                             + "any without Finder tags \(records == 1 ? "is" : "are") not listed.")
+                        Text("This folder also holds \(records) catalogue record\(records == 1 ? "" : "s"); "
+                             + "PDFs without Finder tags are listed only with the catalogue companions.")
                             .font(.callout)
                         Button("Use Catalogue Companions for This Folder") { model.setCatalogueMode(true) }
                             .controlSize(.small)

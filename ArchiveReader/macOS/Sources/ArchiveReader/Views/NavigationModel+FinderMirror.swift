@@ -80,9 +80,6 @@ extension NavigationModel {
         finderMirrorQueue = [:]
         finderMirrorBackfill = []
         if on {
-            // Turning on projects every record again, so an earlier removal has nothing left to put back.
-            try? FinderMirrorRemovals.discard(for: root)
-            finderMirrorRemovalsAvailable = false
             if let key = finderMirrorPendingKey { defaults.set(true, forKey: key) }
             startFinderMirrorBackfill()
         } else {
@@ -182,16 +179,24 @@ extension NavigationModel {
             self.finderMirrorJob = nil
             self.finderMirrorProgress = nil
             guard self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
-            if ranBackfill, !cancelled, self.finderMirrorBackfill.isEmpty, let pendingKey {
+            // A PDF that could not be written leaves the archive's pass pending, so File ▸ Resume Mirroring to Finder
+            // Tags offers to go over it again (publishing is idempotent: a PDF already mirrored is not rewritten).
+            if !report.failures.isEmpty, let pendingKey {
+                self.defaults.set(true, forKey: pendingKey)
+            } else if ranBackfill, !cancelled, self.finderMirrorBackfill.isEmpty, let pendingKey {
                 self.defaults.removeObject(forKey: pendingKey)
+                // Every record is mirrored again, so an earlier Remove Suite Tags has nothing left to put back.
+                try? FinderMirrorRemovals.discard(for: root)
+                self.finderMirrorRemovalsAvailable = false
             }
             if ranBackfill || !report.isQuiet {
                 self.reportCatalogue(report.message(backfill: ranBackfill, cancelled: cancelled,
                                                     total: self.finderMirrorBackfillTotal))
             }
             if !report.failures.isEmpty { self.catalogueEditFailures = report.failures }
-            // A request that arrived as this job ended starts the next one.
-            if !cancelled, !self.finderMirrorQueue.isEmpty { self.runFinderMirrorJobs() }
+            // A request that arrived as this job ended, or after a Stop (which emptied the queue), starts the next one
+            // now, rather than waiting for some later save.
+            if !self.finderMirrorQueue.isEmpty { self.runFinderMirrorJobs() }
         }
     }
 
@@ -370,7 +375,9 @@ enum FinderMirrorWork {
                 parts.append("\(disagreeing) PDF(s) keep older tags the suite did not write that disagree with their records; they were left.")
             }
             if unknown > 0 { parts.append("\(unknown) PDF(s) carry a record of suite tags from a newer version and were left.") }
-            if !failures.isEmpty { parts.append("\(failures.count) PDF(s) could not be changed.") }
+            if !failures.isEmpty {
+                parts.append("\(failures.count) PDF(s) could not be changed; File ▸ Resume Mirroring to Finder Tags tries again.")
+            }
             return parts.joined(separator: " ")
         }
     }
@@ -454,8 +461,8 @@ enum FinderMirrorWork {
 }
 
 /// The record edits that take a Finder edit's values: only the facets the divergence touched, read from the
-/// file's current tags. A removed subject the suite wrote leaves the record; a tag added in Finder that reads as a
-/// subject joins it (the user chose Import, having been shown it).
+/// file's current tags. A subject is imported only as a removal of one the suite wrote (an added tag that reads as
+/// a subject could be the user's own, so it is not a divergence and never read into the record).
 struct FinderMirrorImport: Sendable {
     let divergence: FinderMirror.Divergence
     let tags: [String]
@@ -485,7 +492,6 @@ struct FinderMirrorImport: Sendable {
         let finder = DocumentTags.parse(raw: tags, labelNumber: label)
         let facets = Set((divergence.removed + divergence.added).compactMap(Self.facet(of:)))
             .union(divergence.labelChanged ? [.colour] : [])
-            .union(divergence.addedOther.isEmpty ? [] : [.subject])
         let owner = try? facts.document.get()
         let fields = owner?.document.fields
         var out: [(ItemFacts.FileFacts, CatalogueEdit)] = []
@@ -520,9 +526,8 @@ struct FinderMirrorImport: Sendable {
                 fileEdit(.colour, FinderLabel(labelNumber: label).map { .set(.text($0.tokenName.lowercased())) } ?? .clear)
             case .subject:
                 let removed = divergence.removed.filter { Self.facet(of: $0) == .subject }
-                let subjects = NavigationModel.value(fields?.subjects) ?? []
-                var kept = subjects.filter { subject in !removed.contains { isSameTag($0, subject) } }
-                for tag in divergence.addedOther where !kept.contains(where: { isSameTag($0, tag) }) { kept.append(tag) }
+                guard !removed.isEmpty, let subjects = NavigationModel.value(fields?.subjects) else { continue }
+                let kept = subjects.filter { subject in !removed.contains { isSameTag($0, subject) } }
                 if kept != subjects { documentEdit(.subjects, .set(.names(kept))) }
             case .check:
                 continue

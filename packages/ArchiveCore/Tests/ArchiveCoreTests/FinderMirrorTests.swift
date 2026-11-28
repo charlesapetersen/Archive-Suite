@@ -114,7 +114,6 @@ final class FinderMirrorTests: XCTestCase {
         guard case .diverged(let divergence) = outcome else { return XCTFail("\(outcome)") }
         XCTAssertEqual(divergence.removed, ["Q2"])
         XCTAssertEqual(divergence.added, ["Q3"])
-        XCTAssertEqual(divergence.addedOther, [])
         XCTAssertEqual(Set(try tags(url)), Set(finder), "a divergence writes nothing")
 
         guard case .published = try FinderMirror.publish(url, projection: edited, republishing: true) else {
@@ -128,20 +127,16 @@ final class FinderMirrorTests: XCTestCase {
                                              ledger: FinderMirror.readLedger(url).ledger))
     }
 
-    func testATagAddedInFinderIsShownAndRepublishKeepsItAsTheUsersOwn() throws {
+    func testATagAddedInFinderStaysTheUsersOwnAndTheMirrorGoesOn() throws {
         let url = try makeFile()
         _ = try FinderMirror.publish(url, projection: projection(try record()))
         try setTags(url, try tags(url) + ["ToPrint"])
-        guard case .diverged(let divergence) = try FinderMirror.publish(url, projection: projection(try record(quality: 1)))
-        else { return XCTFail("a tag added in Finder is shown, not passed over") }
-        XCTAssertEqual(divergence.addedOther, ["ToPrint"])
-        XCTAssertEqual(divergence.added, [])
-        guard case .published = try FinderMirror.publish(url, projection: projection(try record(quality: 1)),
-                                                         republishing: true) else { return XCTFail() }
-        XCTAssertTrue(try tags(url).contains("ToPrint"), "Re-publish never removes a tag that could be the user's own")
+        guard case .published = try FinderMirror.publish(url, projection: projection(try record(quality: 1))) else {
+            return XCTFail("a tag that could be the user's own is not a divergence")
+        }
+        XCTAssertTrue(try tags(url).contains("ToPrint"))
         XCTAssertTrue(try tags(url).contains("Q1"))
-        XCTAssertNil(FinderMirror.divergence(current: try tags(url), label: try label(url),
-                                             ledger: FinderMirror.readLedger(url).ledger))
+        XCTAssertFalse(try XCTUnwrap(FinderMirror.readLedger(url).ledger).owned.contains("ToPrint"))
     }
 
     func testRemoveSuiteTagsTakesOffOnlyOwnedTokensAndUndoPutsThemBack() throws {

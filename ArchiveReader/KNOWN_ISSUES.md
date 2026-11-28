@@ -12,11 +12,18 @@ and any entry whose disposition is still `(queued: …)` or `(asked: …)`.
 - **New Processor output carries no Finder tags unless mirroring is on.** The owner's call (W49.storage-finder-owner-ok:
   off everywhere by default) means a PDF the Processor files has its fields, read state included, only in its catalogue
   record. A folder read without File ▸ Use Catalogue Companions for This Folder lists only Read- or Unread-tagged PDFs.
-  When such a folder lists nothing, the empty list says how many PDFs keep catalogue records and offers that mode. A
-  folder that also holds tagged PDFs lists those and gives no such notice, and the count is taken when a scan
-  finishes, so a companion filed while the folder is open is counted at the next scan. The Reader's own mirroring,
-  Import or Re-publish of a Finder edit and an undoable Remove Suite Tags follow in the same item
-  (queued: W49.storage-finder-reader-mirror).
+  When such a folder lists nothing, the empty list says how many PDFs keep catalogue records and offers that mode; a
+  folder that also lists tagged PDFs says so at the foot of the list (W49.storage-finder-reader-mirror). The count is
+  taken when a scan finishes, so a companion filed while the folder is open is counted at the next scan
+  (queued: W49.reader-mirror-followups).
+- **With File ▸ Mirror Archive Fields to Finder Tags on, an edit made while the mirror is writing that PDF can be
+  refused once.** A tag write moves the PDF's change time, which a catalogue save's base checks; the Reader re-reads
+  each PDF the mirror wrote as soon as its batch of up to 100 finishes, and a save refused in between says the record
+  could not be verified, so the user saves again (queued: W49.reader-mirror-followups).
+- **With mirroring on, a tag added in Finder that reads as a subject is kept as the user's own tag and not offered
+  for Import.** The suite cannot tell "ToPrint" from a subject typed in Finder, so it neither imports nor removes such
+  a tag and goes on mirroring the PDF; every other Finder edit of a mirrored tag is offered as Import or Re-publish
+  (asked: W49.reader-mirror-added-tags-owner-ok).
 
 ## Accessibility audit of the preview and document windows (W49.ui-fails-under-coverage, 2026-11-27)
 

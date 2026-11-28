@@ -31,11 +31,6 @@ enum FinderMirrorWords {
         var parts: [String] = []
         if !divergence.removed.isEmpty { parts.append("removed " + divergence.removed.joined(separator: ", ")) }
         if !divergence.added.isEmpty { parts.append("added " + divergence.added.joined(separator: ", ")) }
-        if !divergence.addedOther.isEmpty {
-            parts.append("added " + divergence.addedOther.joined(separator: ", ")
-                         + " (Import adds \(divergence.addedOther.count == 1 ? "it" : "them") as subjects; Re-publish keeps "
-                         + "\(divergence.addedOther.count == 1 ? "it" : "them") as your own tags)")
-        }
         if divergence.labelChanged {
             let name = FinderLabel(labelNumber: divergence.labelAfter)?.tokenName ?? "none"
             parts.append("colour changed to \(name)")
