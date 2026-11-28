@@ -629,11 +629,12 @@ sets it, the Processor's filing follows it, and outside any archive the Processo
   file lacks, and keeps every other tag. A label the suite did not set is left, by Re-publish too. The record is never changed from
   tags, and enabling the mirror never reads tags into it.
 - **A Finder edit (2b).** The tags *diverge* when, against the baseline, an owned token or a facet token is gone,
-  a facet token appeared (anything `DocumentTags.parse` claims as other than a subject, a colour name, `OCR Poor`,
-  `OCR Failed`), or the suite's label changed. A tag that could be hand-made (read as a subject) and was added in
-  Finder is not a divergence: the suite cannot tell it from the user's own. A diverged file is not written; the
-  Reader offers **Import** (the Finder values become user edits of the record, then the mirror is re-projected) or
-  **Re-publish** (the record's values go back, removing the facet tokens that appeared).
+  any tag appeared, or the suite's label changed. A facet token is anything `DocumentTags.parse` claims as other than
+  a subject, a colour name, `OCR Poor` or `OCR Failed`. A diverged file is not written; the Reader offers **Import**
+  (the Finder values of the touched facets become user edits of the record, a tag that appeared and reads as a
+  subject is added to the subjects, then the mirror is re-projected) or **Re-publish** (the record's values go back,
+  removing the facet tokens that appeared; a tag that appeared and reads as a subject could be the user's own, so it
+  stays as an unowned tag). A hand-made tag removed in Finder is not a divergence.
 - **Turning it off (3b).** Writing stops; tags stay and can go stale. **Remove Suite Tags** removes, per file, only
   owned tokens still present and the label if it is still the suite's, then drops the record; a file with no
   readable record keeps every tag. Undo puts back each removed token the file lacks (and the label if it has none)

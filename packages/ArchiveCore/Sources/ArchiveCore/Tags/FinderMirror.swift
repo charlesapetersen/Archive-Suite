@@ -139,13 +139,15 @@ public enum FinderMirror {
     public struct Divergence: Equatable, Sendable {
         /// Tokens the suite's last write left that are gone now.
         public var removed: [String]
-        /// Vocabulary tokens that appeared since (a date, a rating, Read/Unread, a check…). A token that could
-        /// be a hand-made tag (anything read as a subject) is not counted: the suite cannot tell it apart.
+        /// Vocabulary tokens that appeared since (a date, a rating, Read/Unread, a check…). Re-publish removes them.
         public var added: [String]
+        /// Tags that appeared since and read as subjects: a subject typed in Finder or the user's own tag, which the
+        /// suite cannot tell apart. Import adds them as subjects; Re-publish keeps them as the user's own tags.
+        public var addedOther: [String] = []
         public var labelBefore: Int?
         public var labelAfter: Int?
         public var labelChanged: Bool { normalizedLabel(labelBefore) != normalizedLabel(labelAfter) }
-        public var isEmpty: Bool { removed.isEmpty && added.isEmpty && !labelChanged }
+        public var isEmpty: Bool { removed.isEmpty && added.isEmpty && addedOther.isEmpty && !labelChanged }
     }
 
     /// Whether `token` is one of the vocabulary's own facets rather than something a person might type.
@@ -165,10 +167,11 @@ public enum FinderMirror {
         let removed = multisetDifference(ledger.baseline, minus: current).filter { token in
             owned.contains(token) || isFacetToken(token)
         }
-        let added = multisetDifference(current, minus: ledger.baseline).filter(isFacetToken)
+        let appeared = multisetDifference(current, minus: ledger.baseline)
+        let added = appeared.filter(isFacetToken)
         let ownedLabelMoved = ledger.ownedLabel != nil
             && normalizedLabel(label) != normalizedLabel(ledger.baselineLabel)
-        let divergence = Divergence(removed: removed, added: added,
+        let divergence = Divergence(removed: removed, added: added, addedOther: appeared.filter { !isFacetToken($0) },
                                     labelBefore: ownedLabelMoved ? ledger.baselineLabel : nil,
                                     labelAfter: ownedLabelMoved ? label : nil)
         return divergence.isEmpty ? nil : divergence

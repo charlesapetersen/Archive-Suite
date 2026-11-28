@@ -121,17 +121,26 @@ final class FinderMirrorReaderTests: XCTestCase {
         XCTAssertNil(model.finderMirrorDivergences["Letter.pdf"])
         XCTAssertFalse(tags(pdf).contains("Unread"))
 
+        // A tag added in Finder is shown too; Re-publish keeps it as the user's own and never takes it into the record.
+        try setTags(pdf, tags(pdf) + ["ToFile"])
+        model.checkFinderMirror(relativePath: "Letter.pdf")
+        try await waitUntil("added tag shown") { model.finderMirrorDivergences["Letter.pdf"]?.addedOther == ["ToFile"] }
+        model.republishFinderMirror(relativePath: "Letter.pdf")
+        try await waitUntil("re-published") { model.finderMirrorDivergences["Letter.pdf"] == nil && model.finderMirrorTask == nil }
+        XCTAssertTrue(tags(pdf).contains("ToFile"))
+        XCTAssertFalse(NavigationModel.value(try companion(pdf).documents.first?.fields?.subjects)?.contains("ToFile") ?? false)
+
         // Turning off with Remove Suite Tags leaves only tags the suite did not write; Put Back restores the suite's.
         model.requestFinderMirror(false)
         XCTAssertEqual(model.finderMirrorPrompt, .turnOff)
         model.confirmFinderMirror(on: false, removingSuiteTags: true)
         XCTAssertEqual(try ArchiveSettings.read(root: root)?.mirrorFinderTags, false)
         // "Read" was typed in Finder and then imported: the suite never wrote it, so it stays.
-        try await waitUntil("removed") { Set(self.tags(pdf)) == ["ToPrint", "Read"] && model.finderMirrorTask == nil }
+        try await waitUntil("removed") { Set(self.tags(pdf)) == ["ToPrint", "Read", "ToFile"] && model.finderMirrorTask == nil }
         XCTAssertTrue(model.finderMirrorRemovalsAvailable)
         model.putBackSuiteFinderTags()
         try await waitUntil("put back") {
-            Set(self.tags(pdf)) == ["ToPrint", "Berlin", "Lincoln", "Bonn", "Read"] && model.finderMirrorTask == nil
+            Set(self.tags(pdf)) == ["ToPrint", "Berlin", "Lincoln", "Bonn", "Read", "ToFile"] && model.finderMirrorTask == nil
         }
         XCTAssertFalse(model.finderMirrorRemovalsAvailable)
     }

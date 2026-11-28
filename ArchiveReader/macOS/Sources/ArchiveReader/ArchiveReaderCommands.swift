@@ -223,7 +223,7 @@ struct ArchiveReaderCommands: Commands {
                 Button("Resume Mirroring to Finder Tags") { nav?.startFinderMirrorBackfill() }
                     .disabled(nav?.canChangeFinderMirror != true)
             }
-            if nav?.finderMirrorRemovalsAvailable == true {
+            if nav?.finderMirrorRemovalsAvailable == true, nav?.finderMirrorOn == false {
                 Button("Put Back Suite Tags") { nav?.putBackSuiteFinderTags() }
                     .disabled(nav?.finderMirrorTask != nil)
             }

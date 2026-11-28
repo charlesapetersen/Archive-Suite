@@ -95,4 +95,29 @@ final class ArchiveReaderUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["ar.empty.nothingTagged"].exists,
                        "the plain untagged sentence is replaced, not stacked")
     }
+
+    /// W49.storage-finder-reader-mirror: a folder that lists tagged PDFs and also holds catalogue output says so at the
+    /// foot of the list and offers the catalogue companions.
+    func testAListedFolderWithCatalogueOutputSaysSo() throws {
+        let root = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/ArchiveReader", isDirectory: true)
+            .appendingPathComponent("AR-GUI-Mixed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let tagged = root.appendingPathComponent("tagged.pdf")
+        try Data("tagged scratch".utf8).write(to: tagged)
+        try (tagged as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+        try Data("untagged scratch output".utf8).write(to: root.appendingPathComponent("output.pdf"))
+        try Data("{}".utf8).write(to: root.appendingPathComponent("output.pdf.archivesuite.json"))
+
+        app.terminate()
+        app.launchArguments = UITestLaunch.arguments(["-ARUITestRootPath", root.path])
+        app.launch()
+        app.activate()
+
+        let notice = app.descendants(matching: .any)["ar.list.catalogueRecords"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 10), "the listed folder must mention its catalogue output")
+        XCTAssertTrue(app.buttons["ar.list.useCatalogue"].exists, "and offer the catalogue companions")
+        XCTAssertEqual(app.tables["ar.table"].tableRows.count, 1, "the tagged PDF is still listed")
+    }
 }

@@ -370,6 +370,26 @@ struct NavigationWindowView: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         } else {
             switch model.emptyListState {
+            case .none where !model.library.usesCatalogue && model.library.catalogueCompanionsSeen > 0:
+                // W49.storage-finder-reader-mirror: a listed folder that also holds catalogue output, whose PDFs carry no
+                // Finder tags unless the archive mirrors them, says so at the foot of the list.
+                let records = model.library.catalogueCompanionsSeen
+                VStack {
+                    Spacer()
+                    HStack(spacing: 10) {
+                        Text("\(records) PDF\(records == 1 ? " here has" : "s here have") a catalogue companion file; "
+                             + "any without Finder tags \(records == 1 ? "is" : "are") not listed.")
+                            .font(.callout)
+                        Button("Use Catalogue Companions for This Folder") { model.setCatalogueMode(true) }
+                            .controlSize(.small)
+                            .accessibilityIdentifier("ar.list.useCatalogue")
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("ar.list.catalogueRecords")
+                    .padding(.bottom, 10)
+                }
             case .none:
                 EmptyView()
             // W49.reader-ux-gaps-small: both states carry their way out, as the others do.

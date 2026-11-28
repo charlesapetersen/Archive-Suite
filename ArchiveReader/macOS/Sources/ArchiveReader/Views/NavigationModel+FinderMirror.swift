@@ -8,6 +8,11 @@ import Foundation
 /// wrote are ever replaced); turning it on projects every record once, in the background, cancellably, and can be
 /// resumed; a mirrored tag changed in Finder is shown in the Inspector with Import and Re-publish, never taken or
 /// overwritten silently (2b); turning it off can also Remove Suite Tags, which File ▸ Put Back Suite Tags undoes (3b).
+///
+/// One job runs at a time (`finderMirrorTask`). Projection requests queue (`finderMirrorQueue`) and run ahead of the
+/// remaining backfill, so a save never cancels the backfill and the backfill never delays a save's projection. A path
+/// is published with Re-publish's acceptance only when the user chose Re-publish, or chose Import and every record
+/// the Import planned was saved.
 extension NavigationModel {
     enum FinderMirrorPrompt: Identifiable, Equatable {
         case turnOn(pdfs: Int)
@@ -31,18 +36,21 @@ extension NavigationModel {
     func loadFinderMirrorSetting() {
         finderMirrorTask?.cancel()
         finderMirrorTask = nil
+        finderMirrorJob = nil
         finderMirrorProgress = nil
         finderMirrorDivergences = [:]
-        finderMirrorAccepting = []
+        finderMirrorQueue = [:]
+        finderMirrorBackfill = []
         guard let root = rootStore.root else {
             finderMirrorOn = false
+            finderMirrorRemovalsAvailable = false
             return
         }
         finderMirrorOn = ((try? ArchiveSettings.read(root: root)) ?? nil)?.mirrorFinderTags ?? false
         finderMirrorRemovalsAvailable = FinderMirrorRemovals.exists(for: root)
     }
 
-    /// Whether turning mirroring on or off is open now: catalogue mode, and no mirror job or catalogue save running.
+    /// Whether turning mirroring on or off is available now: catalogue mode, and no mirror job or catalogue save running.
     var canChangeFinderMirror: Bool {
         rootStore.root != nil && library.usesCatalogue && catalogueSnapshot != nil && !catalogueEditSaving
             && finderMirrorTask == nil
@@ -69,7 +77,12 @@ extension NavigationModel {
         }
         finderMirrorOn = on
         finderMirrorDivergences = [:]
+        finderMirrorQueue = [:]
+        finderMirrorBackfill = []
         if on {
+            // Turning on projects every record again, so an earlier removal has nothing left to put back.
+            try? FinderMirrorRemovals.discard(for: root)
+            finderMirrorRemovalsAvailable = false
             if let key = finderMirrorPendingKey { defaults.set(true, forKey: key) }
             startFinderMirrorBackfill()
         } else {
@@ -82,7 +95,11 @@ extension NavigationModel {
         }
     }
 
+    /// The Inspector's Stop: ends the running job; queued projections and the rest of the backfill are dropped
+    /// (File ▸ Resume Mirroring to Finder Tags goes on with the backfill).
     func cancelFinderMirrorJob() {
+        finderMirrorQueue = [:]
+        finderMirrorBackfill = []
         finderMirrorTask?.cancel()
     }
 
@@ -100,45 +117,81 @@ extension NavigationModel {
                 affected.insert(relative)
             }
         }
-        let accepting = finderMirrorAccepting.intersection(affected)
-        finderMirrorAccepting.subtract(accepting)
-        runFinderMirror(paths: affected.sorted(), accepting: accepting, backfill: false)
+        enqueueFinderMirror(affected, accepting: false)
     }
 
     /// Turning on, or resuming after an interruption: every record in the archive, in the background.
     func startFinderMirrorBackfill() {
-        guard let paths = catalogueSnapshot?.inventory.relativePDFPaths else { return }
-        runFinderMirror(paths: paths, accepting: [], backfill: true)
+        guard let paths = catalogueSnapshot?.inventory.relativePDFPaths, !paths.isEmpty else { return }
+        finderMirrorBackfill = paths
+        finderMirrorBackfillTotal = paths.count
+        runFinderMirrorJobs()
     }
 
-    private func runFinderMirror(paths: [String], accepting: Set<String>, backfill: Bool) {
-        guard let reader = catalogueReader, let root = rootStore.root, !paths.isEmpty else { return }
-        finderMirrorTask?.cancel()
+    /// Queue paths for projection. `accepting` (the user chose Re-publish, or an Import that saved) is never lowered
+    /// by a later plain request for the same path, and a plain request never raises it.
+    private func enqueueFinderMirror(_ paths: some Sequence<String>, accepting: Bool) {
+        guard finderMirrorOn else { return }
+        for path in paths { finderMirrorQueue[path] = (finderMirrorQueue[path] ?? false) || accepting }
+        runFinderMirrorJobs()
+    }
+
+    private func runFinderMirrorJobs() {
+        guard finderMirrorTask == nil, let reader = catalogueReader, let root = rootStore.root else { return }
         let pendingKey = finderMirrorPendingKey
+        let job = UUID()
+        finderMirrorJob = job
         finderMirrorTask = Task { [weak self] in
             var report = FinderMirrorWork.Report()
-            let chunks = stride(from: 0, to: paths.count, by: 100).map { Array(paths[$0..<min($0 + 100, paths.count)]) }
-            for chunk in chunks {
-                if Task.isCancelled { break }
+            var ranBackfill = false
+            while !Task.isCancelled {
+                guard let self, self.finderMirrorJob == job,
+                      self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
+                // Queued projections first, then the next part of the backfill.
+                var chunk: [String] = []
+                var accepting: Set<String> = []
+                if !self.finderMirrorQueue.isEmpty {
+                    for (path, accepts) in self.finderMirrorQueue.prefix(100) {
+                        chunk.append(path)
+                        if accepts { accepting.insert(path) }
+                    }
+                    for path in chunk { self.finderMirrorQueue[path] = nil }
+                } else if !self.finderMirrorBackfill.isEmpty {
+                    chunk = Array(self.finderMirrorBackfill.prefix(100))
+                    self.finderMirrorBackfill.removeFirst(chunk.count)
+                    ranBackfill = true
+                } else {
+                    break
+                }
                 let part = await Task.detached(priority: .utility) {
                     FinderMirrorWork.publish(chunk, reader: reader, root: root, accepting: accepting)
                 }.value
                 report.merge(part)
-                guard let self, self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
+                guard self.finderMirrorJob == job, self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
                 self.finderMirrorDivergences.merge(part.diverged) { _, new in new }
                 for path in part.published { self.finderMirrorDivergences[path] = nil }
                 self.reviseAfterFinderMirror(part.writtenPaths)
-                if backfill { self.finderMirrorProgress = "Mirroring Finder tags: \(report.done) of \(paths.count)…" }
+                if ranBackfill {
+                    let total = self.finderMirrorBackfillTotal
+                    self.finderMirrorProgress = "Mirroring Finder tags: \(total - self.finderMirrorBackfill.count) of \(total)…"
+                }
             }
-            guard let self, self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
+            guard let self, self.finderMirrorJob == job else { return }
             let cancelled = Task.isCancelled
             self.finderMirrorTask = nil
+            self.finderMirrorJob = nil
             self.finderMirrorProgress = nil
-            if backfill, !cancelled, let pendingKey { self.defaults.removeObject(forKey: pendingKey) }
-            if backfill || !report.isQuiet {
-                self.reportCatalogue(report.message(backfill: backfill, cancelled: cancelled, total: paths.count))
+            guard self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
+            if ranBackfill, !cancelled, self.finderMirrorBackfill.isEmpty, let pendingKey {
+                self.defaults.removeObject(forKey: pendingKey)
+            }
+            if ranBackfill || !report.isQuiet {
+                self.reportCatalogue(report.message(backfill: ranBackfill, cancelled: cancelled,
+                                                    total: self.finderMirrorBackfillTotal))
             }
             if !report.failures.isEmpty { self.catalogueEditFailures = report.failures }
+            // A request that arrived as this job ended starts the next one.
+            if !cancelled, !self.finderMirrorQueue.isEmpty { self.runFinderMirrorJobs() }
         }
     }
 
@@ -164,13 +217,14 @@ extension NavigationModel {
         }
     }
 
-    /// Re-publish: put the record's values back over the Finder edit.
+    /// Re-publish: the user chose to put the record's values back over the Finder edit.
     func republishFinderMirror(relativePath: String) {
-        runFinderMirror(paths: [relativePath], accepting: [relativePath], backfill: false)
+        enqueueFinderMirror([relativePath], accepting: true)
     }
 
-    /// Import: the Finder values of the facets that changed become user edits of the record; the mirror is then
-    /// re-projected from the record, accepting the Finder tags as the new baseline.
+    /// Import: the Finder values of the facets that changed become user edits of the record, in one operation. Only
+    /// when every record it planned was saved is the mirror re-projected taking the Finder tags as its baseline;
+    /// otherwise the divergence stays, to import again or Re-publish. Nothing is ever put back on the user's behalf.
     func importFinderMirror(relativePath: String) {
         guard let root = rootStore.root, let rootPath = rootStore.discoveredPathPrefix,
               let divergence = finderMirrorDivergences[relativePath] else { return }
@@ -179,15 +233,32 @@ extension NavigationModel {
             reportCatalogue("The Finder tags of “\(relativePath)” could not be read.")
             return
         }
-        let plan = FinderMirrorImport(divergence: divergence, tags: names, label: label)
-        finderMirrorAccepting.insert(relativePath)
         let rowPath = URL(fileURLWithPath: rootPath).appendingPathComponent(relativePath).path
-        let started = editCatalogue(title: "Import Finder Tags", paths: [rowPath]) { facts in plan.edits(for: facts) }
-        if !started {
-            finderMirrorAccepting.remove(relativePath)
-            // Nothing in the record differs from Finder: only the mirror's baseline is out of date.
-            republishFinderMirror(relativePath: relativePath)
+        guard let row = library.files(atPaths: [rowPath]).first, let facts = catalogueFacts(for: row) else {
+            reportCatalogue("“\(relativePath)” has no catalogue record to import into.")
+            return
         }
+        let plan = FinderMirrorImport(divergence: divergence, tags: names, label: label)
+        let unimportable = plan.unimportable(for: facts)
+        guard unimportable.isEmpty else {
+            reportCatalogue("“\(unimportable.joined(separator: "”, “"))” cannot be imported: the field it checks has no "
+                            + "value in the record. Remove it in Finder, or choose Re-publish.")
+            return
+        }
+        let planned = plan.edits(for: facts)
+        guard !planned.isEmpty else {
+            reportCatalogue("The record already holds these values. Choose Re-publish to bring the Finder tags back in line.")
+            return
+        }
+        let needed = Set(planned.map { $0.0.pair.occurrence.relativePath })
+        editCatalogue(title: "Import Finder Tags", paths: [rowPath], completed: { [weak self] saved in
+            guard let self else { return }
+            if needed.isSubset(of: saved) {
+                self.enqueueFinderMirror([relativePath], accepting: true)
+            } else {
+                self.reportCatalogue("Import did not finish, so the Finder tags of “\(relativePath)” were left as they are.")
+            }
+        }) { facts in plan.edits(for: facts) }
     }
 
     // MARK: Remove Suite Tags (3b)
@@ -195,8 +266,10 @@ extension NavigationModel {
     /// Remove, from every PDF in the archive, only the tags its ownership record says the suite wrote. What was
     /// removed is kept in Application Support so File ▸ Put Back Suite Tags can undo it.
     func removeSuiteFinderTags() {
-        guard let root = rootStore.root, let paths = catalogueSnapshot?.inventory.relativePDFPaths else { return }
-        finderMirrorTask?.cancel()
+        guard finderMirrorTask == nil, let root = rootStore.root, let reader = catalogueReader,
+              let paths = catalogueSnapshot?.inventory.relativePDFPaths else { return }
+        let job = UUID()
+        finderMirrorJob = job
         finderMirrorTask = Task { [weak self] in
             var removals: [String: FinderMirror.Removal] = [:]
             var failures: [String] = []
@@ -206,14 +279,18 @@ extension NavigationModel {
                 let part = await Task.detached(priority: .utility) { FinderMirrorWork.remove(chunk, root: root) }.value
                 removals.merge(part.removals) { _, new in new }
                 failures += part.failures
-                self?.reviseAfterFinderMirror(Array(part.removals.keys))
-                self?.finderMirrorProgress = "Removing suite tags: \(removals.count) PDFs so far…"
+                guard let self, self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { continue }
+                self.reviseAfterFinderMirror(Array(part.removals.keys))
+                self.finderMirrorProgress = "Removing suite tags: \(removals.count) PDFs so far…"
             }
             let cancelled = Task.isCancelled
+            // Saved whatever happens next, so a root switched meanwhile can still be put back when it is reopened.
             let saved = removals.isEmpty || (try? FinderMirrorRemovals.save(removals, for: root)) != nil
-            guard let self else { return }
+            guard let self, self.finderMirrorJob == job else { return }
             self.finderMirrorTask = nil
+            self.finderMirrorJob = nil
             self.finderMirrorProgress = nil
+            guard self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
             self.finderMirrorRemovalsAvailable = FinderMirrorRemovals.exists(for: root)
             self.catalogueEditFailures = failures
             var message = removals.isEmpty
@@ -228,15 +305,20 @@ extension NavigationModel {
     }
 
     /// Undo the last Remove Suite Tags: put back each removed tag the PDF lacks, and record it as the suite's again.
+    /// Offered only while mirroring is off.
     func putBackSuiteFinderTags() {
-        guard let root = rootStore.root, finderMirrorTask == nil,
+        guard !finderMirrorOn, finderMirrorTask == nil, let root = rootStore.root, let reader = catalogueReader,
               let removals = try? FinderMirrorRemovals.load(for: root) else { return }
+        let job = UUID()
+        finderMirrorJob = job
         finderMirrorTask = Task { [weak self] in
             let failures = await Task.detached(priority: .utility) { FinderMirrorWork.restore(removals, root: root) }.value
             if failures.isEmpty { try? FinderMirrorRemovals.discard(for: root) }
-            guard let self else { return }
-            self.reviseAfterFinderMirror(Array(removals.keys))
+            guard let self, self.finderMirrorJob == job else { return }
             self.finderMirrorTask = nil
+            self.finderMirrorJob = nil
+            guard self.catalogueReader?.rootInstanceID == reader.rootInstanceID else { return }
+            self.reviseAfterFinderMirror(Array(removals.keys))
             self.finderMirrorRemovalsAvailable = FinderMirrorRemovals.exists(for: root)
             self.catalogueEditFailures = failures
             self.reportCatalogue(failures.isEmpty
@@ -372,8 +454,8 @@ enum FinderMirrorWork {
 }
 
 /// The record edits that take a Finder edit's values: only the facets the divergence touched, read from the
-/// file's current tags. A subject is imported only as a removal of one the suite wrote (an added one could be
-/// the user's own tag, so it is never read into the record).
+/// file's current tags. A removed subject the suite wrote leaves the record; a tag added in Finder that reads as a
+/// subject joins it (the user chose Import, having been shown it).
 struct FinderMirrorImport: Sendable {
     let divergence: FinderMirror.Divergence
     let tags: [String]
@@ -403,6 +485,7 @@ struct FinderMirrorImport: Sendable {
         let finder = DocumentTags.parse(raw: tags, labelNumber: label)
         let facets = Set((divergence.removed + divergence.added).compactMap(Self.facet(of:)))
             .union(divergence.labelChanged ? [.colour] : [])
+            .union(divergence.addedOther.isEmpty ? [] : [.subject])
         let owner = try? facts.document.get()
         let fields = owner?.document.fields
         var out: [(ItemFacts.FileFacts, CatalogueEdit)] = []
@@ -429,7 +512,7 @@ struct FinderMirrorImport: Sendable {
             case .readState:
                 fileEdit(.readState, finder.readState.map { .set(.text($0.rawValue.lowercased())) } ?? .clear)
             case .itemType:
-                documentEdit(.itemType, finder.itemType.map { .set(.text($0.rawValue)) } ?? .clear)
+                documentEdit(.itemType, finder.itemType.map { .set(.text($0.rawValue.lowercased())) } ?? .clear)
                 valueSet.insert(.itemType)
             case .ocrPoor:
                 fileEdit(.ocrPoor, .set(.flag(finder.hasPoorOCR)))
@@ -437,8 +520,9 @@ struct FinderMirrorImport: Sendable {
                 fileEdit(.colour, FinderLabel(labelNumber: label).map { .set(.text($0.tokenName.lowercased())) } ?? .clear)
             case .subject:
                 let removed = divergence.removed.filter { Self.facet(of: $0) == .subject }
-                guard !removed.isEmpty, let subjects = NavigationModel.value(fields?.subjects) else { continue }
-                let kept = subjects.filter { subject in !removed.contains { isSameTag($0, subject) } }
+                let subjects = NavigationModel.value(fields?.subjects) ?? []
+                var kept = subjects.filter { subject in !removed.contains { isSameTag($0, subject) } }
+                for tag in divergence.addedOther where !kept.contains(where: { isSameTag($0, tag) }) { kept.append(tag) }
                 if kept != subjects { documentEdit(.subjects, .set(.names(kept))) }
             case .check:
                 continue
@@ -451,6 +535,24 @@ struct FinderMirrorImport: Sendable {
             documentEdit(field, .check(finder.checkedFields.contains(checkable)))
         }
         return out
+    }
+
+    /// Check tags the divergence touched that cannot be imported, because the field they check has no value.
+    func unimportable(for facts: ItemFacts) -> [String] {
+        let fields = (try? facts.document.get())?.document.fields
+        let touched = divergence.removed + divergence.added
+        let replaced: Set<CatalogueEdit.DocumentField> = Set(touched.compactMap {
+            switch Self.facet(of: $0) {
+            case .date?: .documentDate
+            case .sentWith?: .sentWith
+            default: nil
+            }
+        })
+        return touched.filter { token in
+            guard case .check(let checkable)? = Self.facet(of: token),
+                  let field = NavigationModel.catalogueField(checkable) else { return false }
+            return !replaced.contains(field) && !Self.hasValue(field, in: fields)
+        }
     }
 
     private static func hasValue(_ field: CatalogueEdit.DocumentField, in fields: CatalogueRecord.DocumentFields?) -> Bool {
