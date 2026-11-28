@@ -121,6 +121,25 @@ struct NavigationWindowView: View {
             Button("Cancel", role: .cancel) { model.renamingSearch = nil }
         }
         .onChange(of: model.renamingSearch) { _, s in if let s { renameText = s.name } }
+        .alert(FinderMirrorWords.promptTitle(model.finderMirrorPrompt), isPresented: Binding(
+            get: { model.finderMirrorPrompt != nil },
+            set: { if !$0 { model.finderMirrorPrompt = nil } })) {
+            switch model.finderMirrorPrompt {
+            case .turnOn?:
+                Button("Turn On") { model.confirmFinderMirror(on: true) }
+                    .accessibilityIdentifier("ar.finderMirror.turnOn")
+            case .turnOff?:
+                Button("Turn Off") { model.confirmFinderMirror(on: false) }
+                    .accessibilityIdentifier("ar.finderMirror.turnOff")
+                Button("Turn Off and Remove Suite Tags") { model.confirmFinderMirror(on: false, removingSuiteTags: true) }
+                    .accessibilityIdentifier("ar.finderMirror.turnOffRemove")
+            case nil:
+                EmptyView()
+            }
+            Button("Cancel", role: .cancel) { model.finderMirrorPrompt = nil }
+        } message: {
+            Text(FinderMirrorWords.promptMessage(model.finderMirrorPrompt))
+        }
         .alert(model.savedScope.map { SmartFolderReplace.title($0.name) } ?? "",
                isPresented: $confirmingSaveFiltersToScope) {
             Button("Replace") { model.saveFiltersToScope() }.accessibilityIdentifier("ar.filter.saveTo.replace")

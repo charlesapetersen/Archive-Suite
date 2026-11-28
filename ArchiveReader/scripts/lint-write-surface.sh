@@ -143,6 +143,10 @@ ALLOW=(
   # unit-test host or for other fixture roots). The directory is fixed when `ArchiveLibrary` is made and the name
   # is a UUID, so no scanned corpus URL can reach it. A disposable cache: replaced whole, never read as truth.
   "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Search/ReaderCatalogueScan.swift${SEP}try encoder.encode(next).write(to: url, options: .atomic)"
+  # W49.storage-finder-reader-mirror: what the last Remove Suite Tags took off, so Put Back can undo it. The Reader's
+  # own Application Support folder (`FinderMirrorRemovals`), keyed by the root's identity; never inside an archive.
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+FinderMirror.swift${SEP}try JSONEncoder().encode(removals).write(to: url, options: .atomic)"
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+FinderMirror.swift${SEP}try FileManager.default.removeItem(at: url)"
 
   # AuditLedger (Safety §12, W40.audit-ledger): the Reader's append-only record of its own tag writes,
   # one JSON line per verified write. The file is `audit-ledger.jsonl` in the Reader's Application

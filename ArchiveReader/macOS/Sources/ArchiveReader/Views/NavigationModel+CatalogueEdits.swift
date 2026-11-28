@@ -182,6 +182,19 @@ extension NavigationModel {
                                documents: ((ItemFacts) -> Bool)? = nil,
                                completed: ((Set<String>) -> Void)? = nil,
                                edit: (ItemFacts) -> (ItemFacts.FileFacts, CatalogueEdit)?) -> Bool {
+        editCatalogue(title: title, paths: paths, physicalPageIndex: physicalPageIndex, observed: observed,
+                      operationID: operationID, documents: documents, completed: completed,
+                      edits: { facts in edit(facts).map { [$0] } ?? [] })
+    }
+
+    /// Several edits for one selection, saved as one operation (the Finder mirror's Import,
+    /// W49.storage-finder-reader-mirror). A selection with no edit is refused.
+    @discardableResult
+    func editCatalogue(title: String, paths: [String]?, physicalPageIndex: Int? = nil,
+                       observed: [ItemFacts]? = nil, operationID: UUID? = nil,
+                       documents: ((ItemFacts) -> Bool)? = nil,
+                       completed: ((Set<String>) -> Void)? = nil,
+                       edits: (ItemFacts) -> [(ItemFacts.FileFacts, CatalogueEdit)]) -> Bool {
         guard !catalogueEditSaving else {
             reportCatalogue("Wait for the current catalogue change to finish, then try again.")
             return false
@@ -220,35 +233,40 @@ extension NavigationModel {
         if documents == nil { refused = max(0, requested - selection.count) }
         // With every document edited, the PDFs a refused document belongs to: none of them is reported as saved.
         var refusedSources: Set<String> = []
-        let operations = selection.compactMap { facts -> CatalogueEditPlan.Intent? in
-            guard let (base, edit) = edit(facts), base.pair.occurrence.rootInstanceID == reader.rootInstanceID,
+        let operations = selection.flatMap { facts -> [CatalogueEditPlan.Intent] in
+            let wanted = edits(facts)
+            guard !wanted.isEmpty, wanted.allSatisfy({ $0.0.pair.occurrence.rootInstanceID == reader.rootInstanceID }),
                   let source = try? facts.file.get(), let refreshed = selected[key(facts, source)],
                   let refreshedFile = try? refreshed.file.get(), source.samePhysicalOccurrence(as: refreshedFile)
             else {
                 refused += 1
                 if let source = try? facts.file.get() { refusedSources.insert(source.pair.occurrence.relativePath) }
-                return nil
+                return []
             }
-            var member: CatalogueEditPlan.Member?
-            switch edit.target {
-            case .document(let id, _):
-                guard let resolved = try? refreshed.document.get(), id == resolved.document.id,
-                      base.samePhysicalOccurrence(as: resolved.owner), facts.page?.id == refreshed.page?.id else {
-                    refused += 1
-                    refusedSources.insert(source.pair.occurrence.relativePath)
-                    return nil
+            var intents: [CatalogueEditPlan.Intent] = []
+            for (base, edit) in wanted {
+                var member: CatalogueEditPlan.Member?
+                switch edit.target {
+                case .document(let id, _):
+                    guard let resolved = try? refreshed.document.get(), id == resolved.document.id,
+                          base.samePhysicalOccurrence(as: resolved.owner), facts.page?.id == refreshed.page?.id else {
+                        refused += 1
+                        refusedSources.insert(source.pair.occurrence.relativePath)
+                        return []
+                    }
+                    if source.pair.occurrence != base.pair.occurrence {
+                        member = .init(source: source, page: facts.page, document: id)
+                    }
+                case .pageViewRotation(let page):
+                    guard refreshed.page?.id == page else {
+                        refused += 1
+                        return []
+                    }
+                case .file: break
                 }
-                if source.pair.occurrence != base.pair.occurrence {
-                    member = .init(source: source, page: facts.page, document: id)
-                }
-            case .pageViewRotation(let page):
-                guard refreshed.page?.id == page else {
-                    refused += 1
-                    return nil
-                }
-            case .file: break
+                intents.append(.init(base: base, edit: edit, member: member))
             }
-            return .init(base: base, edit: edit, member: member)
+            return intents
         }
         let plan = CatalogueEditPlan(operations)
         // `completed` hears of the PDFs asked for rather than the records written: with every document edited one PDF
@@ -334,6 +352,10 @@ extension NavigationModel {
                 self.catalogueEditFailures = result.failures
                 self.catalogueLastSaveChanged = result.changed
                 self.reportCatalogue(result.message(verb: verb, pending: heads.uncertainCount))
+                // The archive's Finder mirror follows each saved record (W49.storage-finder-reader-mirror).
+                if self.finderMirrorOn, !result.changedPaths.isEmpty {
+                    self.projectFinderMirror(changedRecords: result.changedPaths)
+                }
                 // A recorded tag change follows the Undo or Redo that changed something (W40.tag-window-reader).
                 if let r = result.reversal, result.changed > 0 {
                     self.tagChangeReversed(group: r.group, by: r.by, redo: r.redo)
@@ -349,7 +371,7 @@ extension NavigationModel {
         }
     }
 
-    private func reportCatalogue(_ message: String) {
+    func reportCatalogue(_ message: String) {
         catalogueEditFeedback = message
         statusMessage = message
         announce(message)
@@ -399,7 +421,7 @@ extension NavigationModel {
         }
     }
 
-    private static func catalogueField(_ field: CheckableField) -> CatalogueEdit.DocumentField? {
+    nonisolated static func catalogueField(_ field: CheckableField) -> CatalogueEdit.DocumentField? {
         switch field {
         case .date: .documentDate
         case .sentWith: .sentWith
@@ -415,7 +437,7 @@ extension NavigationModel {
         }
     }
 
-    private static func value<T>(_ field: CatalogueRecord.Field<T>?) -> T? where T: Decodable & Sendable {
+    nonisolated static func value<T>(_ field: CatalogueRecord.Field<T>?) -> T? where T: Decodable & Sendable {
         guard case .value(let current) = field?.current else { return nil }
         return current
     }
