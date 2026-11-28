@@ -33,6 +33,8 @@ extension PDFGenerator {
         guard let doc = PDFDocument(data: pdf), !doc.isLocked else { return .skipped("not readable") }
         let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
         guard carried == nil || carried?.count == doc.pageCount else { return .skipped("the header list does not fit") }
+        // An unfiled working PDF carries its catalogue identity from its write (W49.proc-identity-at-write): kept.
+        let identity = doc.documentRef.flatMap(CataloguePDFIdentity.identity(in:))
         let roles = PDFPageRole.roles(of: doc)
         guard allowMerged || roles == [.image, .text] || roles == [.searchable] else {
             return .skipped("not one source page")
@@ -81,15 +83,16 @@ extension PDFGenerator {
         let data: Data?
         if let newHeaders {
             data = Self.searchableRewrite(doc, original: pdf, pageHeaders: newHeaders,
-                                          replacing: replacement.map { (index, $0) })
+                                          replacing: replacement.map { (index, $0) }, catalogueIdentity: identity)
         } else {
             guard let replacement, let out = Self.withReplacement(in: doc, at: index, page: replacement) else {
                 return .skipped("the original pages could not be copied")
             }
-            data = Self.archivalData(out)
+            data = Self.archivalData(out, catalogueIdentity: identity)
         }
         guard let data, let made = PDFDocument(data: data), made.pageCount == doc.pageCount,
-              made.documentRef.flatMap(PDFHeaderCarrier.pages(of:)) == newHeaders else {
+              made.documentRef.flatMap(PDFHeaderCarrier.pages(of:)) == newHeaders,
+              made.documentRef.flatMap(CataloguePDFIdentity.identity(in:)) == identity else {
             return .skipped("the new file does not read back")
         }
 
@@ -151,7 +154,8 @@ extension PDFGenerator {
 
     /// Use qpdf to keep the searchable pages' compressed streams. Quartz is the fallback used by merge.
     private static func searchableRewrite(_ doc: PDFDocument, original pdf: Data, pageHeaders: [String?],
-                                          replacing: (index: Int, page: PDFPage)?) -> Data? {
+                                          replacing: (index: Int, page: PDFPage)?,
+                                          catalogueIdentity: CataloguePDFIdentity?) -> Data? {
         guard !Task.isCancelled else { return nil }
         let fm = FileManager.default
         do {
@@ -166,10 +170,10 @@ extension PDFGenerator {
                 guard let newBytes = archivalData(replacement) else { throw PDFError.writeFailed }
                 let newPage = dir.appendingPathComponent("page.pdf")
                 try newBytes.write(to: newPage, options: .withoutOverwriting)
-                return try SearchableArchival.data([url], pageHeaders: pageHeaders,
+                return try SearchableArchival.data([url], pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity,
                                                    replacing: (replacing.index, newPage))
             }
-            return try SearchableArchival.data([url], pageHeaders: pageHeaders)
+            return try SearchableArchival.data([url], pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)
         } catch {
             guard !Task.isCancelled else { return nil }
             NSLog("ArchiveProcessor: searchable header rewrite through qpdf failed (%@); rewriting through Quartz",
@@ -177,10 +181,10 @@ extension PDFGenerator {
         }
         if let replacing {
             guard let out = withReplacement(in: doc, at: replacing.index, page: replacing.page) else { return nil }
-            return archivalData(out, pageHeaders: pageHeaders)
+            return archivalData(out, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)
         }
         guard (0..<doc.pageCount).allSatisfy({ doc.page(at: $0)?.pageRef != nil }) else { return nil }
-        return archivalData(doc, pageHeaders: pageHeaders)
+        return archivalData(doc, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)
     }
 
     /// Text with every white space removed: PDFKit's read-back changes line breaks and spacing, never the characters.

@@ -496,6 +496,7 @@ extension OCRProcessor {
             // merge copies those pages verbatim, so one undecodable page makes the merged output a
             // partially scan-less PDF and the operator has to be told.
             let layerOptions = textLayerOptions
+            let identity = catalogueWriteIdentity(for: outputURL)
             let assembly: (ok: Bool, anyPlaceholder: Bool, layerNotes: [String]) = await PDFGenerator.runWorker(priority: .utility) {
                 let gen = PDFGenerator()
                 let fm = FileManager.default
@@ -518,7 +519,7 @@ extension OCRProcessor {
                         }
                         perPagePDFs.append(tmp)
                     }
-                    try gen.mergeDocumentPDFs(sourcePDFs: perPagePDFs, outputURL: outputURL)
+                    try gen.mergeDocumentPDFs(sourcePDFs: perPagePDFs, outputURL: outputURL, catalogueIdentity: identity)
                     return (true, anyPlaceholder, layerNotes)
                 } catch {
                     os_log(.error, "multi-page re-OCR PDF write failed for %{public}@: %{public}@",
@@ -596,7 +597,7 @@ extension OCRProcessor {
     /// read-then-reserve needs no locking.
     func uniqueOutputURL(baseName: String, ext: String, in dir: URL, for sourceURL: URL) -> URL {
         if let existing = outputURLMap[sourceURL], catalogueRun?.contains(existing) != false,
-           !OutputFileSafety.hasCatalogueIdentity(at: existing) { return existing }
+           !OutputFileSafety.isFiledCatalogue(at: existing) { return existing }
         // Lazy rebuild after a reset (outputURLMap populated by resume-restore but cache was cleared).
         if _takenOutputPaths.isEmpty && !outputURLMap.isEmpty {
             _takenOutputPaths = Set(outputURLMap.values.map(OutputFileSafety.pathKey))
@@ -1882,7 +1883,7 @@ extension OCRProcessor {
             localAgentModelName: runConfig.map { $0.localAgent?.provenanceModelName }
                 ?? currentLocalAgent?.provenanceModelName,
             pdfImageMB: pdfSettings.imageMB, textColumns: pdfSettings.textColumns, textLayer: textLayerOptions,
-            copySourceTags: passSourceTags)
+            copySourceTags: passSourceTags, catalogueIdentity: catalogueWriteIdentity(for: outputURL))
     }
 
     /// Write one output PDF (and, copying source tags, its tags). Off the main actor.
@@ -1905,7 +1906,8 @@ extension OCRProcessor {
                                                           sourceFormat: OutputForm.format(ofExtension: r.source.pathExtension),
                                                           // W42.stroke-weight-processor — judged on the source:
                                                           // `imageURL` may be a converted copy without its camera tags.
-                                                          photographed: CompressedPage.isCameraPhoto(r.source))
+                                                          photographed: CompressedPage.isCameraPhoto(r.source),
+                                                          catalogueIdentity: r.catalogueIdentity)
             var outcome = OutputWriteOutcome(success: true, imagePage: output.imagePage, layer: output.layer,
                                              formFallback: output.formFallback, compression: output.compression,
                                              compressedNote: output.compressedNote)

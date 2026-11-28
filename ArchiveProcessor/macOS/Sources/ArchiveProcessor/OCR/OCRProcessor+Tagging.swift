@@ -940,6 +940,7 @@ extension OCRProcessor {
                         let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
                         let (imageMB, columns) = (outputSettings.pdfImageMB, outputSettings.textColumns)
                         let layerOptions = textLayerOptions
+                        let identity = catalogueWriteIdentity(for: outputURL)
                         let output = try await PDFGenerator.runWorker {
                             try PDFGenerator().generateOutput(
                                 imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
@@ -951,7 +952,8 @@ extension OCRProcessor {
                                 textColumns: columns,
                                 textLayer: layerOptions,
                                 sourceFormat: OutputForm.format(ofExtension: source.pathExtension),
-                                photographed: CompressedPage.isCameraPhoto(source)   // W42.stroke-weight-processor
+                                photographed: CompressedPage.isCameraPhoto(source),   // W42.stroke-weight-processor
+                                catalogueIdentity: identity
                             )
                         }
                         guard !Task.isCancelled else { return }
@@ -1730,7 +1732,7 @@ extension OCRProcessor {
             for source in seg.pdfURLs {
                 guard let j = jobIndexBySource[source], !jobs[j].appliedTags.isEmpty,
                       let outputURL = outputURLMap[source],
-                      !OutputFileSafety.hasCatalogueIdentity(at: outputURL) else { continue }
+                      !OutputFileSafety.isFiledCatalogue(at: outputURL) else { continue }
                 var review = enclosureDateReviews[source]
                 let coverName = review?.manual?.rejectedCover == true ? nil : coverSource?.lastPathComponent
                 let cover = coverName == nil ? nil : coverTags
@@ -1997,8 +1999,10 @@ extension OCRProcessor {
                 let staging = try PDFGenerator.stagingDirectory(in: mergeDirectory)
                 defer { try? FileManager.default.removeItem(at: staging) }
                 let candidate = staging.appendingPathComponent("merged.pdf")
+                // A merged document is a file of its own: its own identity, in the one write (W49.proc-identity-at-write).
+                let identity = catalogueWriteIdentity(for: mergeDirectory.appendingPathComponent(baseName + "_merged.pdf"))
                 try await PDFGenerator.runWorker(priority: .utility) {
-                    try PDFGenerator().mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: candidate)
+                    try PDFGenerator().mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: candidate, catalogueIdentity: identity)
                 }
                 guard !Task.isCancelled, segment.pdfURLs.compactMap({ outputURLMap[$0] }) == sourcePDFs,
                       mergeParent() == mergeDirectory else { return }

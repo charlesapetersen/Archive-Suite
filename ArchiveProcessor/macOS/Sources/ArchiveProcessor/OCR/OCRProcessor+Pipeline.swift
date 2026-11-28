@@ -2298,7 +2298,8 @@ extension OCRProcessor {
                         localAgentDisplayName: currentLocalAgent?.provenanceDisplayName,
                         localAgentModelName: currentLocalAgent?.provenanceModelName,
                         pdfImageMB: pdfSettings.imageMB, textColumns: pdfSettings.textColumns,
-                        textLayer: textLayerOptions, copySourceTags: passSourceTags))
+                        textLayer: textLayerOptions, copySourceTags: passSourceTags,
+                        catalogueIdentity: catalogueWriteIdentity(for: r.outputURL)))
                 }
             } else if !toGenerate.isEmpty {
                 let model = pending.model
@@ -2312,6 +2313,8 @@ extension OCRProcessor {
                 // W23.h5-fu — carry each regenerated PDF's image-page verdict back too, so a rebuilt
                 // output that could not embed its scan is reported instead of counting as a clean redo.
                 let layerOptions = textLayerOptions
+                let identities = Dictionary(toGenerate.compactMap { g in catalogueWriteIdentity(for: g.outputURL).map { (g.outputURL, $0) } },
+                                            uniquingKeysWith: { first, _ in first })
                 let regen: (failed: Set<URL>, placeholders: Set<URL>) = await PDFGenerator.runWorker(priority: .utility) { [toGenerate] in
                     let gen = PDFGenerator()
                     var failed = Set<URL>()
@@ -2319,13 +2322,14 @@ extension OCRProcessor {
                     for g in toGenerate {
                         guard !Task.isCancelled else { break }
                         do {
-                            let outcome = try gen.generate(imageURL: g.imageURL, result: g.result, model: model,
+                            let outcome = try gen.generateOutput(imageURL: g.imageURL, result: g.result, model: model,
                                               outputURL: g.outputURL, originalFileName: g.fileName,
                                               gatewayDisplayName: gatewayName,
                                               localAgentDisplayName: localAgentDisplayName,
                                               localAgentModelName: localAgentModelName,
                                               pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions,
-                                              sourceFormat: OutputForm.format(ofExtension: (g.fileName as NSString).pathExtension))
+                                              sourceFormat: OutputForm.format(ofExtension: (g.fileName as NSString).pathExtension),
+                                              catalogueIdentity: identities[g.outputURL]).imagePage
                             if outcome.isPlaceholder { placeholders.insert(g.outputURL) }
                         } catch {
                             failed.insert(g.outputURL)

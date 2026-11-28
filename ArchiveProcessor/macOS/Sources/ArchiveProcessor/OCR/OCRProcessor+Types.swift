@@ -50,6 +50,8 @@ struct OutputWriteRequest: Sendable {
     let textColumns: Int
     let textLayer: PDFGenerator.TextLayerOptions?
     let copySourceTags: Bool
+    /// The identity a catalogue run's working PDF is written with (`catalogueWriteIdentity`); nil outside one.
+    var catalogueIdentity: CataloguePDFIdentity? = nil
 }
 
 /// What one output write came to, carried back to the main actor.

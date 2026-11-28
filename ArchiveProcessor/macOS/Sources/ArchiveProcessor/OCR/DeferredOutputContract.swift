@@ -167,8 +167,33 @@ enum DeferredOutputContract {
                 && header1?.fullBody.contains("DEFERRED PAGE 1 READING") == true)
         let tags0 = (try? MacOSTagger.readTags(from: held[0])) ?? []
         check("the held tags are on the written file", tags0.contains("Alpha") && tags0.contains("Beta"), "\(tags0)")
-        check("the written outputs carry no catalogue identity until filing",
-              !OutputFileSafety.hasCatalogueIdentity(at: held[0]) && !OutputFileSafety.hasCatalogueIdentity(at: held[1]))
+        // W49.proc-identity-at-write — the identity is in the one write, and the working PDF stays the run's to change.
+        func identity(_ url: URL) -> CataloguePDFIdentity? {
+            CGPDFDocument(url as CFURL).flatMap(CataloguePDFIdentity.identity(in:))
+        }
+        let written = [identity(held[0]), identity(held[1])]
+        check("each written output carries its own catalogue identity from the one write",
+              written.allSatisfy { $0 != nil } && written[0]?.fileID != written[1]?.fileID, "\(written)")
+        check("an identified working PDF is unfiled, not filed",
+              held[0...1].allSatisfy { OutputFileSafety.isUnfiledWorkingPDF($0) && !OutputFileSafety.isFiledCatalogue(at: $0) })
+        p.updateClassification(at: 1, to: .documentStart, runConfig: config)
+        check("a class edit after the write rewrites page 2 and keeps the file's identity",
+              PDFHeaderParser.extract(held[1])?.classification == DocumentClassification.documentStart.displayName
+                && identity(held[1]) == written[1], "\(PDFHeaderParser.extract(held[1])?.classification ?? "nil") — \(p.statusMessage)")
+        // A filed copy of the same bytes, with its record beside it, is refused as before.
+        let filedCopy = root.appendingPathComponent("filed-copy.pdf")
+        try? fm.copyItem(at: held[0], to: filedCopy)
+        let outsideRefused: Bool
+        do { try OutputFileSafety.removeGeneratedOutput(filedCopy, for: pages[0]); outsideRefused = false }
+        catch { outsideRefused = (error as? OutputFileSafety.ReplaceError) == .cataloguePDF }
+        let recordBeside = held[0].appendingPathExtension("archivesuite.json")
+        try? Data("{}".utf8).write(to: recordBeside)
+        let recordRefused: Bool
+        do { try OutputFileSafety.removeGeneratedOutput(held[0], for: pages[0]); recordRefused = false }
+        catch { recordRefused = (error as? OutputFileSafety.ReplaceError) == .cataloguePDF }
+        try? fm.removeItem(at: recordBeside)
+        check("an identified PDF outside a working folder, or with its record beside it, is never removed",
+              outsideRefused && recordRefused && fm.fileExists(atPath: filedCopy.path) && fm.fileExists(atPath: held[0].path))
 
         // 4. A held write that fails maps nothing and fails its row, with the reading kept.
         let missingFolder = output.appendingPathComponent("gone", isDirectory: true).appendingPathComponent("p04.pdf")
@@ -183,7 +208,61 @@ enum DeferredOutputContract {
               p.outputURLMap[pages[3]] == nil && p.jobs[3].status == .failed
                 && p.jobs[3].result?.errorCode == "pdf_write_failed" && p.jobs[3].result?.text == reading(3).text,
               "\(p.jobs[3].result?.errorCode ?? "nil")")
+
+        // Filing copies each identified working PDF as it is: the filed bytes are the written ones (no second write).
+        let before = held[0...1].map { try? Data(contentsOf: $0) }
+        let moves = await p.finishCatalogueRun(organizing: false, preOCRed: false, exportingImages: false, stampsUnread: false)
+        let filedPair = held[0...1].map { moves?[$0] }
+        check("filing copies each identified working PDF's bytes and keeps its identity",
+              before.allSatisfy { $0 != nil } && zip(filedPair, before).allSatisfy { filed, bytes in
+                  filed.flatMap { try? Data(contentsOf: $0) } == bytes }
+                && filedPair.map { $0.flatMap(identity) } == written
+                && filedPair.allSatisfy { $0.map(OutputFileSafety.isFiledCatalogue(at:)) == true },
+              "\(filedPair.map { $0?.path ?? "nil" }) — \(p.statusMessage)")
         p.catalogueRunLease = nil
+        try? fm.removeItem(at: manifest)
+        try? fm.removeItem(at: OCRProcessor.pendingCatalogueURL)
+
+        // 4b. A merged document is a file of its own: its own identity in its one write, and filed as it is.
+        let mergeOut = root.appendingPathComponent("merge", isDirectory: true)
+        try? fm.createDirectory(at: mergeOut, withIntermediateDirectories: true)
+        let m = OCRProcessor()
+        m.taggingMode = .none
+        m.rotationMode = .off
+        let mergePair = Array(pages[2...3])
+        guard await m.beginCatalogueRun(outputRoot: mergeOut, sources: mergePair),
+              let mergeRun = pendingRun(m, files: mergePair, output: mergeOut) else {
+            finish(results + ["FAIL: the merge run is set up in scratch"])
+            return
+        }
+        m.activePendingRun = mergeRun
+        m.jobs = mergePair.map { OCRJob(sourceURL: $0) }
+        m.defersOutputWrites = true
+        for i in 0..<2 {
+            let page = OCRResult(text: "MERGED PAGE \(i) READING", classification: i == 0 ? .documentStart : .documentContinuation,
+                                 errorMessage: nil, errorCode: nil)
+            _ = await m.handleOCRResult(page, index: i, jobID: m.jobs[i].id, url: mergePair[i], model: model,
+                                        outputDirectory: mergeOut, runConfig: config)
+        }
+        await m.materializeDeferredOutputs()
+        let parts = mergePair.compactMap { m.outputURLMap[$0] }
+        await m.performDocumentMerging(files: mergePair, outputDirectory: mergeOut, runConfig: config)
+        let merged = m.outputURLMap[mergePair[0]]
+        let mergedIdentity = merged.flatMap(identity)
+        check("a merged document is written with an identity of its own",
+              parts.count == 2 && merged != nil && merged == m.outputURLMap[mergePair[1]] && !parts.contains { $0 == merged }
+                && mergedIdentity != nil
+                && parts.allSatisfy { identity($0) != nil && identity($0)?.fileID != mergedIdentity?.fileID },
+              "\(parts.map(\.lastPathComponent)) → \(merged?.lastPathComponent ?? "nil") — \(m.statusMessage)")
+        let mergedBytes = merged.flatMap { try? Data(contentsOf: $0) }
+        let mergeMoves = await m.finishCatalogueRun(organizing: false, preOCRed: false, exportingImages: false,
+                                                    stampsUnread: false)
+        let filedMerged = merged.flatMap { mergeMoves?[$0] }
+        check("the merged document is filed as written, with its identity",
+              mergeMoves?.count == 1 && mergedBytes != nil && filedMerged.flatMap { try? Data(contentsOf: $0) } == mergedBytes
+                && filedMerged.flatMap(identity) == mergedIdentity,
+              "\(String(describing: mergeMoves)) — \(m.statusMessage)")
+        m.catalogueRunLease = nil
         try? fm.removeItem(at: manifest)
         try? fm.removeItem(at: OCRProcessor.pendingCatalogueURL)
 

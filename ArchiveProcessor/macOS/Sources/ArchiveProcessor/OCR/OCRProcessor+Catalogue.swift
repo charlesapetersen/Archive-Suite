@@ -92,6 +92,40 @@ extension OCRProcessor {
         for source in segment.pdfURLs { catalogueDocumentFields[source] = fields }
     }
 
+    /// W49.proc-identity-at-write — the catalogue identity a write to `outputURL` carries: a new one when it is this
+    /// run's working PDF, nil otherwise. Each write of a working PDF is new content no one has read, so it gets a new
+    /// identity; filing keeps the one the file carries (`catalogueDrafts`) and copies its bytes.
+    func catalogueWriteIdentity(for outputURL: URL) -> CataloguePDFIdentity? {
+        guard catalogueRun?.contains(outputURL) == true else { return nil }
+        return CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+    }
+
+    /// The identity each generated working PDF was written with, read off the main actor. A pre-OCRed run's working
+    /// PDFs are copies of the user's own files, whose identity (if any) is not this run's to file: none is read.
+    /// An identity two files share is not used for either.
+    private func writtenCatalogueIdentities(run: ProcessorCatalogueRun, preOCRed: Bool) async -> [URL: CataloguePDFIdentity] {
+        guard !preOCRed else { return [:] }
+        let pdfs = Set(outputURLMap.values.filter { run.contains($0) })
+        let found: [URL: CataloguePDFIdentity] = await PDFGenerator.runWorker(priority: .utility) {
+            var found: [URL: CataloguePDFIdentity] = [:]
+            for pdf in pdfs {
+                if let identity = CGPDFDocument(pdf as CFURL).flatMap(CataloguePDFIdentity.identity(in:)) {
+                    found[pdf] = identity
+                }
+            }
+            return found
+        }
+        let shared = Dictionary(grouping: found.values.map(\.fileID), by: { $0 }).filter { $0.value.count > 1 }.keys
+        return found.filter { !shared.contains($0.value.fileID) }
+    }
+
+    private struct CatalogueIdentityMismatch: LocalizedError {
+        let filename: String
+        var errorDescription: String? {
+            "“\(filename)” does not carry the catalogue identity it was to be filed with. Resume the run to file it again."
+        }
+    }
+
     private struct DraftFile: Sendable {
         let pdf: URL
         let sources: [URL]
@@ -112,9 +146,12 @@ extension OCRProcessor {
         guard var run = catalogueRun else { return [:] }
         do {
             if run.files == nil {
+                let written = await writtenCatalogueIdentities(run: run, preOCRed: preOCRed)
+                try Task.checkCancellation()
                 run.inputJournalDigests = try catalogueInputJournalDigests(for: run)
                 let drafts = try catalogueDrafts(run: run, organizing: organizing, preOCRed: preOCRed,
-                                                 exportingImages: exportingImages, stampsUnread: stampsUnread)
+                                                 exportingImages: exportingImages, stampsUnread: stampsUnread,
+                                                 written: written)
                 let workingRoot = run.workingRoot
                 let outputRoot = run.outputRoot
                 let generalMirrors = activeRunConfig?.mirrorFinderTags == true
@@ -216,7 +253,8 @@ extension OCRProcessor {
     }
 
     private func catalogueDrafts(run: ProcessorCatalogueRun, organizing: Bool, preOCRed: Bool,
-                                 exportingImages: Bool, stampsUnread: Bool) throws -> [DraftFile] {
+                                 exportingImages: Bool, stampsUnread: Bool,
+                                 written: [URL: CataloguePDFIdentity]) throws -> [DraftFile] {
         let allowedSources = Set(run.sources)
         let work = outputURLMap.filter { allowedSources.contains($0.key) && run.contains($0.value) }
         var sourcesByPDF: [URL: [URL]] = [:]
@@ -245,8 +283,9 @@ extension OCRProcessor {
             }
         }
 
+        // The identity the file was written with (W49.proc-identity-at-write), else a new one its filing copy adds.
         let identities = Dictionary(uniqueKeysWithValues: distinct.map {
-            ($0, CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID()))
+            ($0, written[$0] ?? CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID()))
         })
         var owners: [URL: (UUID, UUID)] = [:]
         for pdf in distinct {
@@ -446,7 +485,22 @@ extension OCRProcessor {
                                                       document: draft.document, fileFields: draft.fileFields,
                                                       preservationManifestSHA256: preservation?.manifest.digest()).encoded()
             let prepared = workingRoot.appendingPathComponent(draft.identity.fileID.uuidString + ".prepared.pdf")
-            let bytes = try SearchableArchival.catalogueCopy(of: draft.pdf, identity: draft.identity)
+            // A working PDF written with its identity is filed as it is; any other gets a copy that adds one.
+            let carried = try Data(contentsOf: draft.pdf)
+            let bytes: Data
+            switch CGDataProvider(data: carried as CFData).flatMap(CGPDFDocument.init).map(CataloguePDFIdentity.identity(in:)) {
+            case .some(.some(let identity)):
+                // Rewritten after its identity was read (the filing then stops, and a resume reads it again), or a
+                // pre-OCRed copy of a file that already has one: never filed under an identity it does not carry.
+                guard identity == draft.identity else {
+                    throw CatalogueIdentityMismatch(filename: draft.pdf.lastPathComponent)
+                }
+                bytes = carried
+            case .some(.none):
+                bytes = try SearchableArchival.catalogueCopy(of: draft.pdf, identity: draft.identity)
+            case .none:
+                throw PDFError.sourceUnreadable(draft.pdf)
+            }
             try bytes.write(to: prepared, options: .withoutOverwriting)
             try OutputFileSafety.copyExtendedAttributes(from: draft.pdf, to: prepared)
             try ProcessorCatalogueRun.flushFileAndParent(prepared)

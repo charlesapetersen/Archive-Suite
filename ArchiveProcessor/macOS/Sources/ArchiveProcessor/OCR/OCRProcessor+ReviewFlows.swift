@@ -394,7 +394,7 @@ extension OCRProcessor {
         guard jobs.indices.contains(index),
               !reOCRSourceURLs.contains(jobs[index].sourceURL) else { return }
         let currentOutput = outputURLMap[jobs[index].sourceURL]
-        let filed = currentOutput.map(OutputFileSafety.hasCatalogueIdentity(at:)) ?? false
+        let filed = currentOutput.map(OutputFileSafety.isFiledCatalogue(at:)) ?? false
         let oldClassification = Self.taggedClassification(of: jobs[index])
         jobs[index].classification = newClassification
         if let existingResult = jobs[index].result {
@@ -503,6 +503,7 @@ extension OCRProcessor {
                     let (fileName, gatewayName) = (source.lastPathComponent, currentGateway?.displayName)
                     let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
                     let layerOptions = textLayerOptions
+                    let identity = catalogueWriteIdentity(for: outputURL)
                     let output = try await PDFGenerator.runWorker {
                         try pdfGen.generateOutput(
                             imageURL: imageURL,
@@ -517,7 +518,8 @@ extension OCRProcessor {
                             textColumns: pdfSettings.textColumns,
                             textLayer: layerOptions,
                             sourceFormat: OutputForm.format(ofExtension: source.pathExtension),
-                            photographed: CompressedPage.isCameraPhoto(source)   // W42.stroke-weight-processor
+                            photographed: CompressedPage.isCameraPhoto(source),   // W42.stroke-weight-processor
+                            catalogueIdentity: identity
                         )
                     }
                     recordImagePage(output.imagePage, forSource: source)

@@ -23,6 +23,29 @@ enum OutputFileSafety {
             || PDFDocument(url: pdf)?.documentRef.flatMap(CataloguePDFIdentity.identity(in:)) != nil
     }
 
+    /// W49.proc-identity-at-write — a Process Files working PDF: inside a run's private `catalogue-work-<id>` folder
+    /// beside the run journals (`ProcessorCatalogueRun.create`), with no catalogue record beside it. A standard run
+    /// writes the identity in the one output write, so such a file carries one before filing; filing copies it into
+    /// the archive, so nothing has read or recorded it yet and the run's later steps may still rewrite or remove it.
+    static func isUnfiledWorkingPDF(_ pdf: URL) -> Bool {
+        let companion = pdf.appendingPathExtension("archivesuite.json")
+        guard !FileManager.default.fileExists(atPath: companion.path),
+              (try? FileManager.default.destinationOfSymbolicLink(atPath: companion.path)) == nil else { return false }
+        let state = OCRProcessor.pendingCatalogueURL.deletingLastPathComponent().standardizedFileURL.pathComponents
+        let path = pdf.standardizedFileURL.pathComponents
+        guard path.count > state.count + 1, path.starts(with: state, by: { $0.utf8.elementsEqual($1.utf8) }) else {
+            return false
+        }
+        let folder = path[state.count], prefix = "catalogue-work-"
+        return folder.hasPrefix(prefix) && UUID(uuidString: String(folder.dropFirst(prefix.count))) != nil
+    }
+
+    /// An identified PDF that is not an unfiled working PDF: a filed file, or one no run of this Mac is still
+    /// preparing. Never rewritten or removed by an output cleanup.
+    static func isFiledCatalogue(at pdf: URL) -> Bool {
+        hasCatalogueIdentity(at: pdf) && !isUnfiledWorkingPDF(pdf)
+    }
+
     /// Prove file identity using resolved exact paths or filesystem resource identifiers. Case-folded path
     /// equality alone is not proof on a case-sensitive volume, where `Photo.JPG` and `photo.jpg` may differ.
     static func isSameFile(_ lhs: URL, _ rhs: URL) -> Bool {
@@ -180,7 +203,7 @@ enum OutputFileSafety {
     static func replaceGeneratedOutput(_ outputURL: URL, for sourceURL: URL, with data: Data,
                                        replacing original: Data? = nil, fileManager: FileManager = .default) throws {
         guard !isSameFile(outputURL, sourceURL) else { throw ReplaceError.aliasesSource }
-        guard !hasCatalogueIdentity(at: outputURL) else { throw ReplaceError.cataloguePDF }
+        guard !isFiledCatalogue(at: outputURL) else { throw ReplaceError.cataloguePDF }
         guard fileManager.fileExists(atPath: outputURL.path) else { throw ReplaceError.missing }
         let temp = outputURL.deletingLastPathComponent()
             .appendingPathComponent(".archiveprocessor-\(UUID().uuidString).tmp")   // short: a long output name still fits
@@ -243,7 +266,7 @@ enum OutputFileSafety {
     static func removeGeneratedOutput(_ outputURL: URL, for sourceURL: URL,
                                       fileManager: FileManager = .default) throws {
         guard !isSameFile(outputURL, sourceURL) else { return }
-        guard !hasCatalogueIdentity(at: outputURL) else { throw ReplaceError.cataloguePDF }
+        guard !isFiledCatalogue(at: outputURL) else { throw ReplaceError.cataloguePDF }
         if fileManager.fileExists(atPath: outputURL.path) {
             try fileManager.removeItem(at: outputURL)
         }
