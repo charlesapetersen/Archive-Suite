@@ -90,18 +90,17 @@ cd "$REPO_ROOT" || { echo "✗ cannot cd to $REPO_ROOT"; exit 1; }
 SRC_READER="ArchiveReader/macOS/Sources/ArchiveReader"
 SRC_CORE="packages/ArchiveCore/Sources/ArchiveCore"
 SRC_NOTES="ArchiveNotes/macOS/Sources/ArchiveNotes"
-SRC_CORE_UI="packages/ArchiveCore/Sources/ArchiveCoreUI"   # the shared controls; UI by design
-SRC_APP_SUPPORT="packages/ArchiveAppSupport"   # sources compiled directly into Reader and Processor
+SRC_CORE_UI="packages/ArchiveCore/Sources/ArchiveCoreUI"   # the shared controls & UI helpers; UI by design
 
-SRC_TAGWRITE=(    "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" "$SRC_APP_SUPPORT" )
-SRC_DESTRUCTIVE=( "$SRC_READER" "$SRC_CORE" "$SRC_CORE_UI" "$SRC_APP_SUPPORT" )
-SRC_ENUMERATOR=(  "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" "$SRC_APP_SUPPORT" )
+SRC_TAGWRITE=(    "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" )
+SRC_DESTRUCTIVE=( "$SRC_READER" "$SRC_CORE" "$SRC_CORE_UI" )
+SRC_ENUMERATOR=(  "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" )
 SRC_UI_FREE=(     "$SRC_CORE" )
 
 # The UNION — every tree any rule reads. Guard (a) below existence-checks exactly these, so a tree
 # that appears in a rule list but not here would never be checked, and a rename would put that rule
 # back to being silently skipped by grep. Guard (a2) checks for precisely that drift.
-SRCS=( "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" "$SRC_APP_SUPPORT" )
+SRCS=( "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" )
 
 SEP=$'\x1f'   # unit separator — cannot occur in Swift source, so a code line can't forge a key
 

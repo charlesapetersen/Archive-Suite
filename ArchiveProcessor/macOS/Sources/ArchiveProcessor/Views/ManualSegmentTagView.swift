@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCoreUI
 import AppKit
 
 /// Native confirmation before discarding an in-progress run from a review dialog. Uses a modal
@@ -408,7 +409,7 @@ private struct ManualSegTagCard: View {
             Text("Subjects").font(.callout).fontWeight(.medium)
             FlowLayout(spacing: 6) {
                 ForEach(subjects.wrappedValue, id: \.self) { tag in
-                    TagChip(text: tag) { subjects.wrappedValue.removeAll { $0 == tag } }
+                    TagChip(tag, font: .systemFont(ofSize: NSFont.smallSystemFontSize)) { subjects.wrappedValue.removeAll { $0 == tag } }
                 }
                 KeyboardTokenField(
                     text: $input,

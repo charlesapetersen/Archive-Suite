@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCoreUI
 import ArchiveCore
 
 // MARK: - Containers (W47.ct-reader-view; `SPEC/containers.md`)

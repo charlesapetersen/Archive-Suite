@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCoreUI
 
 // MARK: - Shared status badge (Files SF-symbol set ⇄ Live colored dot)
 

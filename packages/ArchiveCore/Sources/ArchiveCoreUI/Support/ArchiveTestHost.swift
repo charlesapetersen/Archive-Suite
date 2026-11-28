@@ -1,30 +1,32 @@
-// ArchiveTestHost.swift — screen-safety for Archive Reader's app-hosted unit tests
+// ArchiveTestHost.swift — screen-safety for app-hosted unit tests across the suite (W49.core-ui-dedup).
 
 import Foundation
 import AppKit
 import SwiftUI
 
-/// Keeps this app's unit-test host off whatever display is attached.
+/// Keeps an app's unit-test host off whatever display is attached.
 ///
-/// XcodeGen configures `ArchiveReaderTests` as an app-hosted unit bundle, so the actual Reader app
-/// process launches for each `xcodebuild test -only-testing:ArchiveReaderTests`. The UI-specific
-/// suppression stays in this app target: ArchiveCore is a UI-free shared domain package.
-enum ArchiveTestHost {
+/// XcodeGen configures app-hosted unit test bundles (`ArchiveReaderTests`, `ArchiveNotesTests`), so the app process
+/// launches for each `xcodebuild test`. Keeping this in `ArchiveCoreUI` leaves `ArchiveCore` UI-free while sharing
+/// one copy across apps.
+public enum ArchiveTestHost {
     /// True only for the host process XCTest injects the unit bundle into, never the UITest app.
-    static var isUnitTestHost: Bool {
+    public static var isUnitTestHost: Bool {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
     /// Call once from the `App` initializer, before any scene is built.
-    @MainActor static func suppressWindowsIfUnitTestHost() {
+    @MainActor public static func suppressWindowsIfUnitTestHost() {
         guard isUnitTestHost else { return }
         NSApplication.shared.setActivationPolicy(.prohibited)
     }
 
     /// Window-scene content that hides the auto-opening host window without closing the test process.
-    struct HiddenWindowStub: NSViewRepresentable {
-        func makeNSView(context: Context) -> NSView { HidingView() }
-        func updateNSView(_ nsView: NSView, context: Context) {}
+    public struct HiddenWindowStub: NSViewRepresentable {
+        public init() {}
+
+        public func makeNSView(context: Context) -> NSView { HidingView() }
+        public func updateNSView(_ nsView: NSView, context: Context) {}
 
         private final class HidingView: NSView {
             override func viewDidMoveToWindow() {

@@ -1,15 +1,12 @@
-// AppAppearance+AppKit.swift — applies ArchiveCore's Appearance setting to the app (W48.appearance-processor).
+// AppAppearance+AppKit.swift — applies ArchiveCore's Appearance setting to the app (W48.appearance, W49.core-ui-dedup).
 //
-// The value type and its defaults key are in ArchiveCore; this half needs AppKit, which ArchiveCore may not import
-// (W9.c3), so it lives in the app target. It is applied through `NSApplication.shared.appearance`, which every
-// window, sheet, panel and AppKit-hosted view inherits, and SwiftUI's `colorScheme` follows it. `follow(_:)` applies
-// the stored value at once and again on every change to the defaults, so a Settings picker bound to the key with
-// `@AppStorage` changes every open window live, and the value is back before the first window on the next launch.
+// The value type and its defaults key live in UI-free ArchiveCore; this AppKit bridge lives once in ArchiveCoreUI
+// so Archive Reader, Archive Notes, and Archive Processor all share one implementation.
 
 import AppKit
 import ArchiveCore
 
-extension AppAppearance {
+public extension AppAppearance {
     /// The appearance to set on `NSApp`; nil follows the system.
     var appearanceName: NSAppearance.Name? {
         switch self {

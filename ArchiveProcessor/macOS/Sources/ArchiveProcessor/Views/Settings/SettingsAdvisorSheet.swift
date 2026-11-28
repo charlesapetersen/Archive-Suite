@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCoreUI
 import UniformTypeIdentifiers
 
 /// "Compare routes & trade-offs…" (W49.proc-settings-advisor-advanced, `processor-settings-redesign.md` §5.6): the

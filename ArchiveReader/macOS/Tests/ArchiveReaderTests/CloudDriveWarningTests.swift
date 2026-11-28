@@ -1,4 +1,5 @@
 import XCTest
+import ArchiveCoreUI
 @testable import ArchiveReader
 
 @MainActor

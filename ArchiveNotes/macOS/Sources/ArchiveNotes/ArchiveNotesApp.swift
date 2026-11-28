@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ArchiveCore
+import ArchiveCoreUI
 
 @main
 struct ArchiveNotesApp: App {
@@ -56,6 +57,15 @@ struct ArchiveNotesApp: App {
                     .environmentObject(previewState)
                     .environmentObject(zoteroStatus)
                     .environmentObject(appDelegate.flushRegistry)   // W7-S6
+                    .task {
+                        CloudDriveWarning.showAtFirstLaunch(
+                            testLaunch: ArchiveTestHost.isUnitTestHost
+                                || UserDefaults.standard.string(forKey: "ANUITestStorePath") != nil
+                                || UserDefaults.standard.bool(forKey: "ANUITestNoLibrary")
+                                || UserDefaults.standard.string(forKey: "ANUITestStoreBookmarkSuite") != nil,
+                            title: "Keep notes and archive material on this Mac"
+                        )
+                    }
                     .onOpenURL { url in
                         NSApp.activate(ignoringOtherApps: true)
                         deepLinkRouter.handle(url)

@@ -488,7 +488,7 @@ final class SourceBlockPreviewState: ObservableObject {
 
     /// File ▸ Choose Archive Folder… — grant a Reader root with no link in hand.
     func chooseArchiveFolder() {
-        chooser.chooseRoot()
+        Task { @MainActor in _ = await chooser.chooseRootWithCloudCheck() }
     }
 
     /// Where Reader-root grants persist. A UITest launch gets its own suite, emptied once per launch, so a

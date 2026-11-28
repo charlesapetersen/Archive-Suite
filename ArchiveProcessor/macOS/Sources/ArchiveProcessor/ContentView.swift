@@ -1,4 +1,5 @@
 import ArchiveCore
+import ArchiveCoreUI
 import SwiftUI
 
 struct ContentView: View {

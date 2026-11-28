@@ -10,6 +10,7 @@
 // (ops/gui/vm-gui-runner.sh, ops/gui/README.md §3), which is the only sanctioned lane for it.
 
 import Testing
+import ArchiveCoreUI
 import AppKit
 @testable import ArchiveNotes
 

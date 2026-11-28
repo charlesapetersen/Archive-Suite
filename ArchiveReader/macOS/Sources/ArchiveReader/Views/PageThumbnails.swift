@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCoreUI
 import PDFKit
 import ImageIO
 import ArchiveCore

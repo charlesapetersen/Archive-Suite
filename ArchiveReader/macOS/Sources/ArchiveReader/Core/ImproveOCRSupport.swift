@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCoreUI
 import ArchiveCore
 
 // MARK: - Improve OCR: the Reader's connection to the shared support folder (W44.reocr-reader)

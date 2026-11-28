@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCoreUI
 import SwiftUI
 import XCTest
 @testable import ArchiveReader
@@ -8,7 +9,7 @@ final class PanelDividerAccessibilityTests: XCTestCase {
     func testVoiceOverResizesTheSameWidthWithinTheDragLimits() {
         var width = 210.0
         let divider = PanelDividerView()
-        divider.width = Binding(get: { width }, set: { width = $0 })
+        divider.size = Binding(get: { width }, set: { width = $0 })
         divider.range = 140...350
 
         XCTAssertEqual(divider.accessibilityRole(), .splitter)

@@ -30,11 +30,11 @@ EXE="$APP/Contents/MacOS/ArchiveReader"
 BUILD_LOG="/tmp/ar-launch-build.log"
 
 # Up to date = the built executable exists and is newer than every source input, the shared packages
-# `project.yml` compiles in included (ArchiveCore, ArchiveAppSupport, UITestSupport's app and shared parts).
+# `project.yml` compiles in included (ArchiveCore, UITestSupport's app and shared parts).
 PKGS="../packages"
 need_build=1
 if [ -x "$EXE" ] && [ -z "$(find "$APPDIR/Sources" "$APPDIR/project.yml" \
-      "$PKGS/ArchiveCore/Sources" "$PKGS/ArchiveCore/Package.swift" "$PKGS/ArchiveAppSupport" \
+      "$PKGS/ArchiveCore/Sources" "$PKGS/ArchiveCore/Package.swift" \
       "$PKGS/UITestSupport/App" "$PKGS/UITestSupport/Shared" -newer "$EXE" 2>/dev/null | head -1)" ]; then
   need_build=0
 fi

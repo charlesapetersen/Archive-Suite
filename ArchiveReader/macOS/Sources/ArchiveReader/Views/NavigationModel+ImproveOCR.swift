@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCoreUI
 import PDFKit
 import ArchiveCore
 

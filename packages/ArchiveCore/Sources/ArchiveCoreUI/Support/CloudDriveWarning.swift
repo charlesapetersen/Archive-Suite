@@ -2,13 +2,13 @@ import AppKit
 import ArchiveCore
 import FileProvider
 
-/// Shared by the two macOS apps. Probes only the selected URLs and their ancestors.
+/// Shared across all three macOS apps (`ArchiveCoreUI`, W49.core-ui-dedup). Probes only the selected URLs and their ancestors.
 @MainActor
-enum CloudDriveWarning {
+public enum CloudDriveWarning {
     private static let seenKey = "hasSeenCloudDriveWarning"
     private static let risks = "Cloud drives may download many files at once, create conflicting copies, or lose Finder tags. Use a folder on this Mac outside any cloud drive."
 
-    static func showAtFirstLaunch(
+    public static func showAtFirstLaunch(
         testLaunch: Bool,
         title: String = "Keep archive material on this Mac"
     ) {
@@ -38,7 +38,7 @@ enum CloudDriveWarning {
     }
 
     /// Ask before the caller opens, scans, or adopts the selection.
-    static func confirmUse(of urls: [URL]) async -> Bool {
+    public static func confirmUse(of urls: [URL]) async -> Bool {
         let selected = await firstCloudSelection(in: urls)
         guard !Task.isCancelled else { return false }
         guard let url = selected else { return true }
@@ -51,7 +51,19 @@ enum CloudDriveWarning {
         return alert.runModal() == .alertSecondButtonReturn
     }
 
-    static func firstCloudSelection(in urls: [URL]) async -> URL? {
+    /// Checks `urls` off the main-queue termination path, then runs `action` directly on the main run loop's
+    /// default mode if confirmed (used by Archive Notes library switching, where `NSApp.terminate` cannot run inside
+    /// a `Task` main-queue job).
+    public static func confirmUse(_ urls: [URL], onMainRunLoop action: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            guard await confirmUse(of: urls) else { return }
+            let loop = CFRunLoopGetMain()
+            CFRunLoopPerformBlock(loop, CFRunLoopMode.defaultMode.rawValue) { MainActor.assumeIsolated(action) }
+            CFRunLoopWakeUp(loop)
+        }
+    }
+
+    public static func firstCloudSelection(in urls: [URL]) async -> URL? {
         var checked = Set<URL>()
         for url in urls where url.isFileURL {
             // Check the picked URL itself (which may carry access from the picker) and any resolved

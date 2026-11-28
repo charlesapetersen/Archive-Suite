@@ -1,4 +1,5 @@
 import ArchiveCore
+import ArchiveCoreUI
 import Foundation
 import SQLite3
 import os

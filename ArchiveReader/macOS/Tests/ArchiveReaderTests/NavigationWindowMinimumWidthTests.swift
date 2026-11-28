@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCoreUI
 import SwiftUI
 import XCTest
 @testable import ArchiveReader

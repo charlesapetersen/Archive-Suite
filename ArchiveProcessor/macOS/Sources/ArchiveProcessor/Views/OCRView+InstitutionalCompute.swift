@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCoreUI
 import SwiftUI
 
 /// The Files tab's institutional-computing import (W41.app-institutional-compute): pick a bulk run's output folder, and the run takes

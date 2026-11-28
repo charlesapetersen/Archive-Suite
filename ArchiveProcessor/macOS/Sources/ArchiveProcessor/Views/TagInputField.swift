@@ -1,3 +1,6 @@
+import AppKit
+import ArchiveCore
+import ArchiveCoreUI
 import SwiftUI
 
 /// A token/chip tag entry field with autocomplete drawn from the Finder tags currently in
@@ -20,7 +23,7 @@ struct TagInputField: View {
         VStack(alignment: .leading, spacing: 4) {
             FlowLayout(spacing: 6) {
                 ForEach(tags, id: \.self) { tag in
-                    TagChip(text: tag) { remove(tag) }
+                    TagChip(tag, font: .systemFont(ofSize: NSFont.smallSystemFontSize)) { remove(tag) }
                 }
                 TextField(tags.isEmpty ? placeholder : "", text: $input)
                     .textFieldStyle(.plain)
@@ -69,72 +72,12 @@ struct TagInputField: View {
     private func commit(_ raw: String) {
         let t = provider.spelling(of: raw.trimmingCharacters(in: .whitespacesAndNewlines))
         input = ""
-        guard !t.isEmpty, !tags.contains(where: { $0.caseInsensitiveCompare(t) == .orderedSame }) else { return }
+        guard !t.isEmpty, !tags.contains(where: { tagKey($0) == tagKey(t) }) else { return }
         tags.append(t)
         provider.register([t])
     }
 
     private func remove(_ tag: String) {
         tags.removeAll { $0 == tag }
-    }
-}
-
-struct TagChip: View {
-    let text: String
-    let onRemove: () -> Void
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Text(text).font(.caption)
-            Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill").font(.caption2)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-    }
-}
-
-/// Simple wrapping (flow) layout for tag chips + input field. Uses the macOS 14 Layout protocol.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var x: CGFloat = 0
-        var y: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        for sv in subviews {
-            let size = sv.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth, x > 0 {
-                x = 0
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-        let totalWidth = (maxWidth == .infinity) ? x : maxWidth
-        return CGSize(width: totalWidth, height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x: CGFloat = bounds.minX
-        var y: CGFloat = bounds.minY
-        var rowHeight: CGFloat = 0
-        for sv in subviews {
-            let size = sv.sizeThatFits(.unspecified)
-            if x + size.width > bounds.maxX, x > bounds.minX {
-                x = bounds.minX
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            sv.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
     }
 }

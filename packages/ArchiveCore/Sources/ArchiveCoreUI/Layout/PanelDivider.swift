@@ -1,26 +1,45 @@
 import SwiftUI
 import AppKit
 
-/// A thin divider that can be dragged to resize an adjacent panel. The same shape as the Reader's
-/// (W40.fix-reader-a11y-labels): a native splitter underneath, so VoiceOver gets a named, adjustable control.
+/// A thin divider that can be dragged to resize an adjacent panel, backed by a native splitter so VoiceOver gets
+/// a named, adjustable control (W40.fix-reader-a11y-labels, W48.notes-stacked-layout, W49.core-ui-dedup).
 ///
 /// `axis` is the direction it resizes along: `.horizontal` is the vertical line between side-by-side panes
-/// (it sets a width), `.vertical` the horizontal line of the stacked layout (it sets the list's height,
-/// W48.notes-stacked-layout). One view for both, so switching layouts keeps the panes' identities.
-struct PanelDivider: View {
-    @Binding var size: Double
+/// (it sets a width), `.vertical` the horizontal line of a stacked layout (it sets a height).
+public struct PanelDivider: View {
+    /// The divider's own thickness (width when horizontal, height when vertical).
+    public static let width: CGFloat = 7
+
+    @Binding public var size: Double
     /// `true` when the resizable panel comes before this divider: to its left (sidebar) or above it (stacked list).
-    let panelBefore: Bool
-    var axis: Axis = .horizontal
-    let range: ClosedRange<CGFloat>
-    let label: String
-    var id: String = ""
+    public let panelBefore: Bool
+    public var axis: Axis = .horizontal
+    public let range: ClosedRange<CGFloat>
+    public let label: String
+    public var id: String = ""
 
     @State private var startSize: CGFloat?
 
-    var body: some View {
+    public init(size: Binding<Double>, panelBefore: Bool, axis: Axis = .horizontal,
+                range: ClosedRange<CGFloat>, label: String, id: String = "") {
+        self._size = size
+        self.panelBefore = panelBefore
+        self.axis = axis
+        self.range = range
+        self.label = label
+        self.id = id
+    }
+
+    /// Side-by-side width divider convenience (`axis == .horizontal`).
+    public init(width: Binding<Double>, panelOnLeft: Bool, range: ClosedRange<CGFloat>,
+                label: String, id: String = "") {
+        self.init(size: width, panelBefore: panelOnLeft, axis: .horizontal, range: range, label: label, id: id)
+    }
+
+    public var body: some View {
         PanelDividerHandle(size: $size, axis: axis, range: range, label: label, id: id)
-            .frame(width: axis == .horizontal ? 7 : nil, height: axis == .vertical ? 7 : nil)
+            .frame(width: axis == .horizontal ? Self.width : nil,
+                   height: axis == .vertical ? Self.width : nil)
             .contentShape(Rectangle())
             .onHover { inside in
                 if inside { (axis == .horizontal ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push() }
@@ -62,12 +81,12 @@ private struct PanelDividerHandle: NSViewRepresentable {
     }
 }
 
-final class PanelDividerView: NSView {
-    var size: Binding<Double> = .constant(0)
-    var range: ClosedRange<CGFloat> = 0...0
+public final class PanelDividerView: NSView {
+    public var size: Binding<Double> = .constant(0)
+    public var range: ClosedRange<CGFloat> = 0...0
     /// The direction the divider resizes along; its line runs across it. The accessibility orientation is the
     /// line's, as NSSplitView reports it: a vertical line between side-by-side panes is `.vertical`.
-    var axis: Axis = .horizontal {
+    public var axis: Axis = .horizontal {
         didSet {
             guard axis != oldValue else { return }
             setAccessibilityOrientation(axis == .horizontal ? .vertical : .horizontal)
@@ -75,7 +94,7 @@ final class PanelDividerView: NSView {
         }
     }
 
-    override init(frame frameRect: NSRect) {
+    public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setAccessibilityElement(true)
         setAccessibilityRole(.splitter)
@@ -84,7 +103,7 @@ final class PanelDividerView: NSView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    override func draw(_ dirtyRect: NSRect) {
+    public override func draw(_ dirtyRect: NSRect) {
         NSColor.separatorColor.setFill()
         if axis == .horizontal {
             NSRect(x: (bounds.width - 1) / 2, y: 0, width: 1, height: bounds.height).fill()
@@ -96,21 +115,21 @@ final class PanelDividerView: NSView {
     /// The size as drawn: a remembered one can sit beyond a range a short window has cut.
     private var shown: Double { min(Double(range.upperBound), max(Double(range.lowerBound), size.wrappedValue)) }
 
-    override func accessibilityValue() -> Any? { shown }
-    override func accessibilityMinValue() -> Any? { Double(range.lowerBound) }
-    override func accessibilityMaxValue() -> Any? { Double(range.upperBound) }
+    public override func accessibilityValue() -> Any? { shown }
+    public override func accessibilityMinValue() -> Any? { Double(range.lowerBound) }
+    public override func accessibilityMaxValue() -> Any? { Double(range.upperBound) }
 
-    override func setAccessibilityValue(_ value: Any?) {
+    public override func setAccessibilityValue(_ value: Any?) {
         guard let number = value as? NSNumber, number.doubleValue.isFinite else { return }
         size.wrappedValue = min(Double(range.upperBound), max(Double(range.lowerBound), number.doubleValue))
     }
 
-    override func accessibilityPerformIncrement() -> Bool {
+    public override func accessibilityPerformIncrement() -> Bool {
         setAccessibilityValue(shown + 10)
         return true
     }
 
-    override func accessibilityPerformDecrement() -> Bool {
+    public override func accessibilityPerformDecrement() -> Bool {
         setAccessibilityValue(shown - 10)
         return true
     }

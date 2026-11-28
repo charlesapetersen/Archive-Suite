@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCoreUI
 import ArchiveCore
 import AppKit
 import CoreImage
@@ -1191,7 +1192,7 @@ private struct SegmentTagCard: View {
             }
             FlowLayout(spacing: 6) {
                 ForEach(subjects, id: \.self) { tag in
-                    TagChip(text: tag) { subjects.removeAll { $0 == tag } }
+                    TagChip(tag, font: .systemFont(ofSize: NSFont.smallSystemFontSize)) { subjects.removeAll { $0 == tag } }
                 }
                 KeyboardTokenField(
                     text: $input,

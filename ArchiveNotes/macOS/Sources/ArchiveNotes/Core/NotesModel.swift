@@ -322,7 +322,7 @@ final class NotesModel: ObservableObject {
         StoreFolderChooser.onMainRunLoop {
             // A launch by double-clicking a library asks to switch to that one instead.
             guard !StoreFolderChooser.libraryArrivedFromFinder else { return }
-            chooser.newLibrary(readerRoots: ReaderRootStore.savedRootFolders(), firstLaunch: true)
+            chooser.newLibraryWithCloudCheck(readerRoots: ReaderRootStore.savedRootFolders(), firstLaunch: true)
         }
     }
 

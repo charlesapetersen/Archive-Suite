@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCoreUI
 import AppKit
 
 /// The reusable 3-pane browsing shell (folder tree │ item list │ detail), instantiated as the

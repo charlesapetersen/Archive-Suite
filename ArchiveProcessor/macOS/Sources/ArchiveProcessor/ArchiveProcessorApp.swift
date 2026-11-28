@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCoreUI
 import ArchiveCore
 
 @main

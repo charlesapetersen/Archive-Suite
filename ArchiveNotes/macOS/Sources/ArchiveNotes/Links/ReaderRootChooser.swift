@@ -13,6 +13,7 @@
 // is no link in hand, and from the preview popover, which knows exactly which root it wants.
 
 import AppKit
+import ArchiveCoreUI
 import Foundation
 import ArchiveCore
 
@@ -68,12 +69,22 @@ final class ReaderRootChooser {
     /// How an outcome is shown. Seam for the same reason.
     var report: @MainActor (Outcome) -> Void = { ReaderRootChooser.presentAlert(for: $0) }
 
+    var confirmCloudDrive: @MainActor ([URL]) async -> Bool = { await CloudDriveWarning.confirmUse(of: $0) }
+
     init(rootStore: ReaderRootStore, resolver: ReaderLinkResolver) {
         self.rootStore = rootStore
         self.resolver = resolver
     }
 
     // MARK: - The two entry points
+
+    /// File ▸ Choose Archive Folder… with cloud-drive confirmation before granting.
+    @discardableResult
+    func chooseRootWithCloudCheck() async -> Outcome {
+        guard let url = pickFolder() else { return .cancelled }
+        guard await confirmCloudDrive([url]) else { return .cancelled }
+        return finishChooseRoot(url)
+    }
 
     /// File ▸ Choose Archive Folder… — grant a root with no link in hand.
     ///
@@ -82,6 +93,10 @@ final class ReaderRootChooser {
     @discardableResult
     func chooseRoot() -> Outcome {
         guard let url = pickFolder() else { return .cancelled }
+        return finishChooseRoot(url)
+    }
+
+    private func finishChooseRoot(_ url: URL) -> Outcome {
         // The owner's question (call 24, W49.notes-store-format): a subfolder of an archive whose marker
         // cannot be seen would get an identity of its own, so ask when a parent could not be looked at.
         if StoreFolderChooser.enclosingMarker(of: url.resolvingSymlinksInPath().standardizedFileURL.path)
@@ -110,6 +125,7 @@ final class ReaderRootChooser {
         progress: (@MainActor @Sendable (Int) -> Void)? = nil
     ) async -> LinkResolution? {
         guard let url = pickFolder() else { return nil }
+        guard await confirmCloudDrive([url]) else { return nil }
         return await resolver.grantAndResolve(
             url: url, rootGUID: rootGUID, relativePath: relativePath, progress: progress
         )

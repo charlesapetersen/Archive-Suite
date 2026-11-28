@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCoreUI
 import ArchiveCore
 import UniformTypeIdentifiers
 
@@ -174,6 +175,7 @@ final class StoreFolderChooser {
     /// Seams (see the type comment).
     var pickFolder: @MainActor () -> URL? = { StoreFolderChooser.runOpenPanel() }
     var pickNewLibrary: @MainActor (_ firstLaunch: Bool) -> URL? = { StoreFolderChooser.runSavePanel(firstLaunch: $0) }
+    var confirmCloudDrive: @MainActor ([URL]) async -> Bool = { await CloudDriveWarning.confirmUse(of: $0) }
     var confirm: @MainActor (_ folder: URL, _ check: FolderCheck) -> Bool = {
         StoreFolderChooser.runConfirmation(folder: $0, check: $1)
     }
@@ -215,6 +217,39 @@ final class StoreFolderChooser {
         return askThenSwitch(picked: picked, target: target, check: check)
     }
 
+    /// File ▸ Open Library… with cloud-drive confirmation before switching on the main run loop.
+    func chooseWithCloudCheck(readerRoots: [URL] = [],
+                              onOutcome: @escaping @MainActor (Outcome) -> Void = { _ in }) {
+        guard let picked = pickFolder() else { onOutcome(.cancelled); return }
+        useWithCloudCheck(picked, readerRoots: readerRoots, onOutcome: onOutcome)
+    }
+
+    /// Opens an existing library after warning if it lives inside a cloud drive, then runs the switch
+    /// directly on the main run loop so Restart & Switch cannot hang inside a `Task` main-queue job.
+    func useWithCloudCheck(_ picked: URL, readerRoots: [URL] = [],
+                           onOutcome: @escaping @MainActor (Outcome) -> Void = { _ in }) {
+        Task { @MainActor in
+            guard await confirmCloudDrive([picked]) else { onOutcome(.cancelled); return }
+            Self.onMainRunLoop {
+                onOutcome(self.use(picked, readerRoots: readerRoots))
+            }
+        }
+    }
+
+    /// File ▸ New Library… (and first launch) with cloud-drive confirmation before creating or switching.
+    func newLibraryWithCloudCheck(readerRoots: [URL] = [], firstLaunch: Bool = false,
+                                  onOutcome: @escaping @MainActor (Outcome) -> Void = { _ in }) {
+        guard var picked = pickNewLibrary(firstLaunch) else { onOutcome(.cancelled); return }
+        if !Self.isLibraryName(picked) { picked.appendPathExtension(Self.libraryExtension) }
+        let chosen = picked
+        Task { @MainActor in
+            guard await confirmCloudDrive([chosen]) else { onOutcome(.cancelled); return }
+            Self.onMainRunLoop {
+                onOutcome(self.createNewLibrary(at: chosen, readerRoots: readerRoots))
+            }
+        }
+    }
+
     /// File ▸ New Library…, and the first launch, which has no library (`RootFolderStore.needsLibrary`). The
     /// Save panel names the library and its place; the package is made empty, and the next launch writes its
     /// marker. Never replaces anything: a name already in use is a library to switch to, or refused.
@@ -222,6 +257,10 @@ final class StoreFolderChooser {
     func newLibrary(readerRoots: [URL] = [], firstLaunch: Bool = false) -> Outcome {
         guard var picked = pickNewLibrary(firstLaunch) else { return .cancelled }
         if !Self.isLibraryName(picked) { picked.appendPathExtension(Self.libraryExtension) }
+        return createNewLibrary(at: picked, readerRoots: readerRoots)
+    }
+
+    private func createNewLibrary(at picked: URL, readerRoots: [URL]) -> Outcome {
         var isDirectory: ObjCBool = false
         if FileManager.default.fileExists(atPath: picked.path, isDirectory: &isDirectory) {
             // The Save panel's Replace must never delete a library: one already there (holding notes, or

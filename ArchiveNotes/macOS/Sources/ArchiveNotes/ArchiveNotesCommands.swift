@@ -140,23 +140,29 @@ struct OpenRecentMenuItems: View {
 @MainActor
 enum LibraryActions {
     static func newLibrary(model: NotesModel, previewState: SourceBlockPreviewState) {
-        grantArchiveIfAsked(model.storeFolderChooser?.newLibrary(readerRoots: previewState.grantedArchiveFolders),
-                            previewState)
+        model.storeFolderChooser?.newLibraryWithCloudCheck(readerRoots: previewState.grantedArchiveFolders) { outcome in
+            grantArchiveIfAsked(outcome, previewState)
+        }
     }
 
     static func openLibrary(model: NotesModel, previewState: SourceBlockPreviewState) {
-        grantArchiveIfAsked(model.storeFolderChooser?.choose(readerRoots: previewState.grantedArchiveFolders),
-                            previewState)
+        model.storeFolderChooser?.chooseWithCloudCheck(readerRoots: previewState.grantedArchiveFolders) { outcome in
+            grantArchiveIfAsked(outcome, previewState)
+        }
     }
 
     /// A library given by URL (from Finder, or Open Recent): Open Library…'s checks and confirmation.
-    static func open(_ url: URL, model: NotesModel, previewState: SourceBlockPreviewState) {
-        grantArchiveIfAsked(model.storeFolderChooser?.use(url, readerRoots: previewState.grantedArchiveFolders),
-                            previewState)
+    static func open(_ url: URL, model: NotesModel, previewState: SourceBlockPreviewState,
+                     onFinished: (@MainActor () -> Void)? = nil) {
+        guard let chooser = model.storeFolderChooser else { onFinished?(); return }
+        chooser.useWithCloudCheck(url, readerRoots: previewState.grantedArchiveFolders) { outcome in
+            grantArchiveIfAsked(outcome, previewState)
+            onFinished?()
+        }
     }
 
     /// Open Recent: a library that can no longer be found is said so and taken off the list. The scope its
-    /// bookmark started is held only while the choice is made; a switch quits first.
+    /// bookmark started is held until the cloud-drive check and choice finish; a switch quits first.
     static func openRecent(_ entry: RecentLibraries.Entry, recents: RecentLibraries,
                            model: NotesModel, previewState: SourceBlockPreviewState) {
         guard let url = recents.resolve(entry) else {
@@ -170,8 +176,9 @@ enum LibraryActions {
             alert.runModal()
             return
         }
-        defer { url.stopAccessingSecurityScopedResource() }
-        open(url, model: model, previewState: previewState)
+        open(url, model: model, previewState: previewState) {
+            url.stopAccessingSecurityScopedResource()
+        }
     }
 
     /// "Is it inside an archive?" answered with Choose Archive Folder…: grant the archive first.
