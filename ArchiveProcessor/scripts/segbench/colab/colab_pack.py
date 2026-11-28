@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Google Colab staging and collection helper for Archive Suite OCR / metadata packs.
+"""Google Colab staging and collection helper for Archive Suite OCR / YOLO packs.
 
 Owner-authorized 2026-11-27 (Google AI Ultra plan, Drive root `My Drive/ArchiveSuite-Colab`).
 
@@ -9,16 +9,18 @@ Commands:
       write Colab-ready manifests pointing at `/content/drive/MyDrive/ArchiveSuite-Colab/datasets/...`,
       and copy `run_pack.ipynb` into DEST.
 
-  colab_pack.py pack ARTIFACT_DIR [--dest DIR] [--name NAME]
-      Stage a prepared Sherlock/cluster pack into DEST/packs/<NAME>/ with Drive-compatible paths,
-      ready to drag into Google Drive and run in `run_pack.ipynb`.
+  colab_pack.py pack ARTIFACT_DIR [--dest DIR] [--name NAME] [--force]
+      Stage a prepared Sherlock/cluster/YOLO pack into DEST/packs/<NAME>/ with Drive-compatible paths,
+      normalising nested `candidates-*.json` to `candidates.json`, bundling Colab runner helpers, and
+      refreshing `run_pack.ipynb` in DEST.
 
-  colab_pack.py fetch RESULTS_DIR TAG [--artifact DIR]
+  colab_pack.py fetch RESULTS_DIR TAG [--artifact DIR] [--no-release]
       Copy finished results downloaded from Google Drive (`results/<NAME>/`) into the Mac artifact
       folder without overwriting inputs (`--ignore-existing` semantics), then mark TAG finished and
       release it in `.maintenance/AUTONOMOUS_PLAN.md` for engine scoring.
 """
-from pathlib import Path
+from __future__ import annotations
+
 import argparse
 import hashlib
 import json
@@ -26,6 +28,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[3]
@@ -52,7 +55,6 @@ def rewrite_manifest(src: Path, dst: Path, images_dir: Path, drive_images_prefix
         orig = Path(row["image"])
         local = images_dir / orig.name
         if not local.is_file():
-            # Fall back to <id>.<ext> if renamed
             cand = images_dir / f"{row['id']}{orig.suffix or '.jpg'}"
             if cand.is_file():
                 local = cand
@@ -93,6 +95,15 @@ def default_manifest_pair() -> tuple[Path, Path]:
     raise SystemExit("Could not find public895.jsonl / truth99.jsonl in ~/.local/state/archive-autonomous/artifacts/")
 
 
+def _refresh_root_docs(dest: Path) -> None:
+    nb_src = HERE / "run_pack.ipynb"
+    if nb_src.is_file():
+        shutil.copy2(nb_src, dest / "run_pack.ipynb")
+    readme_src = HERE / "README.md"
+    if readme_src.is_file():
+        shutil.copy2(readme_src, dest / "README.md")
+
+
 def cmd_stage_datasets(args: argparse.Namespace) -> int:
     dest = Path(args.dest).expanduser()
     pub_dir = dest / "datasets" / "public895"
@@ -115,15 +126,26 @@ def cmd_stage_datasets(args: argparse.Namespace) -> int:
 
     (dest / "packs").mkdir(parents=True, exist_ok=True)
     (dest / "results").mkdir(parents=True, exist_ok=True)
-    nb_src = HERE / "run_pack.ipynb"
-    if nb_src.is_file():
-        shutil.copy2(nb_src, dest / "run_pack.ipynb")
-        print(f"OK notebook -> {dest / 'run_pack.ipynb'}")
-    readme_src = HERE / "README.md"
-    if readme_src.is_file():
-        shutil.copy2(readme_src, dest / "README.md")
-        print(f"OK guide -> {dest / 'README.md'}")
+    _refresh_root_docs(dest)
+    print(f"OK notebook -> {dest / 'run_pack.ipynb'}")
+    print(f"OK guide -> {dest / 'README.md'}")
     return 0
+
+
+def discover_candidates(pack_dir: Path) -> Path | None:
+    """Locate candidates.json at root or nested under support/sherlock/family-coverage/candidates*.json."""
+    direct = pack_dir / "candidates.json"
+    if direct.is_file():
+        return direct
+    for pattern in (
+        "support/sherlock/family-coverage/candidates*.json",
+        "support/sherlock/new-open-boxes/candidates*.json",
+        "candidates*.json",
+    ):
+        matches = sorted(pack_dir.glob(pattern))
+        if matches:
+            return matches[0]
+    return None
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
@@ -139,28 +161,65 @@ def cmd_pack(args: argparse.Namespace) -> int:
         shutil.rmtree(out)
     shutil.copytree(src, out)
 
-    # Include family-coverage + new-open-boxes runners if not already bundled inside support/
+    pack_type = "generic"
+    needs_mineru = False
+    pack_type_file = out / "pack-type.json"
+    if pack_type_file.is_file():
+        pt = json.loads(pack_type_file.read_text(encoding="utf-8"))
+        pack_type = pt.get("pack_type") or pack_type
+    else:
+        cands_src = discover_candidates(out)
+        if cands_src is not None:
+            pack_type = "vllm-ocr"
+            if cands_src != out / "candidates.json":
+                shutil.copy2(cands_src, out / "candidates.json")
+            cands = json.loads((out / "candidates.json").read_text(encoding="utf-8"))
+            needs_mineru = any(
+                c.get("adapter") == "mineru" or "mineru-vl-utils" in (c.get("pip") or [])
+                for c in cands if isinstance(c, dict)
+            )
+
     runners_dst = out / "colab_support"
     runners_dst.mkdir(parents=True, exist_ok=True)
-    for rel in (
-        "ArchiveProcessor/scripts/segbench/sherlock/family-coverage/family_run.py",
-        "ArchiveProcessor/scripts/segbench/sherlock/family-coverage/family_parse.py",
-        "ArchiveProcessor/scripts/segbench/sherlock/family-coverage/family_setup.py",
-        "ArchiveProcessor/scripts/segbench/sherlock/new-open-boxes/boxes_run.py",
-        "ArchiveProcessor/scripts/segbench/sherlock/new-open-boxes/boxes_parse.py",
-    ):
-        p = REPO / rel
+    # Copy Colab helpers plus the full Sherlock family-coverage + new-open-boxes + new-open support modules
+    support_files = [
+        HERE / "colab_prepare.py",
+        HERE / "marks_detect_own_cluster.py",
+        REPO / "ArchiveProcessor/scripts/segbench/sherlock/family-coverage/family_run.py",
+        REPO / "ArchiveProcessor/scripts/segbench/sherlock/family-coverage/family_parse.py",
+        REPO / "ArchiveProcessor/scripts/segbench/sherlock/family-coverage/family_setup.py",
+        REPO / "ArchiveProcessor/scripts/segbench/sherlock/new-open-boxes/boxes_run.py",
+        REPO / "ArchiveProcessor/scripts/segbench/sherlock/new-open-boxes/boxes_parse.py",
+        REPO / "ArchiveProcessor/scripts/segbench/sherlock/new-open-boxes/boxes_setup.py",
+        REPO / "ArchiveProcessor/scripts/segbench/sherlock/new-open/prompt_source.py",
+    ]
+    for p in support_files:
         if p.is_file():
             shutil.copy2(p, runners_dst / p.name)
+    # Also prefer any newer pack-bundled support scripts when present inside out/support/sherlock/
+    for bundled in (
+        out / "support/sherlock/family-coverage/family_run.py",
+        out / "support/sherlock/family-coverage/family_parse.py",
+        out / "support/sherlock/family-coverage/family_setup.py",
+        out / "support/sherlock/new-open-boxes/boxes_run.py",
+        out / "support/sherlock/new-open-boxes/boxes_parse.py",
+        out / "support/sherlock/new-open-boxes/boxes_setup.py",
+        out / "support/sherlock/new-open/prompt_source.py",
+    ):
+        if bundled.is_file():
+            shutil.copy2(bundled, runners_dst / bundled.name)
 
     meta = {
         "pack_name": name,
+        "pack_type": pack_type,
+        "needs_mineru": needs_mineru,
         "source_artifact": str(src),
         "drive_root": args.drive_root.rstrip("/"),
     }
-    (out / "colab-pack.json").write_text(json.dumps(meta, indent=2) + "\n")
-    print(f"OK staged pack -> {out}")
-    print(f"Next: drag {out.name} into My Drive/ArchiveSuite-Colab/packs/ and run run_pack.ipynb with PACK_NAME = '{name}'")
+    (out / "colab-pack.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    _refresh_root_docs(dest)
+    print(f"OK staged {pack_type} pack -> {out}")
+    print(f"Next: upload {out.name} into My Drive/ArchiveSuite-Colab/packs/ and run run_pack.ipynb with PACK_NAME = '{name}'")
     return 0
 
 
