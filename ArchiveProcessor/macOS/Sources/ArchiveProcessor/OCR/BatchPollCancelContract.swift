@@ -241,9 +241,24 @@ enum BatchPollCancelContract {
         let resumable = saved.map { OCRProcessor.pendingBatchIsSelfConsistent($0) } ?? false
 
         let processor = OCRProcessor()
+        // S-060: stale Live Capture hand-off arrays left on the shared controller must be cleared by resumeBatch.
+        processor.preGroupedBoundaries = [true]
+        processor.preGroupedTypes = [.box]
+        processor.preGroupedQualities = ["Q1"]
+        processor.preGroupedYears = [1944]
+        processor.preGroupedMonths = [3]
+        processor.preGroupedSubjects = [["Trade"]]
         let task = Task { @MainActor in await processor.resumeBatch(apiKey: "poll-cancel-not-a-key") }
         task.cancel()
         await task.value
+
+        check("S-060 resumed paid batch clears stale Live Capture preGrouped arrays",
+              processor.preGroupedBoundaries.isEmpty
+                && processor.preGroupedTypes.isEmpty
+                && processor.preGroupedQualities.isEmpty
+                && processor.preGroupedYears.isEmpty
+                && processor.preGroupedMonths.isEmpty
+                && processor.preGroupedSubjects.isEmpty)
 
         let survived = fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path)
         let offersResume = processor.pendingBatchInfo != nil

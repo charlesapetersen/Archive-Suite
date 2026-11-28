@@ -229,11 +229,14 @@ final class ReOCRDialogModel {
                 pageModels[p.pairIndex] = models[k]
             }
             do {
+                let textColumns = SessionProcessingConfig.clampTextColumns(
+                    UserDefaults.standard.integer(forKey: DefaultsKeys.textColumns))
                 let denyDataCollection = trainingProtectedFiles.contains(file.url)
                 let review = try await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
                     try await NewspaperPageReader.$scanDetector.withValue(file.scanDetector) {
                         try await job.start(file: file.url, root: root, textPages: Set(mine.map(\.pairIndex)),
                                             kinds: kinds, model: model, pageModels: pageModels,
+                                            textColumns: textColumns,
                                             placeHandOnImage: placeHandFiles.contains(file.url), read: routed)
                     }
                 }

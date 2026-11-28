@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Bounds how many LLM HTTP requests are in flight at once, across ALL call sites (OCR,
@@ -81,6 +82,44 @@ enum NetworkSession {
         return URLSession(configuration: config)
     }()
 
+    /// Loopback servers (mlx-vlm, Ollama, LM Studio, managed local worker) must fail immediately on a
+    /// refused connection instead of waiting up to `timeoutIntervalForResource` (600 s) for connectivity
+    /// (W49.proc-mac-server-absent-wait).
+    static let loopback: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.waitsForConnectivity = false
+        config.connectionProxyDictionary = [:]
+        config.timeoutIntervalForResource = 600
+        config.httpMaximumConnectionsPerHost = 6
+        return URLSession(configuration: config)
+    }()
+
+    static func isLoopback(_ url: URL?) -> Bool {
+        guard var host = url?.host?.lowercased(), !host.isEmpty else { return false }
+        if host.hasSuffix(".") { host.removeLast() }
+        if host == "localhost" { return true }
+        if host.hasPrefix("[") && host.hasSuffix("]") {
+            host = String(host.dropFirst().dropLast())
+        }
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        if parts.count == 4 && parts[0] == "127" && parts.allSatisfy({ UInt8($0) != nil }) { return true }
+        var addr6 = in6_addr()
+        if inet_pton(AF_INET6, host, &addr6) == 1 {
+            let bytes = withUnsafeBytes(of: &addr6) { Array($0) }
+            // ::1
+            if bytes[0..<15].allSatisfy({ $0 == 0 }) && bytes[15] == 1 { return true }
+            // IPv4-mapped ::ffff:127.0.0.0/104
+            if bytes[0..<10].allSatisfy({ $0 == 0 }) && bytes[10] == 0xff && bytes[11] == 0xff && bytes[12] == 127 {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func session(for request: URLRequest) -> URLSession {
+        isLoopback(request.url) ? loopback : shared
+    }
+
     /// Max concurrent LLM requests in flight. Kept modest so the OCR worker pool plus the
     /// per-image rotation calls don't collectively exceed provider limits and trigger 503s.
     private static let limiter = RequestLimiter(limit: 5)
@@ -90,7 +129,7 @@ enum NetworkSession {
 
     static func withMLXChatSlot<T>(_ request: URLRequest, _ work: () async throws -> T) async throws -> T {
         guard let url = request.url, url.port == 8080, url.path.hasSuffix("/chat/completions"),
-              let host = url.host?.lowercased(), ["127.0.0.1", "localhost", "[::1]", "::1"].contains(host)
+              isLoopback(url)
         else { return try await work() }
         return try await withSlot(mlxChatLimiter, work)
     }
@@ -254,8 +293,8 @@ enum NetworkSession {
         try await withRequestSlot(request) {
             let transport: Transport
             if let stub = activeTestTransport { transport = stub }
-            else if followRedirects { transport = { try await shared.data(for: $0) } }
-            else { transport = { try await shared.data(for: $0, delegate: NoRedirects()) } }
+            else if followRedirects { transport = { try await session(for: $0).data(for: $0) } }
+            else { transport = { try await session(for: $0).data(for: $0, delegate: NoRedirects()) } }
             guard let context = PaidRequests.context, request.httpMethod == "POST" else {
                 return try await performWithRetry(request, policy: policy, maxRetries: maxRetries, transport: transport)
             }
@@ -331,7 +370,7 @@ enum NetworkSession {
                 }
             } else {
                 let bytes: URLSession.AsyncBytes
-                (bytes, response) = try await shared.bytes(for: req)
+                (bytes, response) = try await session(for: req).bytes(for: req)
                 for try await line in bytes.lines where !onLine(line) {
                     stopped = true
                     bytes.task.cancel()
@@ -349,7 +388,7 @@ enum NetworkSession {
         _ request: URLRequest,
         policy: NetworkRetryPolicy,
         maxRetries: Int,
-        transport: Transport = { try await shared.data(for: $0) },
+        transport: Transport = { try await session(for: $0).data(for: $0) },
         sleeper: Sleeper = { try await Task.sleep(for: .seconds($0)) }
     ) async throws -> (Data, URLResponse) {
         var lastError: Error?

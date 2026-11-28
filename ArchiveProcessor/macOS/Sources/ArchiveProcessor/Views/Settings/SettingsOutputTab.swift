@@ -55,7 +55,11 @@ struct SettingsOutputTab: View {
         .onChange(of: pdfImageSizeMB) { _, _ in SessionProcessingConfig.normalizeSizingDefaults() }
         .onChange(of: exportedImageSizeMB) { _, _ in SessionProcessingConfig.normalizeSizingDefaults() }
         .sheet(isPresented: $editingVocabulary) {
-            TagVocabularySheet(vocabulary: $tagVocabulary) { editingVocabulary = false }
+            TagVocabularySheet(vocabulary: $tagVocabulary,
+                               onOpenTagsWindow: {
+                                   editingVocabulary = false
+                                   openWindow(id: ProcessorTagsWindow.id)
+                               }) { editingVocabulary = false }
         }
     }
 
@@ -216,7 +220,7 @@ struct SettingsOutputTab: View {
                 }
             } label: {
                 VStack(alignment: .leading, spacing: 1) {
-                    HelpLabel("Subject vocabulary", help: "When set, Automatic tagging chooses subject tags only from this list. Leave it empty for free-form tags.")
+                    HelpLabel("Subject vocabulary", help: "When set, Automatic tagging chooses subject tags only from this list. Leave it empty for free-form tags. Edit or import replaces the list for future runs without telling Reader or Notes; use Tags Window to rename, merge or remove a tag across the suite.")
                     Text(tags.isEmpty ? "Free-form (none set)" : "\(tags.count) tag\(tags.count == 1 ? "" : "s"): "
                          + tags.prefix(3).joined(separator: ", ") + (tags.count > 3 ? "…" : ""))
                         .font(.caption).foregroundStyle(.primary)
@@ -228,8 +232,10 @@ struct SettingsOutputTab: View {
 }
 
 /// The subject vocabulary's editor: one tag per line, a CSV or text file by Import or by drop.
+/// Whole-list replacement for future Automatic tagging runs; renames/merges across Reader and Notes go through Tags Window (S-062).
 struct TagVocabularySheet: View {
     @Binding var vocabulary: String
+    var onOpenTagsWindow: (() -> Void)? = nil
     var onDone: () -> Void
 
     var body: some View {
@@ -237,6 +243,8 @@ struct TagVocabularySheet: View {
             Text("Subject vocabulary").font(.title3).fontWeight(.semibold)
             Text("One tag per line. Automatic tagging chooses subject tags only from this list; leave it empty for free-form tags. You can also drop a CSV or text file on the box.")
                 .font(.callout).fixedSize(horizontal: false, vertical: true)
+            Text("Changes here replace the list for future runs and are not sent to Archive Reader or Archive Notes. To rename, merge or remove a tag across the suite, use Tags Window.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             TextEditor(text: $vocabulary)
                 .font(.body)
                 .frame(minHeight: 220)
@@ -245,6 +253,9 @@ struct TagVocabularySheet: View {
                 .accessibilityIdentifier("ap.settings.vocabulary.editor")
             HStack {
                 Button("Import from CSV…") { importCSV() }
+                if let onOpenTagsWindow {
+                    Button("Tags Window") { onOpenTagsWindow() }
+                }
                 Spacer()
                 Button("Done") { onDone() }.keyboardShortcut(.defaultAction)
             }

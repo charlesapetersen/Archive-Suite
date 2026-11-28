@@ -23,10 +23,17 @@ final class ProcessorTagsController: ObservableObject {
 
     private let vocabulary: TagVocabulary
     private let defaults: UserDefaults
+    private let findArchives: @Sendable (URL?) -> [URL]
+    private let recordChanges: @Sendable ([TagChange], [URL]) throws -> Int
+    private let setWithdrawnChanges: @Sendable (Set<UUID>, Bool, [URL]) throws -> Int
     private var observers: [NSObjectProtocol] = []
     private var tagsSubscription: AnyCancellable?
     /// The subject list's stored text when the window last read it.
     private var shownSubjects: String?
+    /// Notes for the current change (`subjectListKept`, or "no archive found").
+    private var actionNote: String?
+    /// Record-write failures that have not been cleared by reopening the window (S-062: never dropped on a newer edit).
+    private var writeFailures: [String] = []
 
     /// One change as made, kept for Undo and Redo.
     private struct Step {
@@ -55,9 +62,20 @@ final class ProcessorTagsController: ObservableObject {
     /// Counts changes, so a late note from an earlier change's write is dropped.
     private var generation = 0
 
-    init(vocabulary: TagVocabulary = ProcessorTagVocabulary.shared, defaults: UserDefaults = .standard) {
+    init(
+        vocabulary: TagVocabulary = ProcessorTagVocabulary.shared,
+        defaults: UserDefaults = .standard,
+        findArchives: @escaping @Sendable (URL?) -> [URL] = { ProcessorTagChanges.archives(outputFolder: $0).map(\.url) },
+        recordChanges: @escaping @Sendable ([TagChange], [URL]) throws -> Int = { try ProcessorTagChanges.record($0, in: $1) },
+        setWithdrawnChanges: @escaping @Sendable (Set<UUID>, Bool, [URL]) throws -> Int = { ids, undo, urls in
+            try ProcessorTagChanges.setWithdrawn(ids, undo, in: urls)
+        }
+    ) {
         self.vocabulary = vocabulary
         self.defaults = defaults
+        self.findArchives = findArchives
+        self.recordChanges = recordChanges
+        self.setWithdrawnChanges = setWithdrawnChanges
         final class Box { weak var controller: ProcessorTagsController? }
         let box = Box()
         model = TagsWindowModel(inventory: TagInventory(items: []), noun: .vocabularyList) { plan in
@@ -94,6 +112,8 @@ final class ProcessorTagsController: ObservableObject {
     /// The window was opened: follow the other apps' changes first (`SystemTagsProvider.warmUp` does, off the main
     /// thread, and republishes), then show the lists.
     func windowAppeared() {
+        writeFailures.removeAll()
+        updateNote()
         SystemTagsProvider.shared.warmUp()
         refresh()
     }
@@ -118,7 +138,8 @@ final class ProcessorTagsController: ObservableObject {
     /// The window's writer: the plan on both lists as they are now, one Undo step, recorded for the other apps.
     private func perform(_ plan: TagChangePlan) -> TagsWindowModel.Outcome {
         generation += 1
-        note = nil
+        actionNote = nil
+        updateNote()
         let suggestionsNow = vocabulary.snapshot()
         let suggestions = plan.applied(to: suggestionsNow).flatMap { TagSpellingChange(from: suggestionsNow, to: $0) }
         let subjectsNow = subjectList()
@@ -128,7 +149,7 @@ final class ProcessorTagsController: ObservableObject {
         if let change = subjects, change.applied(to: subjectsNow).isEmpty {
             subjects = nil
             failed = 1
-            appendNote(Self.subjectListKept)
+            appendActionNote(Self.subjectListKept)
         }
         if let suggestions { vocabulary.apply(suggestions); vocabulary.flush() }
         if let subjects { setSubjectList(subjects.applied(to: subjectsNow)) }
@@ -144,9 +165,13 @@ final class ProcessorTagsController: ObservableObject {
         if !entries.isEmpty {
             let folder = Self.outputFolder()
             let targets = step.archives
+            let findArchives = self.findArchives
+            let recordChanges = self.recordChanges
             write(reportsNoArchive: true) {
-                targets.value = ProcessorTagChanges.archives(outputFolder: folder).map(\.url)
-                return try ProcessorTagChanges.record(entries, in: targets.value)
+                // Record target archive URLs before writing so Undo can still withdraw partial writes on failure.
+                let urls = findArchives(folder)
+                targets.value = urls
+                return try recordChanges(entries, urls)
             }
         }
         return .init(changed: changed, failed: failed)
@@ -166,7 +191,8 @@ final class ProcessorTagsController: ObservableObject {
 
     private func replay(_ step: Step, undo: Bool) {
         generation += 1
-        note = nil
+        actionNote = nil
+        updateNote()
         if let change = step.suggestions {
             vocabulary.apply(undo ? change.inverse : change)
             vocabulary.flush()
@@ -179,7 +205,7 @@ final class ProcessorTagsController: ObservableObject {
             if !now.isEmpty, !new.isEmpty {
                 setSubjectList(new)
             } else if new != now {
-                appendNote(Self.subjectListKept)
+                appendActionNote(Self.subjectListKept)
             }
         }
         SystemTagsProvider.shared.republish()
@@ -187,8 +213,15 @@ final class ProcessorTagsController: ObservableObject {
         refresh()
         if !step.recorded.isEmpty {
             let (ids, targets) = (step.recorded, step.archives)
-            write(reportsNoArchive: false) { try ProcessorTagChanges.setWithdrawn(ids, undo, in: targets.value) }
+            let setWithdrawnChanges = self.setWithdrawnChanges
+            write(reportsNoArchive: false) { try setWithdrawnChanges(ids, undo, targets.value) }
         }
+    }
+
+    private enum WriteOutcome: Sendable {
+        case ok
+        case noArchive(String)
+        case failed(String)
     }
 
     /// Runs an archive write off the main thread after every earlier one, and says when the other apps were not told.
@@ -197,23 +230,49 @@ final class ProcessorTagsController: ObservableObject {
         let generation = generation
         writeChain = Task {
             await previous?.value
-            let problem: String? = await Task.detached(priority: .userInitiated) {
+            let outcome: WriteOutcome = await Task.detached(priority: .userInitiated) {
                 do {
                     return try work() == 0 && reportsNoArchive
-                        ? "No archive was found above the output folder (a folder the Reader opens), so the other "
-                          + "apps were not told."
-                        : nil
+                        ? .noArchive("No archive was found above the output folder (a folder the Reader opens), so the other "
+                                     + "apps were not told.")
+                        : .ok
                 } catch {
-                    return "The other apps were not told: \(ProcessorTagChanges.describe(error))."
+                    return .failed("The other apps were not told: \(ProcessorTagChanges.describe(error)).")
                 }
             }.value
-            if let problem, generation == self.generation { self.appendNote(problem) }
+            switch outcome {
+            case .ok: break
+            case .noArchive(let text):
+                if generation == self.generation { self.appendActionNote(text) }
+            case .failed(let text):
+                // S-062: a failed archive record write must never be dropped when a later edit bumps `generation`.
+                if !self.writeFailures.contains(text) { self.writeFailures.append(text) }
+                self.updateNote()
+            }
         }
     }
 
-    private func appendNote(_ text: String) {
-        note = [note, text].compactMap { $0 }.joined(separator: " ")
+    private func appendActionNote(_ text: String) {
+        actionNote = [actionNote, text].compactMap { $0 }.joined(separator: " ")
+        updateNote()
     }
+
+    private func updateNote() {
+        let parts = ([actionNote].compactMap { $0 }) + writeFailures
+        note = parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+#if DEBUG
+    @discardableResult
+    func testPerform(_ plan: TagChangePlan) -> TagsWindowModel.Outcome { perform(plan) }
+
+    func waitForPendingWrites() async {
+        while let current = writeChain {
+            await current.value
+            if writeChain == current { break }
+        }
+    }
+#endif
 
     private static func words(_ plan: TagChangePlan) -> String {
         switch plan.kind {

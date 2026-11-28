@@ -157,6 +157,34 @@ enum ReOCRPairsTestDriver {
             check("3 the new Kind is written", h?.kind == .handwritten)
             check("3 the new reader is named", h?.provenance?.model == model.displayName, "\(String(describing: h?.provenance))")
             check("3 the body is the new text", parsed.body.contains("A much better reading") && !parsed.body.contains("Old reading"))
+            // S-061: Improve OCR honors textColumns when rewriting page 2.
+            let longBody = (1...28).map {
+                "Paragraph \($0): Archival correspondence regarding fiscal allocations and committee minutes for the spring term."
+            }.joined(separator: "\n\n")
+            let longReading = OCRResult(text: longBody, classification: nil, errorMessage: nil, errorCode: nil)
+            let oneColData = try ReOCRPairs.replacementPage(for: p1[0], result: longReading, model: model,
+                                                            kind: .typewritten, textColumns: 1)
+            let twoColData = try ReOCRPairs.replacementPage(for: p1[0], result: longReading, model: model,
+                                                            kind: .typewritten, textColumns: 2)
+            let oneColDoc = PDFDocument(data: oneColData)
+            let twoColDoc = PDFDocument(data: twoColData)
+            let oneColPage = oneColDoc?.page(at: 0)
+            let twoColPage = twoColDoc?.page(at: 0)
+            let oneColHeight = oneColPage?.bounds(for: .mediaBox).height ?? 0
+            let twoColHeight = twoColPage?.bounds(for: .mediaBox).height ?? 0
+            let twoColParsed = twoColPage.map { PDFHeaderParser.parse($0) }
+            let oneColBounds = oneColPage.flatMap { page in
+                oneColDoc?.findString("Paragraph 28", withOptions: []).first?.bounds(for: page)
+            }
+            let twoColBounds = twoColPage.flatMap { page in
+                twoColDoc?.findString("Paragraph 28", withOptions: []).first?.bounds(for: page)
+            }
+            let oneColLeft = oneColBounds.map { !$0.isNull && !$0.isEmpty && $0.minX < 100 } ?? false
+            let twoColRight = twoColBounds.map { !$0.isNull && !$0.isEmpty && $0.minX > 300 } ?? false
+            check("3 S-061 replacementPage lays out two columns when textColumns is 2",
+                  twoColHeight > 0 && twoColHeight < oneColHeight && oneColLeft && twoColRight
+                    && twoColParsed?.header?.originalFilename == p1[0].header?.originalFilename,
+                  "1-col h=\(oneColHeight) b=\(String(describing: oneColBounds)) 2-col h=\(twoColHeight) b=\(String(describing: twoColBounds))")
             do {
                 _ = try ReOCRPairs.replacementPage(for: p1[0], result: OCRResult(text: "  \n", classification: nil,
                                                    errorMessage: nil, errorCode: nil), model: model, kind: nil)

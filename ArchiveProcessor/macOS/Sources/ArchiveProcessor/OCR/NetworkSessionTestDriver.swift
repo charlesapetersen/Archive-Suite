@@ -1,4 +1,6 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
+import ArchiveCore
+import Darwin
 import Foundation
 
 /// Headless, no-network regression for request retry/cancellation safety. Every response is injected;
@@ -161,6 +163,8 @@ enum NetworkSessionTestDriver {
         } catch {
             check("scratch paid ledger setup: \(error.localizedDescription)", false)
         }
+        await loopbackRefusedFailsFast(check)
+        await tagsControllerWriteFailureSurvivesNextEdit(check)
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["NETWORKSESSION_TEST_OUT"]
@@ -297,6 +301,159 @@ enum NetworkSessionTestDriver {
               reopenedAgain.paidRequestsThisMonth().contains {
                   $0.request?.jobID == "partial-batch" && $0.request?.basis == .estimate && close($0.usd, 0.03)
               })
+    }
+
+    /// W49.proc-mac-server-absent-wait: a refused loopback connection must fail immediately with
+    /// `cannotConnectToHost` instead of waiting up to `timeoutIntervalForResource` (600 s) for connectivity.
+    private static func loopbackRefusedFailsFast(_ check: (String, Bool) -> Void) async {
+        check("loopback host recognition covers 127.0.0.0/8, localhost and IPv6 loopback only",
+              NetworkSession.isLoopback(URL(string: "http://127.0.0.1:8080/v1/chat/completions"))
+                && NetworkSession.isLoopback(URL(string: "http://127.0.0.2:8080/v1"))
+                && NetworkSession.isLoopback(URL(string: "http://localhost:11434/v1"))
+                && NetworkSession.isLoopback(URL(string: "http://localhost.:8080/v1"))
+                && NetworkSession.isLoopback(URL(string: "http://[::1]:8080/v1"))
+                && NetworkSession.isLoopback(URL(string: "http://[0:0:0:0:0:0:0:1]:8080/v1"))
+                && NetworkSession.isLoopback(URL(string: "http://[::ffff:127.0.0.1]:8080/v1"))
+                && !NetworkSession.isLoopback(URL(string: "https://api.openai.com/v1/responses"))
+                && !NetworkSession.isLoopback(URL(string: "http://127.0.0.example.com/v1")))
+        check("loopback session disables waitsForConnectivity while shared keeps it",
+              !NetworkSession.loopback.configuration.waitsForConnectivity
+                && NetworkSession.shared.configuration.waitsForConnectivity)
+
+        // Reserve an ephemeral unused port on 127.0.0.1 and close it immediately so nothing listens there.
+        func closedLoopbackPort() -> UInt16? {
+            let fd = socket(AF_INET, SOCK_STREAM, 0)
+            guard fd >= 0 else { return nil }
+            defer { close(fd) }
+            var addr = sockaddr_in()
+            addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+            addr.sin_family = sa_family_t(AF_INET)
+            addr.sin_port = 0
+            addr.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))
+            let bound = withUnsafePointer(to: &addr) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
+            }
+            guard bound == 0 else { return nil }
+            var assigned = sockaddr_in()
+            var len = socklen_t(MemoryLayout<sockaddr_in>.size)
+            let got = withUnsafeMutablePointer(to: &assigned) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    getsockname(fd, $0, &len)
+                }
+            }
+            guard got == 0 else { return nil }
+            return UInt16(bigEndian: assigned.sin_port)
+        }
+
+        guard let port = closedLoopbackPort(),
+              let url = URL(string: "http://127.0.0.1:\(port)/v1/chat/completions") else {
+            check("closed ephemeral loopback port allocated", false)
+            return
+        }
+        precondition(!NetworkSession.testTransportIsActive)
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 20
+
+        let dataStart = Date()
+        var dataCode: URLError.Code?
+        do {
+            _ = try await NetworkSession.data(for: req, policy: .nonIdempotent, maxRetries: 0)
+        } catch let e as URLError {
+            dataCode = e.code
+        } catch {}
+        let dataElapsed = Date().timeIntervalSince(dataStart)
+        check("refused loopback NetworkSession.data fails immediately without waiting for connectivity",
+              dataCode == .cannotConnectToHost && dataElapsed < 3.0)
+
+        let streamStart = Date()
+        let streamCode = await probeClosedLoopbackStream(req)
+        let streamElapsed = Date().timeIntervalSince(streamStart)
+        check("refused loopback NetworkSession.streamLines fails immediately without waiting for connectivity",
+              streamCode == .cannotConnectToHost && streamElapsed < 3.0)
+    }
+
+    nonisolated private static func probeClosedLoopbackStream(_ request: URLRequest) async -> URLError.Code? {
+        do {
+            _ = try await NetworkSession.streamLines(for: request) { _ in true }
+            return nil
+        } catch let e as URLError {
+            return e.code
+        } catch {
+            return nil
+        }
+    }
+
+    /// S-062(b): a failing first record write in ProcessorTagsController must keep its warning note even when a
+    /// second change is made before the first write completes (bumping `generation`).
+    private static func tagsControllerWriteFailureSurvivesNextEdit(_ check: (String, Bool) -> Void) async {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("APTagsController-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let suiteName = "NetworkSessionTestDriver.S062.\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            check("S-062 scratch defaults created", false)
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("Trade\nFinance", forKey: DefaultsKeys.tagVocabulary)
+        let vocab = TagVocabulary(fileURL: scratch.appendingPathComponent("vocab.json"))
+        _ = vocab.add(rawTags: ["Trade", "Finance"], labelNumber: nil)
+
+        final class Counter: @unchecked Sendable {
+            private let lock = NSLock()
+            private var n = 0
+            func next() -> Int { lock.withLock { n += 1; return n } }
+        }
+        let calls = Counter()
+        let controller = ProcessorTagsController(
+            vocabulary: vocab,
+            defaults: defaults,
+            findArchives: { _ in [scratch] },
+            recordChanges: { _, _ in
+                let call = calls.next()
+                if call == 1 {
+                    Thread.sleep(forTimeInterval: 0.08)
+                    throw CocoaError(.fileWriteNoPermission)
+                }
+                return 1
+            }
+        )
+        guard let firstPlan = controller.model.inventory.renamePlan("Trade", to: "Commerce") else {
+            check("S-062 first rename plan built", false)
+            return
+        }
+        _ = controller.testPerform(firstPlan)
+        // Queue a second change immediately while the first write is still in flight (bumping `generation`).
+        guard let secondPlan = controller.model.inventory.renamePlan("Commerce", to: "Shipping") else {
+            check("S-062 second rename plan built", false)
+            return
+        }
+        _ = controller.testPerform(secondPlan)
+        await controller.waitForPendingWrites()
+        check("S-062 failing first tag-change write keeps its warning note even after a second change bumps generation",
+              controller.note?.contains("The other apps were not told:") == true)
+
+        // A clean controller whose write succeeds leaves note nil.
+        let cleanSuite = "NetworkSessionTestDriver.S062.clean.\(UUID().uuidString)"
+        guard let cleanDefaults = UserDefaults(suiteName: cleanSuite) else { return }
+        defer { cleanDefaults.removePersistentDomain(forName: cleanSuite) }
+        cleanDefaults.set("Trade\nFinance", forKey: DefaultsKeys.tagVocabulary)
+        let cleanVocab = TagVocabulary(fileURL: scratch.appendingPathComponent("vocab-clean.json"))
+        _ = cleanVocab.add(rawTags: ["Trade", "Finance"], labelNumber: nil)
+        let clean = ProcessorTagsController(
+            vocabulary: cleanVocab, defaults: cleanDefaults,
+            findArchives: { _ in [scratch] },
+            recordChanges: { _, _ in 1 }
+        )
+        if let plan = clean.model.inventory.renamePlan("Trade", to: "Commerce") {
+            _ = clean.testPerform(plan)
+            await clean.waitForPendingWrites()
+        }
+        check("S-062 successful tag-change write leaves controller.note nil", clean.note == nil)
     }
 }
 

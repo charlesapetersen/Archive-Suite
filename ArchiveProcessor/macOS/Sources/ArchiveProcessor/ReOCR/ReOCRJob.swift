@@ -100,7 +100,7 @@ struct ReOCRJob {
     /// Kind by the same index (absent: the header's own).
     /// `pageModels` names, by text page, the model a page's reader is (for its header) when it is not `model`.
     func start(file: URL, root: Root, textPages: Set<Int>? = nil, kinds: [Int: OCRPageKind] = [:], model: LLMModel,
-               pageModels: [Int: LLMModel] = [:], placeHandOnImage: Bool = false,
+               pageModels: [Int: LLMModel] = [:], textColumns: Int = 1, placeHandOnImage: Bool = false,
                gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                read: Reader) async throws -> Review {
         try flags.checkSuitable()
@@ -162,6 +162,7 @@ struct ReOCRJob {
                     } else {
                         let page = try ReOCRPairs.replacementPage(
                             for: pair, result: reading, model: pageModel, kind: kind,
+                            textColumns: textColumns,
                             gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
                             localAgentModelName: localAgentModelName)
                         replacements[pair.textIndex] = page

@@ -101,6 +101,7 @@ enum ReOCRPairs {
     /// segmentation, not to this re-read. A failed, refused, cut-off or empty reading is never made into a page: the
     /// old text stays.
     static func replacementPage(for pair: Pair, result: OCRResult, model: LLMModel, kind: OCRPageKind?,
+                                textColumns: Int = 1,
                                 gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                                 localAgentModelName: String? = nil) throws -> Data {
         guard !pair.isSearchable, let old = pair.header else { throw Refusal.pageNotMade(page: pair.textIndex) }
@@ -114,10 +115,12 @@ enum ReOCRPairs {
         // PDFKit reads a wrapped or underscore-split filename back as several lines; the written name never holds a
         // line break (`headerBlock` turns control characters into spaces), so the lines join with nothing between.
         let filename = old.originalFilename?.replacingOccurrences(of: "\n", with: "")
+        let cols = SessionProcessingConfig.clampTextColumns(textColumns)
         guard let page = PDFGenerator().textPageData(result: kept, model: model, originalFileName: filename,
                                                      gatewayDisplayName: gatewayDisplayName,
                                                      localAgentDisplayName: localAgentDisplayName,
                                                      localAgentModelName: localAgentModelName,
+                                                     textColumns: cols,
                                                      sourceDates: dates.isEmpty ? nil : dates, pageKind: kind,
                                                      straightenedDegrees: old.straightenedDegrees) else {
             throw Refusal.pageNotMade(page: pair.textIndex)

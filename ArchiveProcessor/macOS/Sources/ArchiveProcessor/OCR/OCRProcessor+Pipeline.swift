@@ -418,6 +418,13 @@ extension OCRProcessor {
         mergeDocuments = runConfig.mergeDocuments
         tagVocabulary = runConfig.tagVocabulary
         exportOriginals = runConfig.outputImageFile
+        // S-060: a legacy/paid-batch resume has no phone hand-off snapshot; never inherit stale Live Capture arrays.
+        preGroupedBoundaries = []
+        preGroupedTypes = []
+        preGroupedQualities = []
+        preGroupedYears = []
+        preGroupedMonths = []
+        preGroupedSubjects = []
     }
 
     /// Apply exactly the instance/runtime-only values captured above. `pendingRunIsSelfConsistent`

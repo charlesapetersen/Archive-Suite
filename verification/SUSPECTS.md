@@ -1484,9 +1484,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   `OCR/OCRProcessor+Catalogue.swift` `catalogueQuality`.
 - **Would confirm it:** a driver case: set `preGroupedQualities`, resume a scratch batch journal, read the tags.
 - **Would clear it:** the arrays are cleared on the way into `resumeBatch`.
-- **Status:** `open` — verification queued as `W49.proc-s060-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s060-verify`, 2026-11-27).
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 1, multi-path drift).
+  - 2026-11-27 W49.proc-s060-verify (Gemini) — confirmed `applyResumeConfig` (used by `resumeBatch` and legacy `resumeRun`) left all 6 `preGrouped*` arrays intact on the shared controller. Cleared `preGroupedBoundaries`, `preGroupedTypes`, `preGroupedQualities`, `preGroupedYears`, `preGroupedMonths`, and `preGroupedSubjects` in `applyResumeConfig`; added regression check in `BatchPollCancelContract.swift` (`scripts/test-batch-resume.sh` ALL PASS).
 
 ### S-061 · Improve OCR rewrites page 2 in one column whatever the collection's text-column setting
 
@@ -1495,12 +1496,13 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Suspected behaviour:** `ReOCRPairs.replacementPage` calls `PDFGenerator.textPageData` without `textColumns`
   (default 1); the fresh write passes the run's `textColumns`. A two- to four-column collection gets a one-column
   page 2 after Improve OCR.
-- **Where:** `ReOCR/ReOCRPairs.swift` `replacementPage`.
+- **Where:** `ReOCR/ReOCRPairs.swift` `replacementPage`; `ReOCR/ReOCRJob.swift` `start`; `ReOCR/ReOCRDialogModel.swift`.
 - **Would confirm it:** Improve OCR on a scratch two-column output; read page 2's layout.
 - **Would clear it:** the replacement page is laid out elsewhere with the collection's columns.
-- **Status:** `open` — verification queued as `W49.proc-s061-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s061-verify`, 2026-11-27).
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure class 1, multi-path drift).
+  - 2026-11-27 W49.proc-s061-verify (Gemini) — confirmed `ReOCRPairs.replacementPage`, `ReOCRJob.start`, and `ReOCRDialogModel` omitted `textColumns` (always defaulting to 1). Threaded clamped `textColumns` from `DefaultsKeys.textColumns` through `ReOCRDialogModel` → `ReOCRJob.start` → `ReOCRPairs.replacementPage` → `PDFGenerator.textPageData`. Added 1-column vs 2-column layout geometry check in `ReOCRPairsTestDriver.swift` (`scripts/test-reocr-pairs.sh` and `test-reocr-job.sh` ALL PASS).
 
 ### S-062 · Subject-list edits in Settings ▸ Output are not recorded for the other apps, and a failed record can go unsaid
 
@@ -1510,14 +1512,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   or merge in `tag-changes.json`; the text sheet does not, so a spelling fixed there never reaches the Reader or Notes.
   (b) `ProcessorTagsController.write` shows a failed record's note only if `generation` is unchanged, and the next
   change bumps it, so a second change made before the first write ends hides "The other apps were not told…".
-- **Where:** `Views/Settings/SettingsOutputTab.swift` `filingSection`; `Tagging/ProcessorTagsWindow.swift` `perform`,
-  `replay`, `write`.
+- **Where:** `Views/Settings/SettingsOutputTab.swift` `filingSection`, `TagVocabularySheet`; `Tagging/ProcessorTagsWindow.swift` `perform`, `replay`, `write`.
 - **Would confirm it:** (a) a rename typed in the text sheet leaves no entry in a scratch archive's `tag-changes.json`;
   (b) a driver with a failing first record and a second change queued behind it.
 - **Would clear it:** (a) the text sheet is meant as a whole-list replacement and says so; (b) the note is kept.
-- **Status:** `open` — verification queued as `W49.proc-s062-verify`.
+- **Status:** `fixed` — verified and fixed independently by Gemini (`W49.proc-s062-verify`, 2026-11-27).
 - **History:**
   - 2026-11-26 W49.proc-arch-review-gate-b — raised (failure classes 3 and 5).
+  - 2026-11-27 W49.proc-s062-verify (Gemini) — confirmed both halves: (a) `TagVocabularySheet` and the Output tab help text now state explicitly that free-text/CSV editing replaces the subject list for future runs without telling Reader or Notes, and offer a direct "Tags Window" button for cross-suite renames/merges/removals; (b) `ProcessorTagsController.write` separates `.ok`/`.noArchive`/`.failed` outcomes, never drops failed record writes when `generation` advances, preserves `writeFailures` across subsequent edits until `windowAppeared()`, and populates `step.archives` before writing so Undo still withdraws partial multi-archive writes. Added regression check in `NetworkSessionTestDriver.swift` (`scripts/test-network-session.sh` and `scripts/test-settings-tabs.sh` ALL PASS).
 
 ### S-063 · Processor catalogue records spell the item type `Box` / `Folder`, not the catalogue's `box` / `folder`
 
