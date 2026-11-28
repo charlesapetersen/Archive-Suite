@@ -183,7 +183,8 @@ final class FormattingContext: ObservableObject {
 
     func updateState() {
         guard let tv = textView else { return }
-        state = EditorFormatting.currentState(for: tv)
+        let next = EditorFormatting.currentState(for: tv)
+        if state != next { state = next }
     }
 
     /// W3-S5 seam: the coordinator that owns the editor, used for `insertBlock`.

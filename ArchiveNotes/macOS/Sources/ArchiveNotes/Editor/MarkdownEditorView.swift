@@ -121,6 +121,8 @@ struct MarkdownEditorView: NSViewRepresentable {
 
     @MainActor
     func makeNSView(context: Context) -> NSScrollView {
+        context.coordinator.isInViewUpdate = true
+        defer { context.coordinator.isInViewUpdate = false }
         let textView = EditorTextView()
         textView.setAccessibilityIdentifier("an.editor.text")
         textView.delegate = context.coordinator
@@ -235,6 +237,8 @@ struct MarkdownEditorView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         let coordinator = context.coordinator
         guard let textView = coordinator.textView else { return }
+        coordinator.isInViewUpdate = true
+        defer { coordinator.isInViewUpdate = false }
         coordinator.parent = self
         // SwiftUI's .disabled does not disable an AppKit document view automatically. Keep the old
         // body readable during a switch, but refuse input until its identity matches the selection.
@@ -468,6 +472,11 @@ struct MarkdownEditorView: NSViewRepresentable {
         /// The last scroll token handled by `updateNSView`, so a jump fires once per request (W7-S3).
         var lastScrollToken: Int?
         var isApplyingProgrammaticChange = false
+        /// True while `makeNSView` or `updateNSView` is on the stack (W49.notes-s055-verify): any
+        /// `textViewDidChangeSelection` fired synchronously by installing/re-styling the document defers
+        /// its `@Published` `FormattingContext.state` update out of the SwiftUI view-update pass.
+        var isInViewUpdate = false
+        private var formattingUpdateQueued = false
         var currentIsRaw = false
         var currentFontSize: CGFloat = 14
         /// The source Markdown last pushed into the text view by makeNSView/updateNSView/switchMode.
@@ -518,7 +527,21 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         nonisolated func textViewDidChangeSelection(_ notification: Notification) {
             MainActor.assumeIsolated {
-                formattingContext?.updateState()
+                if isInViewUpdate || isApplyingProgrammaticChange {
+                    scheduleFormattingStateUpdate()
+                } else {
+                    formattingContext?.updateState()
+                }
+            }
+        }
+
+        private func scheduleFormattingStateUpdate() {
+            guard !formattingUpdateQueued else { return }
+            formattingUpdateQueued = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.formattingUpdateQueued = false
+                self.formattingContext?.updateState()
             }
         }
 

@@ -1396,13 +1396,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   `IntegrationJourneyUITests.testD11_ProcessorOutputSourceBlock`. Some `@Published` property is set while a view's
   body or an update is being computed. SwiftUI may then drop or repeat that change, so a selection, a focus or an
   inspector value can show stale state. No wrong behaviour was seen in these tests; the warning is the only sign.
-- **Where:** not located. The three tests share a list-row selection and the editor taking focus.
+- **Where:** `ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/MarkdownEditorView.swift` (`makeNSView` / `updateNSView` -> `textViewDidChangeSelection` -> `FormattingContext.updateState()`), `Editor/EditorFormatting.swift` (`@Published var state`), and `Views/NotesWindowAccessor.swift` (`updateNSView` calling `onWindow` / `configureWindow` synchronously).
 - **Would confirm it:** a breakpoint or `os_log` on SwiftUI's warning in a Notes Debug build in the VM (one of the
   tests above), naming the property and the view update that sets it.
 - **Would clear it:** the warning comes from a system view or the test harness, not from Notes' own state.
-- **Status:** `open` — verification queued as `W49.notes-s055-verify`.
+- **Status:** `fixed` — verified and fixed in `W49.notes-s055-verify` (2026-11-27, Gemini).
 - **History:**
   - 2026-11-26 W40.d11 — raised; seen on main and on the item's branch, which changes only tests in Notes.
+  - 2026-11-27 W49.notes-s055-verify (Gemini) — reproduced on pristine `origin/main` (`6e03da12`) in the macOS 27.2 Tart VM (`NotesPolishUITests`: 2 runtime warnings in both `xcuitest.log` and `uitest.xcresult`, each firing immediately on `selectItem(uuid:)`). Root cause: `MarkdownEditorView.makeNSView`/`updateNSView` installed or replaced the text storage (`textView.string = …`, `replaceStyledDocument(with:)`, `selectedRanges = …`), which synchronously triggered `Coordinator.textViewDidChangeSelection` → `FormattingContext.updateState()`, unconditionally publishing `@Published var state` from inside a SwiftUI view update; `NotesWindowAccessor.updateNSView` also called `onWindow` (`configureWindow`, mutating `@State` properties) synchronously instead of deferring like `makeNSView`. Fix: track `isInViewUpdate` in `MarkdownEditorView.Coordinator` and coalesce-defer `formattingContext?.updateState()` via `DispatchQueue.main.async` whenever `isInViewUpdate || isApplyingProgrammaticChange`, change-guard `FormattingContext.updateState()` (`if state != next { state = next }`), and defer `NotesWindowAccessor.updateNSView`'s `onWindow(w)` via `DispatchQueue.main.async`. Re-ran `NotesPolishUITests` in the macOS 27.2 VM: 2/2 PASS with `runtimeWarnings: []` (0 warnings in both `xcuitest.log` and `uitest.xcresult`).
 
 ### S-056 · A held output still held after three write passes is dropped while its page counts as a success
 

@@ -15,6 +15,8 @@ struct NotesWindowAccessor: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        if let w = nsView.window { onWindow(w) }   // in case the window attaches after makeNSView
+        if let w = nsView.window {
+            DispatchQueue.main.async { onWindow(w) }   // defer out of view-update pass (W49.notes-s055-verify)
+        }
     }
 }

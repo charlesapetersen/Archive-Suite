@@ -1,6 +1,8 @@
 import Testing
 import Foundation
 import AppKit
+import Combine
+import SwiftUI
 @testable import ArchiveNotes
 
 @Suite("FormattingActionTests — W3-S3 formatting toolbar actions")
@@ -262,6 +264,61 @@ struct FormattingActionTests {
         tv.setSelectedRange(NSRange(location: 3, length: 1))
         EditorFormatting.toggleBold(tv, fontSize: fontSize)
         #expect(MarkdownBridge.serialize(tv.textStorage!).trimmed == "one two")
+    }
+
+    // MARK: - View-update publish guard (S-055 / W49.notes-s055-verify)
+
+    @Test @MainActor
+    func updateStateDoesNotRepublishUnchangedFormattingState() {
+        let tv = makeTextView("Plain text")
+        let ctx = FormattingContext()
+        ctx.textView = tv
+        ctx.updateState()
+        var publishes = 0
+        let bag = ctx.objectWillChange.sink { _ in publishes += 1 }
+        defer { bag.cancel() }
+
+        ctx.updateState()
+        #expect(publishes == 0)
+
+        tv.setSelectedRange(NSRange(location: 0, length: 5))
+        EditorFormatting.toggleBold(tv, fontSize: fontSize)
+        ctx.updateState()
+        #expect(publishes == 1)
+        #expect(ctx.state.isBold)
+
+        ctx.updateState()
+        #expect(publishes == 1)
+    }
+
+    @Test @MainActor
+    func selectionChangeDuringViewUpdateDefersFormattingStatePublish() async {
+        let tv = makeTextView("**Bold** text")
+        let ctx = FormattingContext()
+        ctx.textView = tv
+        let editor = MarkdownEditorView(markdown: .constant("**Bold** text"), isRaw: .constant(false), formatting: ctx)
+        let coordinator = MarkdownEditorView.Coordinator(editor)
+        coordinator.textView = tv
+        coordinator.formattingContext = ctx
+
+        var publishes = 0
+        let bag = ctx.objectWillChange.sink { _ in publishes += 1 }
+        defer { bag.cancel() }
+
+        coordinator.isInViewUpdate = true
+        tv.setSelectedRange(NSRange(location: 0, length: 4))
+        coordinator.textViewDidChangeSelection(Notification(name: NSTextView.didChangeSelectionNotification, object: tv))
+        // Must not publish synchronously while inside makeNSView / updateNSView.
+        #expect(publishes == 0)
+        #expect(!ctx.state.isBold)
+        coordinator.isInViewUpdate = false
+
+        // Next run-loop turn applies the coalesced update cleanly.
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            DispatchQueue.main.async { cont.resume() }
+        }
+        #expect(publishes == 1)
+        #expect(ctx.state.isBold)
     }
 
     // MARK: - Helpers
